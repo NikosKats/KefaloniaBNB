@@ -1,0 +1,218 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { KEFALONIA_LOCATIONS, ITHACA_LOCATIONS } from '../../lib/locations.ts';
+import type { Lang } from '../../i18n/translations.ts';
+import { getLocationDescription, translateTag, getDemandLabel } from '../../i18n/locations-i18n.ts';
+const lang: Lang = Astro.locals.lang;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const demandColor: Record<string, string> = {
+  high: 'bg-emerald-100 text-emerald-700',
+  medium: 'bg-blue-100 text-blue-700',
+  emerging: 'bg-amber-100 text-amber-700',
+};
+
+function typeIcon(type: string) {
+  switch (type) {
+    case 'city':    return '🏙';
+    case 'beach':   return '🏖';
+    case 'village': return '🏘';
+    case 'island':  return '🏝';
+    case 'hub':     return '⛴';
+    case 'area':    return '🌊';
+    default:        return '📍';
+  }
+}
+---
+
+<BaseLayout
+  title="All Destinations — Kefalonia & Ithaca | KefaloniaBNB"
+  description="Explore all vacation rental destinations in the Kefalonia region and Ithaca Island — from Golden Beach and Potos to Keramoti and Kefalonia Old Town."
+>
+  <!-- Hero -->
+  <section class="bg-[#1a1a2e] text-white py-20 px-4">
+    <div class="max-w-3xl mx-auto text-center">
+      <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-widest mb-4">
+        {isEl ? 'Εξερευνήστε Προορισμούς' : isBg ? 'Разгледайте дестинации' : isSr ? 'Истражите дестинације' : isTr ? 'Destinasyonları Keşfedin' : isRo ? 'Explorează Destinațiile' : 'Explore Destinations'}
+      </p>
+      <h1 class="text-4xl sm:text-5xl font-bold leading-tight mb-5">
+        {isEl ? 'Κάβαλα & Ιθάκη,' : isBg ? 'Кавала & Итака,' : isSr ? 'Кавала & Итака,' : isTr ? 'Kefalonia & İtaka,' : isRo ? 'Kefalonia & Ithaca,' : 'Kefalonia & Ithaca,'}<br/>
+        {isEl ? 'Κάθε Γωνιά.' : isBg ? 'Всяко кътче.' : isSr ? 'Сваки кутак.' : isTr ? 'Her Köşe.' : isRo ? 'Fiecare Colț.' : 'Every Corner.'}
+      </h1>
+      <p class="text-white/60 text-lg max-w-2xl mx-auto">
+        {isEl
+          ? 'Από την Παλιά Πόλη της Κεφαλονιάς έως τις μαρμάρινες παραλίες της Ιθάκης — περιηγηθείτε σε κάθε προορισμό.'
+          : isBg
+          ? 'От старинния Стар град на Кавала до мраморните плажове на Итака — разгледайте всяка дестинация и намерете идеалното си настаняване.'
+          : isSr
+          ? 'Од византијског старог града Кавале до мермерних плажа Итакаа — прегледајте све дестинације и пронађите савршен смештај.'
+          : isTr
+          ? 'Kefalonia\'nın Bizans eski şehrinden İtaka\'un mermer plajlarına — tüm destinasyonları keşfedin.'
+          : isRo
+          ? 'De la orașul vechi bizantin al Kavalei la plajele de marmură ale Ithaca-ului — răsfoiți fiecare destinație și găsiți sejurul perfect.'
+          : 'From Kefalonia\'s Byzantine old town to Ithaca\'s marble beaches — browse every destination we cover and find your perfect stay.'}
+      </p>
+    </div>
+  </section>
+
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 py-16 space-y-20">
+
+    <!-- Kefalonia Region -->
+    <section>
+      <div class="flex items-end justify-between mb-8">
+        <div>
+          <p class="text-[#c9a96e] text-sm font-semibold uppercase tracking-widest mb-1">
+            {isEl ? 'Ηπειρωτικά' : isBg ? 'Континент' : isSr ? 'Копно' : isTr ? 'Kıta' : isRo ? 'Continent' : 'Mainland'}
+          </p>
+          <h2 class="text-3xl font-bold text-gray-900">
+            {isEl ? 'Περιοχή Κεφαλονιάς' : isBg ? 'Регион Кавала' : isSr ? 'Регион Кавала' : isTr ? 'Kefalonia Bölgesi' : isRo ? 'Regiunea Kefalonia' : 'Kefalonia Region'}
+          </h2>
+          <p class="text-gray-500 mt-1">
+            {isEl
+              ? 'Παράκτιες πόλεις, παραλίες και πολιτιστικά αξιοθέατα στη βόρεια ηπειρωτική Ελλάδα.'
+              : isBg
+              ? 'Крайбрежни градове, плажове и културни забележителности на северната континентална Гърция.'
+              : isSr
+              ? 'Приобалски градови, плаже и културне знаменитости на северном копну.'
+              : isTr
+              ? 'Kuzey anakarasında kıyı kasabaları, plajlar ve kültürel anıtlar.'
+              : isRo
+              ? 'Orașe costiere, plaje și repere culturale pe continentul nordic.'
+              : 'Coastal towns, beaches, and cultural landmarks on the northern mainland.'}
+          </p>
+        </div>
+        <a href="/rentals?region=kefalonia" class="text-sm font-semibold text-[#1a1a2e] hover:text-[#c9a96e] transition-colors whitespace-nowrap">
+          {isEl ? 'Περιήγηση →' : isBg ? 'Разгледай всички →' : isSr ? 'Прегледај све →' : isTr ? 'Tümünü Gez →' : isRo ? 'Răsfoiește toate →' : 'Browse all →'}
+        </a>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {KEFALONIA_LOCATIONS.map((loc) => (
+          <a
+            href={`/locations/${loc.slug}`}
+            class="group bg-white border border-gray-100 rounded-2xl p-5 hover:border-[#c9a96e] hover:shadow-md transition-all"
+          >
+            <div class="flex items-start justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <span class="text-2xl">{typeIcon(loc.type)}</span>
+                <span class="font-semibold text-gray-900 group-hover:text-[#1a1a2e] leading-tight">{loc.name}</span>
+              </div>
+              <span class={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ml-2 ${demandColor[loc.demand]}`}>
+                {getDemandLabel(loc.demand, lang)}
+              </span>
+            </div>
+            <p class="text-sm text-gray-500 leading-relaxed mb-3">{getLocationDescription(loc.slug, lang) || loc.description}</p>
+            <div class="flex flex-wrap gap-1">
+              {loc.tags.slice(0, 3).map((tag) => (
+                <span class="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">{translateTag(tag, lang)}</span>
+              ))}
+            </div>
+          </a>
+        ))}
+      </div>
+    </section>
+
+    <!-- Ithaca Island -->
+    <section>
+      <div class="flex items-end justify-between mb-8">
+        <div>
+          <p class="text-[#c9a96e] text-sm font-semibold uppercase tracking-widest mb-1">
+            {isEl ? 'Νησί' : isBg ? 'Остров' : isSr ? 'Острво' : isTr ? 'Ada' : isRo ? 'Insulă' : 'Island'}
+          </p>
+          <h2 class="text-3xl font-bold text-gray-900">
+            {isEl ? 'Νήσος Ιθάκη' : isBg ? 'Остров Итака' : isSr ? 'Острво Итака' : isTr ? 'İtaka Adası' : isRo ? 'Insula Ithaca' : 'Ithaca Island'}
+          </h2>
+          <p class="text-gray-500 mt-1">
+            {isEl
+              ? 'Δάση πεύκων έως τη θάλασσα, μαρμάρινες παραλίες, ορεινά χωριά και κρυστάλλινο νερό.'
+              : isBg
+              ? 'Борови гори до морето, мраморни плажове, планински села и кристална вода.'
+              : isSr
+              ? 'Борови шуме до мора, мермерне плаже, планинска села и кристалочиста вода.'
+              : isTr
+              ? 'Denize kadar uzanan çam ormanları, mermer plajlar, dağ köyleri ve kristal su.'
+              : isRo
+              ? 'Păduri de pini până la mare, plaje de marmură, sate montane și apă cristalină.'
+              : 'Pine forests to the sea, marble beaches, mountain villages and crystal water.'}
+          </p>
+        </div>
+        <a href="/rentals?region=ithaca" class="text-sm font-semibold text-[#1a1a2e] hover:text-[#c9a96e] transition-colors whitespace-nowrap">
+          {isEl ? 'Περιήγηση →' : isBg ? 'Разгледай всички →' : isSr ? 'Прегледај све →' : isTr ? 'Tümünü Gez →' : isRo ? 'Răsfoiește toate →' : 'Browse all →'}
+        </a>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {ITHACA_LOCATIONS.map((loc) => (
+          <a
+            href={`/locations/${loc.slug}`}
+            class="group bg-white border border-gray-100 rounded-2xl p-5 hover:border-[#c9a96e] hover:shadow-md transition-all"
+          >
+            <div class="flex items-start justify-between mb-3">
+              <div class="flex items-center gap-2">
+                <span class="text-2xl">{typeIcon(loc.type)}</span>
+                <span class="font-semibold text-gray-900 group-hover:text-[#1a1a2e] leading-tight">{loc.name}</span>
+              </div>
+              <span class={`text-xs font-semibold px-2 py-0.5 rounded-full flex-shrink-0 ml-2 ${demandColor[loc.demand]}`}>
+                {getDemandLabel(loc.demand, lang)}
+              </span>
+            </div>
+            <p class="text-sm text-gray-500 leading-relaxed mb-3">{getLocationDescription(loc.slug, lang) || loc.description}</p>
+            <div class="flex flex-wrap gap-1">
+              {loc.tags.slice(0, 3).map((tag) => (
+                <span class="text-xs bg-gray-100 text-gray-600 rounded-full px-2 py-0.5">{translateTag(tag, lang)}</span>
+              ))}
+            </div>
+          </a>
+        ))}
+      </div>
+    </section>
+
+    <!-- CTA -->
+    <section class="bg-[#1a1a2e] rounded-3xl p-10 text-center text-white">
+      <h2 class="text-2xl font-bold mb-3">
+        {isEl
+          ? 'Δεν μπορείτε να αποφασίσετε; Δείτε τα πάντα.'
+          : isBg
+          ? 'Не можете да решите? Разгледайте всичко.'
+          : isSr
+          ? 'Не можете да одлучите? Прегледајте све.'
+          : isTr
+          ? 'Karar veremiyor musunuz? Her şeye göz atın.'
+          : isRo
+          ? 'Nu vă puteți decide? Răsfoiți totul.'
+          : "Can't decide? Browse everything."}
+      </h2>
+      <p class="text-white/60 mb-6">
+        {isEl
+          ? 'Όλα τα ακίνητα στην Κεφαλονιά και τη Ιθάκη — φιλτράρετε κατά αριθμό επισκεπτών, υπνοδωμάτια, πρόσβαση στην παραλία και άλλα.'
+          : isBg
+          ? 'Всички имоти в Кавала и Итака — филтрирайте по брой гости, спални, достъп до плаж и още.'
+          : isSr
+          ? 'Све некретнине у Кавали и Итакау — филтрирајте по броју гостију, спаваћим собама, приступу плажи и другим параметрима.'
+          : isTr
+          ? 'Kefalonia ve İtaka genelinde tüm mülkler — misafir sayısı, yatak odası, plaj erişimi ve daha fazlasına göre filtreleyin.'
+          : isRo
+          ? 'Toate proprietățile din Kefalonia și Ithaca — filtrați după oaspeți, dormitoare, acces la plajă și altele.'
+          : 'All properties across Kefalonia and Ithaca — filter by guests, bedrooms, beach access and more.'}
+      </p>
+      <a href="/rentals" class="inline-block bg-[#c9a96e] hover:bg-[#b8934a] text-white font-bold px-8 py-3 rounded-xl transition-colors">
+        {isEl
+          ? 'Περιήγηση σε Όλα τα Ακίνητα'
+          : isBg
+          ? 'Разгледайте всички имоти'
+          : isSr
+          ? 'Прегледај све некретнине'
+          : isTr
+          ? 'Tüm Mülkleri Gez'
+          : isRo
+          ? 'Răsfoiește Toate Proprietățile'
+          : 'Browse All Properties'}
+      </a>
+    </section>
+
+  </div>
+</BaseLayout>

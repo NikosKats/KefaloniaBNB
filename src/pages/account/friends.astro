@@ -1,0 +1,214 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isBg = lang === 'bg';
+const isEl = lang === 'el';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const t = {
+  friends: isEl ? 'Φίλοι' : isBg ? 'Приятели' : isSr ? 'Пријатељи' : isTr ? 'Arkadaşlar' : isRo ? 'Prieteni' : 'Friends',
+  myAccount: isEl ? 'Ο Λογαριασμός μου' : isBg ? 'Моят акаунт' : isSr ? 'Мој налог' : isTr ? 'Hesabım' : isRo ? 'Contul Meu' : 'My Account',
+  requests: isEl ? 'Αιτήματα' : isBg ? 'Заявки' : isSr ? 'Захтеви' : isTr ? 'İstekler' : isRo ? 'Cereri' : 'Requests',
+  noFriends: isEl ? 'Δεν έχετε φίλους ακόμα. Επισκεφτείτε προφίλ μελών για να προσθέσετε φίλους.' : isBg ? 'Все още нямате приятели. Посетете профилите на членовете, за да добавите приятели.' : isSr ? 'Још немате пријатеље. Посетите профиле чланова да додате пријатеље.' : isTr ? 'Henüz arkadaşınız yok. Arkadaş eklemek için üye profillerini ziyaret edin.' : isRo ? 'Niciun prieten încă. Vizitați profilurile membrilor pentru a adăuga prieteni.' : 'No friends yet. Visit community profiles to add friends.',
+  goToCommunity: isEl ? 'Πήγαινε στην Κοινότητα' : isBg ? 'Към общността' : isSr ? 'Иди у заједницу' : isTr ? 'Topluluğa Git' : isRo ? 'Mergi la Comunitate' : 'Go to Community',
+  message: isEl ? 'Μήνυμα' : isBg ? 'Съобщение' : isSr ? 'Порука' : isTr ? 'Mesaj' : isRo ? 'Mesaj' : 'Message',
+  unfriend: isEl ? 'Αφαίρεση' : isBg ? 'Премахнете приятел' : isSr ? 'Уклони' : isTr ? 'Arkadaşlıktan Çıkar' : isRo ? 'Elimină prieten' : 'Unfriend',
+  received: isEl ? 'Ελήφθησαν' : isBg ? 'Получени' : isSr ? 'Примљени' : isTr ? 'Gelen' : isRo ? 'Primite' : 'Received',
+  sent: isEl ? 'Εστάλησαν' : isBg ? 'Изпратени' : isSr ? 'Послати' : isTr ? 'Gönderilen' : isRo ? 'Trimise' : 'Sent',
+  accept: isEl ? 'Αποδοχή' : isBg ? 'Приемете' : isSr ? 'Прихвати' : isTr ? 'Kabul Et' : isRo ? 'Acceptă' : 'Accept',
+  decline: isEl ? 'Απόρριψη' : isBg ? 'Откажете' : isSr ? 'Одбиј' : isTr ? 'Reddet' : isRo ? 'Refuză' : 'Decline',
+  pending: isEl ? 'Εκκρεμεί' : isBg ? 'В изчакване' : isSr ? 'На чекању' : isTr ? 'Beklemede' : isRo ? 'În așteptare' : 'Pending',
+  noPending: isEl ? 'Δεν υπάρχουν εκκρεμή αιτήματα.' : isBg ? 'Няма чакащи заявки.' : isSr ? 'Нема захтева на чекању.' : isTr ? 'Bekleyen istek yok.' : isRo ? 'Nicio cerere în așteptare.' : 'No pending requests.',
+  member: isEl ? 'Μέλος' : isBg ? 'Член' : isSr ? 'Члан' : isTr ? 'Üye' : isRo ? 'Membru' : 'Member',
+};
+
+const session = Astro.locals.session;
+if (!session) return Astro.redirect('/community/join?next=/account/friends');
+
+const service = getServiceClient();
+const userId = session.user.id;
+
+const { data: rows } = await service
+  .from('friends')
+  .select('id, requester_id, addressee_id, status, created_at, requester:profiles!friends_requester_id_fkey(id, full_name, avatar_url, location), addressee:profiles!friends_addressee_id_fkey(id, full_name, avatar_url, location)')
+  .or(`requester_id.eq.${userId},addressee_id.eq.${userId}`)
+  .in('status', ['pending', 'accepted'])
+  .order('created_at', { ascending: false });
+
+const friends: any[] = [];
+const pendingReceived: any[] = [];
+const pendingSent: any[] = [];
+
+for (const row of rows ?? []) {
+  const other = row.requester_id === userId ? row.addressee : row.requester;
+  const entry = { id: row.id, status: row.status, created_at: row.created_at, profile: other };
+  if (row.status === 'accepted') friends.push(entry);
+  else if (row.addressee_id === userId) pendingReceived.push(entry);
+  else pendingSent.push(entry);
+}
+
+const pendingCount = pendingReceived.length;
+---
+
+<BaseLayout title={t.friends} noIndex>
+  <div class="max-w-3xl mx-auto px-4 py-10">
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold text-gray-900">{t.friends}</h1>
+      <a href="/account" class="text-sm text-gray-500 hover:text-gray-700">&larr; {t.myAccount}</a>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex border-b border-gray-200 mb-6">
+      <button id="tab-friends" class="px-4 py-2.5 text-sm font-semibold text-[#1a1a2e] border-b-2 border-[#1a1a2e]">
+        {t.friends} ({friends.length})
+      </button>
+      <button id="tab-requests" class="px-4 py-2.5 text-sm font-medium text-gray-400 border-b-2 border-transparent hover:text-gray-600">
+        {t.requests} {pendingCount > 0 ? `(${pendingCount})` : ''}
+      </button>
+    </div>
+
+    <!-- Friends list -->
+    <div id="panel-friends">
+      {friends.length === 0 ? (
+        <div class="text-center py-12">
+          <p class="text-gray-400 text-sm">{t.noFriends}</p>
+          <a href="/community/board" class="inline-block mt-4 text-sm text-[#c9a96e] hover:underline">{t.goToCommunity}</a>
+        </div>
+      ) : (
+        <div class="space-y-3">
+          {friends.map((f: any) => (
+            <div class="flex items-center justify-between bg-white rounded-xl border border-gray-100 p-4">
+              <a href={`/community/member/${f.profile.id}`} class="flex items-center gap-3 min-w-0">
+                <div class="w-10 h-10 rounded-full bg-gray-200 overflow-hidden shrink-0">
+                  {f.profile.avatar_url ? (
+                    <img src={f.profile.avatar_url} alt="" class="w-full h-full object-cover" />
+                  ) : (
+                    <div class="w-full h-full flex items-center justify-center text-gray-400 text-sm font-bold">
+                      {(f.profile.full_name || '?')[0].toUpperCase()}
+                    </div>
+                  )}
+                </div>
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold text-gray-900 truncate">{f.profile.full_name || t.member}</p>
+                  {f.profile.location && <p class="text-xs text-gray-500 truncate">{f.profile.location}</p>}
+                </div>
+              </a>
+              <div class="flex items-center gap-2 shrink-0">
+                <a href={`/account/messages?new=${f.profile.id}`} class="text-xs text-gray-500 hover:text-[#1a1a2e] px-3 py-1.5 border border-gray-200 rounded-lg">{t.message}</a>
+                <button data-unfriend={f.id} class="text-xs text-red-500 hover:text-red-700 px-3 py-1.5 border border-red-200 rounded-lg hover:bg-red-50 transition-colors">{t.unfriend}</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+
+    <!-- Requests panel -->
+    <div id="panel-requests" class="hidden">
+      {pendingReceived.length > 0 && (
+        <div class="mb-6">
+          <h3 class="text-sm font-semibold text-gray-700 mb-3">{t.received}</h3>
+          <div class="space-y-3">
+            {pendingReceived.map((f: any) => (
+              <div class="flex items-center justify-between bg-white rounded-xl border border-gray-100 p-4">
+                <a href={`/community/member/${f.profile.id}`} class="flex items-center gap-3 min-w-0">
+                  <div class="w-10 h-10 rounded-full bg-gray-200 overflow-hidden shrink-0">
+                    {f.profile.avatar_url ? (
+                      <img src={f.profile.avatar_url} alt="" class="w-full h-full object-cover" />
+                    ) : (
+                      <div class="w-full h-full flex items-center justify-center text-gray-400 text-sm font-bold">
+                        {(f.profile.full_name || '?')[0].toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  <p class="text-sm font-semibold text-gray-900 truncate">{f.profile.full_name || t.member}</p>
+                </a>
+                <div class="flex items-center gap-2 shrink-0">
+                  <button data-accept={f.id} class="text-xs text-white bg-[#1a1a2e] hover:bg-[#2d2d4e] px-3 py-1.5 rounded-lg transition-colors">{t.accept}</button>
+                  <button data-reject={f.id} class="text-xs text-gray-500 hover:text-gray-700 px-3 py-1.5 border border-gray-200 rounded-lg">{t.decline}</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {pendingSent.length > 0 && (
+        <div>
+          <h3 class="text-sm font-semibold text-gray-700 mb-3">{t.sent}</h3>
+          <div class="space-y-3">
+            {pendingSent.map((f: any) => (
+              <div class="flex items-center justify-between bg-white rounded-xl border border-gray-100 p-4">
+                <a href={`/community/member/${f.profile.id}`} class="flex items-center gap-3 min-w-0">
+                  <div class="w-10 h-10 rounded-full bg-gray-200 overflow-hidden shrink-0">
+                    {f.profile.avatar_url ? (
+                      <img src={f.profile.avatar_url} alt="" class="w-full h-full object-cover" />
+                    ) : (
+                      <div class="w-full h-full flex items-center justify-center text-gray-400 text-sm font-bold">
+                        {(f.profile.full_name || '?')[0].toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  <p class="text-sm font-semibold text-gray-900 truncate">{f.profile.full_name || t.member}</p>
+                </a>
+                <span class="text-xs text-gray-400">{t.pending}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {pendingReceived.length === 0 && pendingSent.length === 0 && (
+        <p class="text-center text-gray-400 text-sm py-12">{t.noPending}</p>
+      )}
+    </div>
+  </div>
+</BaseLayout>
+
+<script is:inline define:vars={{ tAccept: t.accept, tDecline: t.decline, tUnfriend: t.unfriend }}>
+  // Tab switching
+  var tabFriends = document.getElementById('tab-friends');
+  var tabRequests = document.getElementById('tab-requests');
+  var panelFriends = document.getElementById('panel-friends');
+  var panelRequests = document.getElementById('panel-requests');
+  var activeClass = 'px-4 py-2.5 text-sm font-semibold text-[#1a1a2e] border-b-2 border-[#1a1a2e]';
+  var inactiveClass = 'px-4 py-2.5 text-sm font-medium text-gray-400 border-b-2 border-transparent hover:text-gray-600';
+
+  tabFriends?.addEventListener('click', function() {
+    panelFriends?.classList.remove('hidden'); panelRequests?.classList.add('hidden');
+    tabFriends.className = activeClass; tabRequests.className = inactiveClass;
+  });
+  tabRequests?.addEventListener('click', function() {
+    panelRequests?.classList.remove('hidden'); panelFriends?.classList.add('hidden');
+    tabRequests.className = activeClass; tabFriends.className = inactiveClass;
+  });
+
+  // Accept / Reject / Unfriend
+  document.addEventListener('click', async function(e) {
+    var btn = e.target.closest('[data-accept],[data-reject],[data-unfriend]');
+    if (!btn) return;
+    var friendId = btn.dataset.accept || btn.dataset.reject || btn.dataset.unfriend;
+    var action = btn.dataset.accept ? 'accept' : btn.dataset.reject ? 'reject' : 'unfriend';
+    btn.disabled = true;
+    btn.textContent = '...';
+    try {
+      if (action === 'unfriend') {
+        await fetch('/api/community/friends/' + friendId, { method: 'DELETE' });
+      } else {
+        await fetch('/api/community/friends/' + friendId, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status: action === 'accept' ? 'accepted' : 'rejected' }),
+        });
+      }
+      btn.closest('.flex.items-center.justify-between')?.remove();
+    } catch {
+      btn.disabled = false;
+      btn.textContent = action === 'accept' ? tAccept : action === 'reject' ? tDecline : tUnfriend;
+    }
+  });
+</script>

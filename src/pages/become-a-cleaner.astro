@@ -1,0 +1,438 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { type Lang } from '../i18n/translations.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as Lang;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://kefaloniabnb.com';
+
+const benefits = [
+  {
+    icon: '💰',
+    title: isEl ? 'Ανταγωνιστική Αμοιβή' : isBg ? 'Конкурентно Заплащане' : isSr ? 'Конкурентна Накнада' : isTr ? 'Rekabetçi Ücret' : isRo ? 'Plată Competitivă' : 'Competitive Pay',
+    body: isEl
+      ? 'Ορίστε τις δικές σας τιμές ανά εργασία. Κρατάτε το 95% κάθε πληρωμής — εμείς παίρνουμε μόνο ένα τέλος πλατφόρμας 5%.'
+      : isBg
+      ? 'Определете собствените си цени за всяка задача. Запазвате 95% от всяко плащане — ние вземаме само 5% такса за платформата.'
+      : isSr
+      ? 'Одредите сопствене цене по послу. Задржавате 95% сваке уплате — ми узимамо само 5% накнаде платформе.'
+      : isTr
+      ? 'İş başına kendi fiyatlarınızı belirleyin. Her ödemeden %95\'ini alırsınız — biz yalnızca %5 platform ücreti alırız.'
+      : isRo
+      ? 'Stabiliți-vă propriile prețuri per lucrare. Păstrați 95% din fiecare plată — noi reținem doar 5% taxă de platformă.'
+      : 'Set your own prices per job. Keep 95% of every payment — we take just a 5% platform fee.',
+  },
+  {
+    icon: '📅',
+    title: isEl ? 'Ευέλικτο Πρόγραμμα' : isBg ? 'Гъвкав График' : isSr ? 'Флексибилан Распоред' : isTr ? 'Esnek Program' : isRo ? 'Program Flexibil' : 'Flexible Schedule',
+    body: isEl
+      ? 'Εσείς επιλέγετε για ποιες εργασίες να υποβάλετε προσφορά. Ορίστε τη δική σας διαθεσιμότητα και μη αναλαμβάνετε περισσότερα από όσα μπορείτε να χειριστείτε.'
+      : isBg
+      ? 'Вие избирате за кои задачи да оферирате. Задайте собствената си наличност и никога не поемайте повече, отколкото можете да се справите.'
+      : isSr
+      ? 'Ви бирате за које послове да конкуришете. Одредите сопствену доступност и никада не преузимајте више него што можете да обавите.'
+      : isTr
+      ? 'Hangi işlere teklif vereceğinizi siz seçersiniz. Kendi programınızı belirleyin ve üstesinden gelemeyeceğinizden fazlasını asla üstlenmeyin.'
+      : isRo
+      ? 'Dvs. alegeți pentru ce lucrări să licitați. Stabiliți-vă propria disponibilitate și nu preluați mai mult decât puteți gestiona.'
+      : 'You choose which jobs to bid on. Set your own availability and never take more than you can handle.',
+  },
+  {
+    icon: '⚡',
+    title: isEl ? 'Γρήγορες Αποδόσεις' : isBg ? 'Бързи Плащания' : isSr ? 'Брза Исплата' : isTr ? 'Hızlı Ödemeler' : isRo ? 'Plăți Rapide' : 'Fast Payouts',
+    body: isEl
+      ? 'Μόλις ο ιδιοκτήτης εγκρίνει την εργασία σας, η πληρωμή μεταφέρεται απευθείας στον λογαριασμό Stripe σας.'
+      : isBg
+      ? 'След като собственикът на имота одобри работата ви, плащането се прехвърля директно по вашата Stripe сметка.'
+      : isSr
+      ? 'Чим власник некретнине одобри ваш рад, уплата се преноси директно на ваш Stripe налог.'
+      : isTr
+      ? 'Mülk sahibi çalışmanızı onayladığında ödeme doğrudan Stripe hesabınıza aktarılır.'
+      : isRo
+      ? 'Odată ce proprietarul aprobă munca dvs., plata este transferată direct în contul dvs. Stripe.'
+      : 'Once the property owner approves your work, payment is transferred directly to your Stripe account.',
+  },
+  {
+    icon: '📱',
+    title: isEl ? 'Απλή Εφαρμογή' : isBg ? 'Лесно Приложение' : isSr ? 'Једноставна Апликација' : isTr ? 'Basit Uygulama' : isRo ? 'Aplicație Simplă' : 'Simple App',
+    body: isEl
+      ? 'Διαχειριστείτε τα πάντα από το τηλέφωνό σας — δείτε λεπτομέρειες εργασίας, επισημάνετε τη λίστα ελέγχου, ανεβάστε φωτογραφίες πριν & μετά.'
+      : isBg
+      ? 'Управлявайте всичко от телефона си — вижте детайлите на задачата, отбелязвайте контролния списък, качвайте снимки преди и след почистването.'
+      : isSr
+      ? 'Управљајте свим са телефона — прегледајте детаље посла, обележите контролну листу, отпремите фотографије пре и после.'
+      : isTr
+      ? 'Her şeyi telefonunuzdan yönetin — iş detaylarını görün, kontrol listesini işaretleyin, öncesi ve sonrası fotoğrafları yükleyin.'
+      : isRo
+      ? 'Gestionați totul de pe telefon — vedeți detaliile lucrării, bifați lista de verificare, încărcați fotografii înainte și după.'
+      : 'Manage everything from your phone — see job details, tick off your checklist, upload before & after photos.',
+  },
+  {
+    icon: '🏡',
+    title: isEl ? 'Ποιοτικά Ακίνητα' : isBg ? 'Качествени Имоти' : isSr ? 'Квалитетне Некретнине' : isTr ? 'Kaliteli Mülkler' : isRo ? 'Proprietăți de Calitate' : 'Quality Properties',
+    body: isEl
+      ? 'Εργαστείτε σε premium ενοικιαζόμενες βίλες και διαμερίσματα στην περιοχή της Καβάλας. Σταθερές, επαναλαμβανόμενες κρατήσεις.'
+      : isBg
+      ? 'Работете в луксозни ваканционни вили и апартаменти в района на Kefalonia. Редовни, повтарящи се резервации.'
+      : isSr
+      ? 'Радите у премиум одмаралишним вилама и апартманима у региону Кавале. Стални, понављајући резервације.'
+      : isTr
+      ? 'Kefalonia bölgesindeki premium tatil villalarında ve dairelerinde çalışın. Tutarlı, tekrarlayan rezervasyonlar.'
+      : isRo
+      ? 'Lucrați în vile și apartamente premium de vacanță din regiunea Kefalonia. Rezervări constante și recurente.'
+      : 'Work in premium vacation villas and apartments in the Kefalonia region. Consistent, repeat bookings.',
+  },
+  {
+    icon: '🤝',
+    title: isEl ? 'Άμεση Σχέση' : isBg ? 'Пряка Връзка' : isSr ? 'Директан Однос' : isTr ? 'Doğrudan İlişki' : isRo ? 'Relație Directă' : 'Direct Relationship',
+    body: isEl
+      ? 'Χτίστε φήμη με τους ιδιοκτήτες ακινήτων. Οι καθαριστές με κορυφαία βαθμολογία έχουν προτεραιότητα ορατότητας προσφορών.'
+      : isBg
+      ? 'Изградете репутация при собствениците на имоти. Почистващите с най-висок рейтинг получават приоритетна видимост на офертите.'
+      : isSr
+      ? 'Изградите репутацију код власника некретнина. Чистачи са највишом оценом добијају приоритет у видљивости понуда.'
+      : isTr
+      ? 'Mülk sahipleriyle itibar oluşturun. En yüksek puanlı temizlikçiler teklif görünürlüğünde öncelik elde eder.'
+      : isRo
+      ? 'Construiți-vă reputația cu proprietarii. Curățătorii cu cele mai bune evaluări primesc prioritate la vizibilitatea ofertelor.'
+      : 'Build a reputation with property owners. Top-rated cleaners get priority bid visibility.',
+  },
+];
+
+const steps = [
+  {
+    n: '01',
+    title: isEl ? 'Δημιουργήστε το προφίλ σας' : isBg ? 'Създайте своя профил' : isSr ? 'Направите свој профил' : isTr ? 'Profilinizi Oluşturun' : isRo ? 'Creați-vă profilul' : 'Create your profile',
+    body: isEl
+      ? 'Εγγραφείτε σε 2 λεπτά. Προσθέστε το βιογραφικό σας, τους τύπους ακινήτων που εξυπηρετείτε, τις τιμές και την περιοχή σας.'
+      : isBg
+      ? 'Регистрирайте се за 2 минути. Добавете биографията си, видовете имоти, които обслужвате, вашите цени и района, в який работите.'
+      : isSr
+      ? 'Региструјте се за 2 минута. Додајте биографију, врсте некретнина које услужујете, цене и своје подручје.'
+      : isTr
+      ? '2 dakikada kaydolun. Biyografinizi, hizmet verdiğiniz mülk türlerini, fiyatlandırmanızı ve bölgenizi ekleyin.'
+      : isRo
+      ? 'Înregistrați-vă în 2 minute. Adăugați biografia, tipurile de proprietăți pe care le deserviți, prețurile și zona dvs.'
+      : 'Sign up in 2 minutes. Add your bio, the property types you service, your pricing, and your area.',
+  },
+  {
+    n: '02',
+    title: isEl ? 'Συνδέστε Stripe' : isBg ? 'Свържете Stripe' : isSr ? 'Повежите Stripe' : isTr ? 'Stripe\'ı Bağlayın' : isRo ? 'Conectați Stripe' : 'Connect Stripe',
+    body: isEl
+      ? 'Συνδέστε τον τραπεζικό λογαριασμό σας μέσω Stripe Express (δωρεάν). Έτσι λαμβάνετε πληρωμές με ασφάλεια.'
+      : isBg
+      ? 'Свържете банковата си сметка чрез Stripe Express (безплатно). По този начин получавате плащанията си по сигурен начин.'
+      : isSr
+      ? 'Повежите банковни рачун преко Stripe Express (бесплатно). На тај начин безбедно примате уплате.'
+      : isTr
+      ? 'Banka hesabınızı Stripe Express (ücretsiz) üzerinden bağlayın. Ödemelerinizi bu şekilde güvenle alırsınız.'
+      : isRo
+      ? 'Conectați contul bancar prin Stripe Express (gratuit). Așa primiți plățile în siguranță.'
+      : 'Link your bank account via Stripe Express (free). This is how you receive payments securely.',
+  },
+  {
+    n: '03',
+    title: isEl ? 'Αναζητήστε ανοιχτά αιτήματα' : isBg ? 'Разгледайте отворените заявки' : isSr ? 'Прегледајте отворене захтеве' : isTr ? 'Açık Talepleri Görüntüleyin' : isRo ? 'Răsfoiți cererile deschise' : 'Browse open requests',
+    body: isEl
+      ? 'Οι ιδιοκτήτες δημοσιεύουν αιτήματα καθαρισμού μετά από checkout επισκεπτών. Αναζητήστε κατά ημερομηνία και τοποθεσία, μετά υποβάλετε την προσφορά σας.'
+      : isBg
+      ? 'Собствениците на имоти публикуват заявки за почистване след напускане на гостите. Разгледайте по дата и местоположение, след което подайте офертата си.'
+      : isSr
+      ? 'Власници некретнина објављују захтеве за чишћење након одласка гостију. Прегледајте по датуму и локацији, затим пошаљите понуду.'
+      : isTr
+      ? 'Mülk sahipleri misafir çıkışlarının ardından temizlik talepleri yayınlar. Tarihe ve konuma göre filtreleyin, ardından teklifinizi verin.'
+      : isRo
+      ? 'Proprietarii postează cereri de curățenie după checkout-ul oaspeților. Navigați după dată și locație, apoi plasați oferta.'
+      : 'Property owners post cleaning requests after guest checkouts. Browse by date and location, then place your bid.',
+  },
+  {
+    n: '04',
+    title: isEl ? 'Κάντε τη δουλειά' : isBg ? 'Извършете работата' : isSr ? 'Завршите посао' : isTr ? 'İşi Yapın' : isRo ? 'Efectuați lucrarea' : 'Do the work',
+    body: isEl
+      ? 'Την ημέρα, ξεκινήστε την εργασία στην εφαρμογή, δουλέψτε τη λίστα ελέγχου και ανεβάστε φωτογραφίες πριν & μετά.'
+      : isBg
+      ? 'В деня на почистването стартирайте задачата в приложението, следвайте контролния списък и качете снимки преди и след работата.'
+      : isSr
+      ? 'На дан чишћења покрените посао у апликацији, пратите контролну листу и отпремите фотографије пре и после.'
+      : isTr
+      ? 'Gün geldiğinde uygulamada işi başlatın, kontrol listesini takip edin ve öncesi ile sonrası fotoğraflarını yükleyin.'
+      : isRo
+      ? 'În ziua respectivă, începeți lucrarea în aplicație, parcurgeți lista de verificare și încărcați fotografii înainte și după.'
+      : 'On the day, start the job in the app, work through the checklist, and upload before & after photos.',
+  },
+  {
+    n: '05',
+    title: isEl ? 'Αμειφθείτε' : isBg ? 'Получете плащането си' : isSr ? 'Примите плаћање' : isTr ? 'Ödemenizi Alın' : isRo ? 'Primiți plata' : 'Get paid',
+    body: isEl
+      ? 'Ο ιδιοκτήτης αξιολογεί τις φωτογραφίες σας και εγκρίνει την εργασία. Η πληρωμή μπαίνει αυτόματα στον λογαριασμό σας.'
+      : isBg
+      ? 'Собственикът преглежда снимките ви и одобрява задачата. Плащането постъпва автоматично по вашата сметка.'
+      : isSr
+      ? 'Власник прегледа ваше фотографије и одобри посао. Уплата аутоматски стиже на ваш налог.'
+      : isTr
+      ? 'Mülk sahibi fotoğraflarınızı inceler ve işi onaylar. Ödeme otomatik olarak hesabınıza yatar.'
+      : isRo
+      ? 'Proprietarul vă verifică fotografiile și aprobă lucrarea. Plata intră automat în contul dvs.'
+      : 'The owner reviews your photos and approves the job. Payment hits your account automatically.',
+  },
+];
+
+const faqs = [
+  {
+    q: isEl ? 'Υπάρχει τέλος εγγραφής;' : isBg ? 'Има ли такса за регистрация?' : isSr ? 'Да ли постоји накнада за пријаву?' : isTr ? 'Kaydolmak ücretli mi?' : isRo ? 'Există o taxă de înscriere?' : 'Is there a fee to join?',
+    a: isEl
+      ? 'Όχι. Η εγγραφή είναι εντελώς δωρεάν. Παίρνουμε μόνο προμήθεια 5% όταν ολοκληρώνετε μια αμειβόμενη εργασία.'
+      : isBg
+      ? 'Не. Регистрацията е напълно безплатна. Вземаме само 5% комисиона, когато завършите платена задача.'
+      : isSr
+      ? 'Не. Регистрација је потпуно бесплатна. Узимамо само 5% провизије када завршите плаћени посао.'
+      : isTr
+      ? 'Hayır. Kaydolmak tamamen ücretsizdir. Yalnızca ücretli bir iş tamamladığınızda %5 komisyon alırız.'
+      : isRo
+      ? 'Nu. Înscrierea este complet gratuită. Reținem doar un comision de 5% când finalizați o lucrare plătită.'
+      : 'No. Signing up is completely free. We only take a 5% commission when you complete a paid job.',
+  },
+  {
+    q: isEl ? 'Πόσο γρήγορα αμείβομαι;' : isBg ? 'Колко бързо получавам плащане?' : isSr ? 'Колико брзо добијам плаћање?' : isTr ? 'Ne kadar hızlı ödeme alırım?' : isRo ? 'Cât de repede primesc plata?' : 'How quickly do I get paid?',
+    a: isEl
+      ? 'Μόλις ο ιδιοκτήτης εγκρίνει την εργασία σας (συνήθως την ίδια μέρα), το Stripe μεταφέρει τα έσοδά σας απευθείας στην τράπεζά σας. Ισχύουν οι τυπικοί χρόνοι απόδοσης Stripe (1–2 εργάσιμες μέρες στην Ελλάδα).'
+      : isBg
+      ? 'Веднага щом собственикът одобри задачата ви (обикновено същия ден), Stripe превежда приходите ви директно по банковата ви сметка. Важат стандартните срокове на Stripe (1–2 работни дни в Гърция).'
+      : isSr
+      ? 'Чим власник некретнине одобри ваш посао (обично истог дана), Stripe преноси вашу зараду директно на банковни рачун. Примењују се стандардна времена исплате Stripe-а (1–2 радна дана у Грчкој).'
+      : isTr
+      ? 'Mülk sahibi işinizi onaylar onaylamaz (genellikle aynı gün) Stripe kazancınızı doğrudan bankanıza aktarır. Standart Stripe ödeme süreleri geçerlidir (Yunanistan\'da 1–2 iş günü).'
+      : isRo
+      ? 'Imediat ce proprietarul aprobă lucrarea dvs. (de obicei în aceeași zi), Stripe transferă câștigurile direct în banca dvs. Se aplică timpii standard de plată Stripe (1–2 zile lucrătoare în Grecia).'
+      : 'As soon as the property owner approves your job (typically the same day), Stripe transfers your earnings directly to your bank. Standard Stripe payout times apply (1–2 business days in Greece).',
+  },
+  {
+    q: isEl ? 'Μπορώ να επιλέξω ποια ακίνητα καθαρίζω;' : isBg ? 'Мога ли да избирам кои имоти почиствам?' : isSr ? 'Могу ли да бирам које некретнине чистим?' : isTr ? 'Hangi mülkleri temizleyeceğimi seçebilir miyim?' : isRo ? 'Pot alege ce proprietăți curăț?' : 'Can I choose which properties I clean?',
+    a: isEl
+      ? 'Ναι. Αναζητάτε ανοιχτά αιτήματα και υποβάλλετε προσφορά μόνο σε εργασίες που ταιριάζουν με το πρόγραμμα, την τοποθεσία και τις τιμές σας.'
+      : isBg
+      ? 'Да. Разглеждате отворените заявки и оферирате само за задачи, подходящи за вашия график, местоположение и ценови диапазон.'
+      : isSr
+      ? 'Да. Прегледате отворене захтеве и конкуришете само за послове који одговарају вашем распореду, локацији и ценама.'
+      : isTr
+      ? 'Evet. Açık talepleri inceler ve yalnızca programınıza, konumunuza ve fiyatlandırmanıza uyan işlere teklif verirsiniz.'
+      : isRo
+      ? 'Da. Navigați cererile deschise și licitați doar pentru lucrările care se potrivesc programului, locației și prețurilor dvs.'
+      : 'Yes. You browse open requests and bid only on jobs that suit your schedule, location, and pricing.',
+  },
+  {
+    q: isEl ? 'Χρειάζεται να έχω τα δικά μου υλικά καθαρισμού;' : isBg ? 'Необходими ли са ми собствени почистващи препарати?' : isSr ? 'Да ли ми треба сопствени прибор за чишћење?' : isTr ? 'Kendi temizlik malzemelerimi getirmem gerekiyor mu?' : isRo ? 'Am nevoie de propriile produse de curățenie?' : 'Do I need my own cleaning supplies?',
+    a: isEl
+      ? 'Αυτό συμφωνείται απευθείας με κάθε ιδιοκτήτη. Πολλοί παρέχουν υλικά επί τόπου· κάποιοι προτιμούν να φέρνετε τα δικά σας. Αναφέρεται στις λεπτομέρειες της εργασίας.'
+      : isBg
+      ? 'Това се договаря директно с всеки собственик. Много от тях осигуряват консумативи на място; някои предпочитат да носите свои. Указано е в детайлите на задачата.'
+      : isSr
+      ? 'То се договара директно са сваким власником. Многи обезбеђују потрепштине на лицу места; неки преферирају да донесете своје. Наведено је у детаљима посла.'
+      : isTr
+      ? 'Bu her mülk sahibiyle doğrudan anlaşılır. Birçoğu malzemeleri yerinde sağlar; bazıları kendinizinkini getirmenizi tercih eder. İş detaylarında belirtilmiştir.'
+      : isRo
+      ? 'Acest lucru se stabilește direct cu fiecare proprietar. Mulți furnizează produse la fața locului; unii preferă să le aduceți pe ale dvs. Este menționat în detaliile lucrării.'
+      : 'This is agreed directly with each property owner. Many provide supplies on-site; some prefer you bring your own. It\'s noted in the job details.',
+  },
+  {
+    q: isEl ? 'Ποιες περιοχές καλύπτει αυτό;' : isBg ? 'Кои райони обхваща услугата?' : isSr ? 'Које области ово покрива?' : isTr ? 'Bu hangi bölgeleri kapsıyor?' : isRo ? 'Ce zone acoperă?' : 'What areas does this cover?',
+    a: isEl
+      ? 'Προς το παρόν Kefalonia, Keramoti, Νέα Πέραμος και γύρω περιοχές στη βόρεια Ελλάδα. Περισσότερες περιοχές σύντομα.'
+      : isBg
+      ? 'Към момента Kefalonia, Keramoti, Nea Peramos и околните райони в Северна Гърция. Очаквайте скоро и нови региони.'
+      : isSr
+      ? 'Тренутно Кавала, Керамоти, Неа Перамос и околна подручја у северној Грчкој. Ускоро и нови региони.'
+      : isTr
+      ? 'Şu anda Kefalonia, Keramoti, Nea Peramos ve Kuzey Yunanistan\'daki çevre bölgeler. Yakında daha fazla bölge.'
+      : isRo
+      ? 'În prezent Kefalonia, Keramoti, Nea Peramos și zonele înconjurătoare din nordul Greciei. Mai multe regiuni în curând.'
+      : 'Currently Kefalonia, Keramoti, Nea Peramos, and surrounding areas in northern Greece. More regions coming soon.',
+  },
+  {
+    q: isEl ? 'Μπορώ να ορίσω τις δικές μου τιμές;' : isBg ? 'Мога ли да задавам собствените си цени?' : isSr ? 'Могу ли да одредим сопствене цене?' : isTr ? 'Kendi fiyatlarımı belirleyebilir miyim?' : isRo ? 'Pot să îmi stabilesc propriile prețuri?' : 'Can I set my own prices?',
+    a: isEl
+      ? 'Ναι. Ορίζετε τη βασική τιμή σας ανά τύπο ακινήτου και αριθμό υπνοδωματίων. Όταν υποβάλλετε προσφορά για εργασία μπορείτε επίσης να προσαρμόσετε την τιμή για το συγκεκριμένο αίτημα.'
+      : isBg
+      ? 'Да. Задавате базовата си цена по вид имот и брой спални. При оферирането за конкретна задача можете допълнително да коригирате цената за това конкретно заявление.'
+      : isSr
+      ? 'Да. Одређујете основну цену по врсти некретнине и броју спаваћих соба. Када конкуришете за посао, можете такође прилагодити цену за тај конкретни захтев.'
+      : isTr
+      ? 'Evet. Mülk türü ve yatak odası sayısına göre temel fiyatınızı siz belirlersiniz. Bir işe teklif verirken o talebe özgü fiyatı da ayarlayabilirsiniz.'
+      : isRo
+      ? 'Da. Vă stabiliți prețul de bază per tip de proprietate și număr de dormitoare. Când licitați pentru o lucrare, puteți ajusta prețul pentru cererea respectivă.'
+      : 'Yes. You set your base price per property type and bedroom count. When you bid on a job you can also adjust the price for that specific request.',
+  },
+];
+---
+
+<BaseLayout
+  title="Become a Cleaner Partner — KefaloniaBNB"
+  description="Join the KefaloniaBNB cleaning network. Get paid to clean premium vacation rentals in the Kefalonia region. Set your own hours, prices, and availability."
+>
+
+  <!-- Hero -->
+  <section class="bg-[#1a1a2e] text-white">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28 text-center">
+      <div class="inline-flex items-center gap-2 bg-white/10 rounded-full px-4 py-1.5 text-sm text-[#c9a96e] font-medium mb-6">
+        <span>🧹</span> {isEl ? 'Πρόγραμμα Συνεργατών Καθαριστών' : isBg ? 'Програма за партньори почистващи' : isSr ? 'Програм партнера чистача' : isTr ? 'Temizlikçi Ortaklar Programı' : isRo ? 'Programul Partenerilor Curățători' : 'Cleaner Partner Programme'}
+      </div>
+      <h1 class="text-4xl md:text-5xl font-bold leading-tight mb-5">
+        {isEl ? 'Αμειφθείτε για να καθαρίζετε' : isBg ? 'Получавайте заплащане за почистване' : isSr ? 'Зарађујте чишћењем' : isTr ? 'Temizlik yaparak kazanın' : isRo ? 'Fiți plătiți să curățați' : 'Get paid to clean'}<br class="hidden md:block" /> {isEl ? 'premium ενοικιαζόμενα' : isBg ? 'на луксозни ваканционни имоти' : isSr ? 'премиум одмаралишних некретнина' : isTr ? 'premium tatil kiralıklarında' : isRo ? 'proprietăți premium de vacanță' : 'premium vacation rentals'}
+      </h1>
+      <p class="text-lg text-gray-300 max-w-xl mx-auto mb-8">
+        {isEl ? 'Εντάξτε το δίκτυο επαγγελματιών καθαριστών μας στην περιοχή της Καβάλας. Ευέλικτο ωράριο, δίκαιη αμοιβή, άμεσες αποδόσεις — με τους δικούς σας όρους.' : isBg ? 'Присъединете се към мрежата ни от професионални почистващи в района на Kefalonia. Гъвкаво работно време, справедливо заплащане, незабавни плащания — при вашите условия.' : isSr ? 'Придружите се нашој мрежи професионалних чистача у региону Кавале. Флексибилно радно време, поштена зарада, тренутне исплате — под вашим условима.' : isTr ? 'Kefalonia bölgesindeki profesyonel temizlikçi ağımıza katılın. Esnek saatler, adil ücret, anında ödemeler — kendi şartlarınızla.' : isRo ? 'Alăturați-vă rețelei noastre de curățători profesioniști din regiunea Kefalonia. Program flexibil, plată corectă, plăți instant — în condițiile dvs.' : 'Join our network of professional cleaners in the Kefalonia region. Flexible hours, fair pay, instant payouts — on your terms.'}
+      </p>
+      <div class="flex flex-col sm:flex-row gap-3 justify-center">
+        <a href="/cleaner/signup" class="bg-[#c9a96e] text-white font-semibold px-8 py-3.5 rounded-xl hover:opacity-90 transition-opacity text-sm">
+          {isEl ? 'Υποβάλετε Αίτηση — Είναι Δωρεάν' : isBg ? 'Кандидатствайте — Безплатно е' : isSr ? 'Пријавите се — Бесплатно је' : isTr ? 'Başvurun — Ücretsiz' : isRo ? 'Aplicați — Este Gratuit' : 'Apply to Join — It\'s Free'}
+        </a>
+        <a href="/cleaner/login" class="bg-white/10 text-white font-semibold px-8 py-3.5 rounded-xl hover:bg-white/20 transition-colors text-sm">
+          {isEl ? 'Ήδη συνεργάτης; Σύνδεση →' : isBg ? 'Вече партньор? Влезте →' : isSr ? 'Већ партнер? Пријавите се →' : isTr ? 'Zaten ortak mısınız? Giriş yapın →' : isRo ? 'Deja partener? Conectați-vă →' : 'Already a partner? Sign in →'}
+        </a>
+      </div>
+      <p class="text-gray-500 text-xs mt-4">{isEl ? 'Χωρίς τέλη. Χωρίς συμβόλαια. Αρχίστε να κερδίζετε σε λιγότερο από 24 ώρες.' : isBg ? 'Без такси. Без договори. Започнете да печелите само за 24 часа.' : isSr ? 'Без накнада. Без уговора. Почните да зарађујете за само 24 сата.' : isTr ? 'Ücret yok. Sözleşme yok. 24 saat içinde kazanmaya başlayın.' : isRo ? 'Fără taxe. Fără contracte. Începeți să câștigați în doar 24 de ore.' : 'No fees. No contracts. Start earning in as little as 24 hours.'}</p>
+    </div>
+  </section>
+
+  <!-- Stats bar -->
+  <section class="border-b border-gray-100">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-3 gap-4 text-center">
+      <div>
+        <p class="text-3xl font-bold text-gray-900">95%</p>
+        <p class="text-sm text-gray-500 mt-0.5">{isEl ? 'Κρατάτε' : isBg ? 'Запазвате' : isSr ? 'Задржавате' : isTr ? 'Siz alırsınız' : isRo ? 'Păstrați' : 'You keep'}</p>
+      </div>
+      <div>
+        <p class="text-3xl font-bold text-gray-900">1–2</p>
+        <p class="text-sm text-gray-500 mt-0.5">{isEl ? 'Αποδόσεις ανά ημέρα' : isBg ? 'Дни до плащане' : isSr ? 'Дани до исплате' : isTr ? 'Günlük ödemeler' : isRo ? 'Plăți în zile' : 'Day payouts'}</p>
+      </div>
+      <div>
+        <p class="text-3xl font-bold text-gray-900">100%</p>
+        <p class="text-sm text-gray-500 mt-0.5">{isEl ? 'Το πρόγραμμά σας' : isBg ? 'Вашият график' : isSr ? 'Ваш распоред' : isTr ? 'Kendi programınız' : isRo ? 'Programul dvs.' : 'Your schedule'}</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Benefits -->
+  <section class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <h2 class="text-3xl font-bold text-gray-900 text-center mb-3">{isEl ? 'Γιατί να καθαρίζετε μαζί μας;' : isBg ? 'Защо да почиствате с нас?' : isSr ? 'Зашто чистити са нама?' : isTr ? 'Neden bizimle temizlik yapın?' : isRo ? 'De ce să curățați cu noi?' : 'Why clean with us?'}</h2>
+    <p class="text-gray-500 text-center mb-12 max-w-lg mx-auto">{isEl ? 'Δημιουργήσαμε την πλατφόρμα που θέλουν πραγματικά οι καθαριστές — διαφανής αμοιβή, χωρίς μεσάζοντες και απλή κινητή διεπαφή.' : isBg ? 'Изградихме платформата, която почистващите действително искат — прозрачно заплащане, без посредници и лесен мобилен интерфейс.' : isSr ? 'Направили смо платформу коју чистачи заиста желе — прозирна зарада, без посредника иједноставан мобилни интерфејс.' : isTr ? 'Temizlikçilerin gerçekten istediği platformu inşa ettik — şeffaf ücret, aracı yok ve basit bir mobil arayüz.' : isRo ? 'Am construit platforma pe care curățătorii chiar o doresc — plată transparentă, fără intermediari și o interfață mobilă simplă.' : 'We built the platform cleaners actually want — transparent pay, no middlemen, and a simple mobile interface.'}</p>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {benefits.map(b => (
+        <div class="bg-white rounded-2xl border border-gray-100 p-6 hover:border-[#c9a96e] transition-colors">
+          <p class="text-3xl mb-3">{b.icon}</p>
+          <h3 class="font-semibold text-gray-900 mb-2">{b.title}</h3>
+          <p class="text-sm text-gray-500 leading-relaxed">{b.body}</p>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="bg-gray-50 py-20">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-3xl font-bold text-gray-900 text-center mb-3">{isEl ? 'Πώς λειτουργεί' : isBg ? 'Как работи' : isSr ? 'Како функционише' : isTr ? 'Nasıl çalışır' : isRo ? 'Cum funcționează' : 'How it works'}</h2>
+      <p class="text-gray-500 text-center mb-12">{isEl ? 'Από την εγγραφή έως την πρώτη απόδοση σε πέντε απλά βήματα.' : isBg ? 'От регистрацията до първото плащане в пет лесни стъпки.' : isSr ? 'Од регистрације до прве исплате у петједноставних корака.' : isTr ? 'Kayıttan ilk ödemeye beş basit adımda.' : isRo ? 'De la înregistrare la prima plată în cinci pași simpli.' : 'From signup to first payout in five simple steps.'}</p>
+
+      <div class="space-y-6">
+        {steps.map((s, i) => (
+          <div class="flex gap-5 items-start">
+            <div class="flex-shrink-0 w-12 h-12 rounded-2xl bg-[#1a1a2e] text-[#c9a96e] flex items-center justify-center font-bold text-sm">
+              {s.n}
+            </div>
+            <div class="pt-1">
+              <h3 class="font-semibold text-gray-900 mb-1">{s.title}</h3>
+              <p class="text-sm text-gray-500 leading-relaxed">{s.body}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- What you get (checklist) -->
+  <section class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <div class="md:grid md:grid-cols-2 md:gap-16 items-center">
+      <div>
+        <h2 class="text-3xl font-bold text-gray-900 mb-4">{isEl ? 'Όλα όσα χρειάζεστε στην εφαρμογή' : isBg ? 'Всичко необходимо в едно приложение' : isSr ? 'Све што вам треба у апликацији' : isTr ? 'Uygulamada ihtiyacınız olan her şey' : isRo ? 'Tot ce aveți nevoie în aplicație' : 'Everything you need in the app'}</h2>
+        <p class="text-gray-500 mb-8 leading-relaxed">
+          {isEl ? 'Η πύλη καθαριστών KefaloniaBNB είναι φτιαγμένη ειδικά για επαγγελματίες καθαριστές ακινήτων. Χωρίς φουσκωτές εφαρμογές, χωρίς κρυφά τέλη — μόνο τα εργαλεία που χρειάζεστε.' : isBg ? 'Порталът за почистващи на KefaloniaBNB е създаден специално за професионални почистващи на имоти. Без излишни функции, без скрити такси — само инструментите, от които се нуждаете.' : isSr ? 'Портал за чистаче KefaloniaBNB направљен је специјално за професионалне чистаче некретнина. Без надутих апликација, без скривених накнада — само алати потребни за обављање посла.' : isTr ? 'KefaloniaBNB temizlikçi portalı, profesyonel mülk temizlikçileri için özel olarak tasarlanmıştır. Şişirilmiş uygulamalar yok, gizli ücretler yok — yalnızca işi bitirmek için ihtiyacınız olan araçlar.' : isRo ? 'Portalul de curățători KefaloniaBNB este construit special pentru curățători profesioniști de proprietăți. Fără aplicații umflate, fără taxe ascunse — doar instrumentele de care aveți nevoie pentru a finaliza lucrarea.' : 'The KefaloniaBNB cleaner portal is built specifically for professional property cleaners. No bloated apps, no hidden fees — just the tools you need to get the job done.'}
+        </p>
+        <ul class="space-y-3">
+          {[
+            isEl ? 'Αναζητήστε ανοιχτά αιτήματα καθαρισμού κατά ημερομηνία και τοποθεσία' : isBg ? 'Разглеждайте отворени заявки за почистване по дата и местоположение' : isSr ? 'Прегледајте отворене захтеве за чишћење по датуму и локацији' : isTr ? 'Açık temizlik taleplerini tarihe ve konuma göre görüntüleyin' : isRo ? 'Răsfoiți cererile deschise de curățenie după dată și locație' : 'Browse open cleaning requests by date and location',
+            isEl ? 'Υποβάλετε προσφορές με τιμή και προτεινόμενη ώρα έναρξης' : isBg ? 'Подавайте оферти с вашата цена и предложен час на започване' : isSr ? 'Пошаљите понуде са вашом ценом и предложеним временом почетка' : isTr ? 'Fiyatınız ve önerilen başlangıç saatiyle teklif verin' : isRo ? 'Plasați oferte cu prețul și ora de început propuse' : 'Place bids with your price and proposed start time',
+            isEl ? 'Λάβετε επιβεβαιώσεις εργασίας και οδηγίες πρόσβασης στο ακίνητο' : isBg ? 'Получавайте потвърждения за задачи и инструкции за достъп до имота' : isSr ? 'Примите потврде посла и упутства за приступ некретнини' : isTr ? 'İş onaylarını ve mülk erişim talimatlarını alın' : isRo ? 'Primiți confirmări de lucrare și instrucțiuni de acces la proprietate' : 'Receive job confirmations and property access instructions',
+            isEl ? 'Δουλέψτε μέσω δομημένης λίστας ελέγχου καθαρισμού' : isBg ? 'Следвайте структуриран контролен списък за почистване' : isSr ? 'Пратите структуирану контролну листу чишћења' : isTr ? 'Yapılandırılmış temizlik kontrol listesini takip edin' : isRo ? 'Parcurgeți o listă de verificare structurată de curățenie' : 'Work through a structured cleaning checklist',
+            isEl ? 'Ανεβάστε φωτογραφίες πριν & μετά ως απόδειξη εργασίας' : isBg ? 'Качвайте снимки преди и след почистването като доказателство за работата' : isSr ? 'Отпремите фотографије пре и после као фотографски доказ рада' : isTr ? 'İş kanıtı olarak öncesi ve sonrası fotoğraflar yükleyin' : isRo ? 'Încărcați fotografii înainte și după ca dovadă a lucrării' : 'Upload before & after photos as proof of work',
+            isEl ? 'Αμειφθείτε αυτόματα με την έγκριση της εργασίας' : isBg ? 'Получавайте плащане автоматично при одобрение на задачата' : isSr ? 'Примајте аутоматска плаћања по одобрењу посла' : isTr ? 'İş onayında otomatik olarak ödeme alın' : isRo ? 'Fiți plătiți automat la aprobarea lucrării' : 'Get paid automatically on job approval',
+            isEl ? 'Δημιουργήστε αξιολόγηση με κριτικές ιδιοκτητών' : isBg ? 'Изграждайте рейтинг с отзиви от собственици на имоти' : isSr ? 'Градите своју процену рецензијама власника некретнина' : isTr ? 'Mülk sahibi yorumlarıyla puanınızı oluşturun' : isRo ? 'Construiți-vă evaluarea cu recenzii de la proprietari' : 'Build your rating with owner reviews',
+          ].map(item => (
+            <li class="flex items-start gap-3 text-sm text-gray-700">
+              <span class="flex-shrink-0 w-5 h-5 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-xs font-bold mt-0.5">✓</span>
+              {item}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div class="mt-12 md:mt-0 bg-[#1a1a2e] rounded-3xl p-8 text-white">
+        <p class="text-sm font-medium text-[#c9a96e] mb-4 uppercase tracking-wide">{isEl ? 'Ενδεικτικά έσοδα' : isBg ? 'Примерни приходи' : isSr ? 'Пример зараде' : isTr ? 'Örnek kazançlar' : isRo ? 'Câștiguri exemplu' : 'Example earnings'}</p>
+        <div class="space-y-4">
+          {[
+            { type: isEl ? 'Στούντιο / 1 ΥΔ' : isBg ? 'Студио / 1 спалня' : isSr ? 'Студио / 1 СС' : isTr ? 'Stüdyo / 1 YO' : isRo ? 'Garsonieră / 1 Dorm' : 'Studio / 1 BR', time: '2–3 hrs', earn: '€45–60' },
+            { type: isEl ? 'Διαμέρισμα 2 ΥΔ' : isBg ? 'Апартамент 2 спални' : isSr ? 'Апартман 2 СС' : isTr ? '2 YO Daire' : isRo ? 'Apartament 2 Dorm' : '2 BR Apartment', time: '3–4 hrs', earn: '€70–90' },
+            { type: isEl ? 'Βίλα 3 ΥΔ' : isBg ? 'Вила 3 спални' : isSr ? 'Вила 3 СС' : isTr ? '3 YO Villa' : isRo ? 'Vilă 3 Dorm' : '3 BR Villa', time: '4–5 hrs', earn: '€95–130' },
+            { type: isEl ? 'Βίλα 4+ ΥΔ' : isBg ? 'Вила 4+ спални' : isSr ? 'Вила 4+ СС' : isTr ? '4+ YO Villa' : isRo ? 'Vilă 4+ Dorm' : '4 BR+ Villa', time: '5–7 hrs', earn: '€130–200' },
+          ].map(r => (
+            <div class="flex items-center justify-between border-b border-white/10 pb-4">
+              <div>
+                <p class="font-medium">{r.type}</p>
+                <p class="text-xs text-gray-400">{r.time}</p>
+              </div>
+              <p class="text-xl font-bold text-[#c9a96e]">{r.earn}</p>
+            </div>
+          ))}
+        </div>
+        <p class="text-xs text-gray-500 mt-4">{isEl ? 'Οι τιμές είναι ενδεικτικές. Εσείς ορίζετε τις δικές σας τιμές.' : isBg ? 'Цените са примерни. Вие сами определяте своите тарифи.' : isSr ? 'Цене су илустративне. Ви одређујете сопствене тарифе.' : isTr ? 'Fiyatlar örnek niteliktedir. Kendi tarifelerinizi siz belirlersiniz.' : isRo ? 'Prețurile sunt ilustrative. Dvs. vă stabiliți propriile tarife.' : 'Prices are illustrative. You set your own rates.'}</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="bg-gray-50 py-20">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-3xl font-bold text-gray-900 text-center mb-12">{isEl ? 'Κοινές ερωτήσεις' : isBg ? 'Често задавани въпроси' : isSr ? 'Честа питања' : isTr ? 'Sık sorulan sorular' : isRo ? 'Întrebări frecvente' : 'Common questions'}</h2>
+      <div class="space-y-4">
+        {faqs.map(faq => (
+          <details class="group bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <summary class="flex items-center justify-between px-6 py-4 cursor-pointer text-sm font-medium text-gray-900 list-none">
+              {faq.q}
+              <span class="ml-4 flex-shrink-0 text-gray-400 group-open:rotate-180 transition-transform">▾</span>
+            </summary>
+            <div class="px-6 pb-4 text-sm text-gray-500 leading-relaxed">{faq.a}</div>
+          </details>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="bg-[#1a1a2e] text-white py-20">
+    <div class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <p class="text-4xl mb-4">🧹</p>
+      <h2 class="text-3xl font-bold mb-4">{isEl ? 'Έτοιμοι να αρχίσετε να κερδίζετε;' : isBg ? 'Готови ли сте да започнете да печелите?' : isSr ? 'Спремни да почнете да зарађујете?' : isTr ? 'Kazanmaya başlamaya hazır mısınız?' : isRo ? 'Pregătiți să începeți să câștigați?' : 'Ready to start earning?'}</h2>
+      <p class="text-gray-400 mb-8">{isEl ? 'Εντάξτε σήμερα το δίκτυο καθαριστών KefaloniaBNB. Δωρεάν εγγραφή, χωρίς δέσμευση.' : isBg ? 'Присъединете се към мрежата на почистващите на KefaloniaBNB днес. Безплатна регистрация, без ангажимент.' : isSr ? 'Придружите се мрежи чистача KefaloniaBNB данас. Бесплатна регистрација, без обавеза.' : isTr ? 'Bugün KefaloniaBNB temizlikçi ağına katılın. Ücretsiz kayıt, taahhüt yok.' : isRo ? 'Alăturați-vă rețelei de curățători KefaloniaBNB astăzi. Înregistrare gratuită, fără obligații.' : 'Join the KefaloniaBNB cleaner network today. Free to sign up, no commitment.'}</p>
+      <a href="/cleaner/signup" class="inline-block bg-[#c9a96e] text-white font-semibold px-10 py-4 rounded-xl hover:opacity-90 transition-opacity">
+        {isEl ? 'Δημιουργήστε τον Δωρεάν Λογαριασμό σας' : isBg ? 'Създайте безплатен акаунт' : isSr ? 'Направите бесплатан налог' : isTr ? 'Ücretsiz Hesabınızı Oluşturun' : isRo ? 'Creați-vă Contul Gratuit' : 'Create Your Free Account'}
+      </a>
+      <p class="text-gray-500 text-xs mt-4">
+        {isEl ? 'Έχετε ήδη λογαριασμό;' : isBg ? 'Вече имате акаунт?' : isSr ? 'Већ имате налог?' : isTr ? 'Zaten hesabınız var mı?' : isRo ? 'Aveți deja un cont?' : 'Already have an account?'} <a href="/cleaner/login" class="text-[#c9a96e] hover:opacity-80">{isEl ? 'Σύνδεση →' : isBg ? 'Влезте →' : isSr ? 'Пријавите се →' : isTr ? 'Giriş yapın →' : isRo ? 'Conectați-vă →' : 'Sign in →'}</a>
+      </p>
+    </div>
+  </section>
+
+</BaseLayout>

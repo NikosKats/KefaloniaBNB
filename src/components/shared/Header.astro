@@ -1,0 +1,333 @@
+---
+import LanguageSwitcher from './LanguageSwitcher.astro';
+import { t, type Lang } from '../../i18n/translations.ts';
+
+const path = Astro.url.pathname;
+const lang = (Astro.locals.lang ?? 'en') as Lang;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const session = Astro.locals.session;
+const profile = Astro.locals.profile as any;
+const isLoggedIn = !!session;
+const unreadCount = profile?.unread_messages_count ?? 0;
+const notifCount = profile?.unread_notifications_count ?? 0;
+const avatarUrl = profile?.avatar_url;
+const initials = (profile?.full_name || profile?.email || '?')[0].toUpperCase();
+const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL ?? '';
+const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY ?? '';
+const accessToken = session?.access_token ?? '';
+
+const navLinks = [
+  { href: '/rentals',      label: t(lang, 'nav.rentals') },
+  { href: '/community/restaurants', label: isEl ? 'Εστιατόρια' : isBg ? 'Ресторанти' : isSr ? 'Ресторани' : isTr ? 'Restoranlar' : isRo ? 'Restaurante' : 'Restaurants' },
+  { href: '/community/board', label: isEl ? 'Κοινότητα' : isBg ? 'Общност' : isSr ? 'Заједница' : isTr ? 'Topluluk' : isRo ? 'Comunitate' : 'Community' },
+  { href: '/blog',         label: t(lang, 'nav.blog') },
+  { href: '/about',       label: t(lang, 'nav.about') },
+  { href: '/contact',     label: t(lang, 'nav.contact') },
+];
+
+const role = profile?.role;
+const isAdmin = role === 'admin' || role === 'super_admin';
+const isPropertyOwner = role === 'property_owner';
+const isRestaurantOwner = role === 'restaurant_owner';
+
+const accountLinks = [
+  { href: '/account', label: isEl ? 'Ο λογαριασμός μου' : isBg ? 'Моят акаунт' : isSr ? 'Мој налог' : isTr ? 'Hesabım' : isRo ? 'Contul Meu' : 'My Account' },
+  { href: '/my-bookings', label: isEl ? 'Οι κρατήσεις μου' : isBg ? 'Моите резервации' : isSr ? 'Моје резервације' : isTr ? 'Rezervasyonlarım' : isRo ? 'Rezervările Mele' : 'My Bookings' },
+  { href: '/account/reservations', label: isEl ? 'Κρατήσεις εστιατορίων' : isBg ? 'Ресторантски резервации' : isSr ? 'Резервације ресторана' : isTr ? 'Restoran Rezervasyonlarım' : isRo ? 'Rezervările Mele' : 'My Reservations' },
+  { href: '/account/notifications', label: isEl ? 'Ειδοποιήσεις' : isBg ? 'Известия' : isSr ? 'Обавештења' : isTr ? 'Bildirimler' : isRo ? 'Notificări' : 'Notifications', badge: notifCount },
+  { href: '/account/messages', label: isEl ? 'Μηνύματα' : isBg ? 'Съобщения' : isSr ? 'Поруке' : isTr ? 'Mesajlar' : isRo ? 'Mesaje' : 'Messages', badge: unreadCount },
+  { href: '/account/favorites', label: isEl ? 'Αγαπημένα' : isBg ? 'Любими' : isSr ? 'Омиљени' : isTr ? 'Favoriler' : isRo ? 'Favorite' : 'Favorites' },
+  { href: '/account/friends', label: isEl ? 'Φίλοι' : isBg ? 'Приятели' : isSr ? 'Пријатељи' : isTr ? 'Arkadaşlar' : isRo ? 'Prieteni' : 'Friends' },
+  { href: '/community/profile', label: isEl ? 'Προφίλ' : isBg ? 'Профил' : isSr ? 'Профил' : isTr ? 'Profil' : isRo ? 'Profil' : 'Profile' },
+];
+
+// Role-based dashboard links
+const dashboardLink = isAdmin
+  ? { href: '/admin', label: isEl ? 'Πίνακας Διαχείρισης' : isBg ? 'Админ панел' : isSr ? 'Админ панел' : isTr ? 'Yönetim Paneli' : isRo ? 'Panou Admin' : 'Admin Dashboard' }
+  : isPropertyOwner
+    ? { href: '/admin', label: isEl ? 'Πίνακας Ιδιοκτήτη' : isBg ? 'Панел на собственика' : isSr ? 'Панел власника' : isTr ? 'Sahip Paneli' : isRo ? 'Panou Proprietar' : 'Owner Dashboard' }
+    : isRestaurantOwner
+      ? { href: '/admin/restaurant', label: isEl ? 'Πίνακας Εστιατορίου' : isBg ? 'Панел на ресторанта' : isSr ? 'Панел ресторана' : isTr ? 'Restoran Paneli' : isRo ? 'Panou Restaurant' : 'Restaurant Dashboard' }
+      : null;
+---
+
+<header class="sticky top-0 z-50 bg-white/95 backdrop-blur-sm border-b border-gray-100" data-sb-url={supabaseUrl} data-sb-key={supabaseAnonKey} data-sb-token={accessToken}>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="flex items-center justify-between h-16">
+
+      <!-- Logo -->
+      <a href="/" class="flex items-center gap-2 group">
+        <div class="w-8 h-8 bg-[#1a1a2e] rounded-lg flex items-center justify-center">
+          <span class="text-white text-sm font-bold">K</span>
+        </div>
+        <span class="font-bold text-gray-900 text-lg tracking-tight group-hover:text-[#c9a96e] transition-colors">
+          KefaloniaBNB
+        </span>
+      </a>
+
+      <!-- Desktop nav -->
+      <nav class="hidden md:flex items-center gap-1">
+        {navLinks.map((link) => (
+          <a
+            href={link.href}
+            class={`px-4 py-2 text-sm font-medium transition-colors border-b-2 ${
+              path.startsWith(link.href) && link.href !== '/'
+                ? 'text-[#1a1a2e] border-[#1a1a2e] font-semibold'
+                : 'text-gray-600 border-transparent hover:text-gray-900'
+            }`}
+          >
+            {link.label}
+          </a>
+        ))}
+      </nav>
+
+      <!-- Right side -->
+      <div class="flex items-center gap-2">
+        <LanguageSwitcher />
+
+        {isLoggedIn ? (
+          <!-- Notification bell -->
+          <a
+            href="/account/notifications"
+            id="notif-bell"
+            class="relative p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+            title={isEl ? 'Ειδοποιήσεις' : isBg ? 'Известия' : isSr ? 'Обавештења' : isTr ? 'Bildirimler' : isRo ? 'Notificări' : 'Notifications'}
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0" />
+            </svg>
+            {notifCount > 0 && (
+              <span id="notif-badge" class="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                {notifCount > 9 ? '9+' : notifCount}
+              </span>
+            )}
+            {notifCount === 0 && (
+              <span id="notif-badge" class="hidden absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center"></span>
+            )}
+          </a>
+
+          <!-- Logged in: avatar dropdown -->
+          <div class="relative" id="user-dropdown-container">
+            <button
+              id="user-dropdown-btn"
+              class="flex items-center gap-1 p-1 rounded-full hover:ring-2 hover:ring-gray-200 transition-all"
+            >
+              <div class="w-8 h-8 rounded-full bg-[#1a1a2e] overflow-hidden flex items-center justify-center text-white text-xs font-bold">
+                {avatarUrl ? (
+                  <img src={avatarUrl} alt="" class="w-full h-full object-cover" />
+                ) : (
+                  initials
+                )}
+              </div>
+              {unreadCount > 0 && (
+                <span class="absolute -top-0.5 -right-0.5 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              )}
+            </button>
+
+            <!-- Dropdown menu -->
+            <div id="user-dropdown" class="hidden absolute right-0 mt-2 w-52 bg-white rounded-xl border border-gray-100 shadow-lg py-2 z-50">
+              {accountLinks.map((link) => (
+                <a href={link.href} class="flex items-center justify-between px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+                  <span>{link.label}</span>
+                  {link.badge && link.badge > 0 && (
+                    <span class="w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                      {link.badge > 9 ? '9+' : link.badge}
+                    </span>
+                  )}
+                </a>
+              ))}
+              {dashboardLink && (
+                <>
+                  <div class="border-t border-gray-100 my-1"></div>
+                  <a href={dashboardLink.href} class="flex items-center gap-2 px-4 py-2.5 text-sm text-[#1a1a2e] font-medium hover:bg-gray-50 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" /></svg>
+                    {dashboardLink.label}
+                  </a>
+                </>
+              )}
+              <div class="border-t border-gray-100 my-1"></div>
+              <button id="header-logout-btn" class="w-full text-left px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors">
+                {isEl ? 'Αποσύνδεση' : isBg ? 'Изход' : isSr ? 'Одјава' : isTr ? 'Çıkış' : isRo ? 'Deconectare' : 'Log Out'}
+              </button>
+            </div>
+          </div>
+        ) : (
+          <!-- Not logged in: person icon -->
+          <a
+            href="/my-bookings"
+            class="p-2 rounded-lg text-gray-500 hover:text-gray-900 hover:bg-gray-100 transition-colors"
+            title={isEl ? 'Σύνδεση' : isBg ? 'Вход' : isSr ? 'Пријава' : isTr ? 'Giriş' : isRo ? 'Autentificare' : 'Log In'}
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+            </svg>
+          </a>
+        )}
+
+        <a
+          href="/rentals"
+          class="hidden sm:inline-flex items-center gap-2 bg-[#1a1a2e] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#2d2d4e] transition-colors"
+        >
+          {t(lang, 'nav.book_now')}
+        </a>
+
+        <!-- Mobile menu button -->
+        <button
+          id="mobile-menu-btn"
+          class="md:hidden p-2 rounded-lg text-gray-600 hover:bg-gray-100 transition-colors"
+          aria-label="Toggle menu"
+        >
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile menu -->
+    <div id="mobile-menu" class="hidden md:hidden pb-4">
+      <nav class="flex flex-col gap-1">
+        {navLinks.map((link) => (
+          <a
+            href={link.href}
+            class="px-4 py-3 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          >
+            {link.label}
+          </a>
+        ))}
+
+        {isLoggedIn ? (
+          <>
+            <div class="border-t border-gray-100 my-2"></div>
+            {accountLinks.map((link) => (
+              <a href={link.href} class="flex items-center justify-between px-4 py-3 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                <span>{link.label}</span>
+                {link.badge && link.badge > 0 && (
+                  <span class="w-5 h-5 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">{link.badge}</span>
+                )}
+              </a>
+            ))}
+            {dashboardLink && (
+              <a href={dashboardLink.href} class="flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-semibold text-[#1a1a2e] hover:bg-gray-50 transition-colors border-t border-gray-100 mt-1 pt-3">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 1 1-3 0m3 0a1.5 1.5 0 1 0-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 0 1-3 0m3 0a1.5 1.5 0 0 0-3 0m-9.75 0h9.75" /></svg>
+                {dashboardLink.label}
+              </a>
+            )}
+            <button id="mobile-logout-btn" class="text-left px-4 py-3 rounded-lg text-sm font-medium text-red-500 hover:bg-red-50 transition-colors">
+              {isEl ? 'Αποσύνδεση' : isBg ? 'Изход' : isSr ? 'Одјава' : isTr ? 'Çıkış' : isRo ? 'Deconectare' : 'Log Out'}
+            </button>
+          </>
+        ) : (
+          <a
+            href="/my-bookings"
+            class="px-4 py-3 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors flex items-center gap-2"
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z" />
+            </svg>
+            {isEl ? 'Σύνδεση / Εγγραφή' : isBg ? 'Вход / Регистрация' : isSr ? 'Пријава / Регистрација' : isTr ? 'Giriş / Kayıt' : isRo ? 'Autentificare / Înregistrare' : 'Log In / Sign Up'}
+          </a>
+        )}
+
+        <div class="px-4 py-2">
+          <LanguageSwitcher />
+        </div>
+        <a
+          href="/rentals"
+          class="mt-2 text-center bg-[#1a1a2e] text-white px-4 py-3 rounded-xl text-sm font-semibold"
+        >
+          {t(lang, 'footer.book_direct')}
+        </a>
+      </nav>
+    </div>
+  </div>
+</header>
+
+<script is:inline>
+  // Mobile menu
+  var mobileBtn = document.getElementById('mobile-menu-btn');
+  var mobileMenu = document.getElementById('mobile-menu');
+  mobileBtn?.addEventListener('click', function() { mobileMenu?.classList.toggle('hidden'); });
+
+  // User dropdown
+  var dropdownBtn = document.getElementById('user-dropdown-btn');
+  var dropdown = document.getElementById('user-dropdown');
+  if (dropdownBtn && dropdown) {
+    dropdownBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      dropdown.classList.toggle('hidden');
+    });
+    document.addEventListener('click', function(e) {
+      if (!dropdown.contains(e.target) && e.target !== dropdownBtn) {
+        dropdown.classList.add('hidden');
+      }
+    });
+  }
+
+  // Logout
+  function doLogout() {
+    fetch('/api/auth/logout', { method: 'POST' }).then(function() { window.location.href = '/'; });
+  }
+  var logoutBtn = document.getElementById('header-logout-btn');
+  var mobileLogout = document.getElementById('mobile-logout-btn');
+  logoutBtn?.addEventListener('click', doLogout);
+  mobileLogout?.addEventListener('click', doLogout);
+
+  // Live notification badge via Supabase Realtime
+  (function() {
+    var bell = document.getElementById('notif-bell');
+    var badge = document.getElementById('notif-badge');
+    if (!bell || !badge) return;
+
+    var header = document.querySelector('header[data-sb-url]');
+    var sbUrl = header?.getAttribute('data-sb-url');
+    var sbKey = header?.getAttribute('data-sb-key');
+    var sbToken = header?.getAttribute('data-sb-token');
+    if (!sbUrl || !sbKey || !sbToken) return;
+
+    var wsUrl = sbUrl.replace('https://', 'wss://') + '/realtime/v1/websocket?apikey=' + sbKey + '&vsn=1.0.0';
+    var ws = new WebSocket(wsUrl);
+    var heartbeatRef = 0;
+    var heartbeatInterval;
+
+    ws.onopen = function() {
+      // Authenticate
+      ws.send(JSON.stringify({
+        topic: 'realtime:public:user_notifications',
+        event: 'phx_join',
+        payload: { access_token: sbToken, config: { postgres_changes: [{ event: 'INSERT', schema: 'public', table: 'user_notifications' }] } },
+        ref: '1'
+      }));
+      // Heartbeat
+      heartbeatInterval = setInterval(function() {
+        heartbeatRef++;
+        ws.send(JSON.stringify({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: String(heartbeatRef) }));
+      }, 30000);
+    };
+
+    ws.onmessage = function(evt) {
+      try {
+        var msg = JSON.parse(evt.data);
+        if (msg.event === 'postgres_changes' && msg.payload?.data?.record) {
+          // Show / increment badge
+          var current = parseInt(badge.textContent) || 0;
+          var next = current + 1;
+          badge.textContent = next > 9 ? '9+' : String(next);
+          badge.classList.remove('hidden');
+          // Subtle bell animation
+          bell.classList.add('animate-bounce');
+          setTimeout(function() { bell.classList.remove('animate-bounce'); }, 1000);
+        }
+      } catch(e) {}
+    };
+
+    ws.onclose = function() { clearInterval(heartbeatInterval); };
+  })();
+</script>

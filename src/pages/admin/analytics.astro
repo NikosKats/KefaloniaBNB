@@ -1,0 +1,592 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const role = Astro.locals.profile?.role ?? 'admin';
+const isOwner = role === 'property_owner';
+const isSuperAdmin = role === 'super_admin';
+const ownerListingIds: string[] = Astro.locals.ownerListingIds ?? [];
+const currentUserId = Astro.locals.session?.user?.id ?? '';
+
+const service = getServiceClient();
+
+// Date range from query params (default: last 30 days)
+const range = Astro.url.searchParams.get('range') ?? '30d';
+const ownerFilter = Astro.url.searchParams.get('owner') ?? ''; // super admin only
+const now = new Date();
+let from: Date;
+switch (range) {
+  case '7d':   from = new Date(now.getTime() - 7 * 86400000); break;
+  case '90d':  from = new Date(now.getTime() - 90 * 86400000); break;
+  case '12m':  from = new Date(now.getTime() - 365 * 86400000); break;
+  case 'all':  from = new Date('2020-01-01'); break;
+  default:     from = new Date(now.getTime() - 30 * 86400000); break;
+}
+const fromStr = from.toISOString();
+
+// Fetch owners list for super admin filter
+let allOwners: any[] = [];
+if (isSuperAdmin) {
+  const { data } = await service.from('profiles').select('id,full_name,company_name,email')
+    .eq('role', 'property_owner').order('full_name');
+  allOwners = data ?? [];
+}
+
+// Determine which listing IDs to scope to
+let scopeListingIds: string[] | null = null; // null = all (super admin, no filter)
+if (isOwner) {
+  scopeListingIds = ownerListingIds;
+} else if (ownerFilter) {
+  // Super admin filtering by specific owner
+  const { data: ownerListings } = await service.from('listings').select('id').eq('owner_id', ownerFilter);
+  scopeListingIds = (ownerListings ?? []).map((l: any) => l.id);
+}
+
+// ── Fetch listings for this scope ─────────────────────────────────────────────
+let listingsQuery = service.from('listings')
+  .select('id,title,slug,base_price,is_active,review_count,avg_rating,owner_id,commission_rate');
+if (scopeListingIds !== null) {
+  if (scopeListingIds.length === 0) {
+    listingsQuery = listingsQuery.eq('id', '00000000-0000-0000-0000-000000000000');
+  } else {
+    listingsQuery = listingsQuery.in('id', scopeListingIds);
+  }
+}
+const { data: listings } = await listingsQuery;
+const listingIds = (listings ?? []).map((l: any) => l.id);
+
+// ── Fetch bookings in date range ──────────────────────────────────────────────
+let bookingsQuery = service.from('bookings')
+  .select('id,listing_id,status,payment_method,payment_status,total_price,platform_fee,owner_payout,deposit_amount,check_in,check_out,guest_country,created_at,confirmed_at,cancelled_at')
+  .gte('created_at', fromStr)
+  .neq('status', 'awaiting_payment');
+if (listingIds.length > 0) {
+  bookingsQuery = bookingsQuery.in('listing_id', listingIds);
+} else if (scopeListingIds !== null) {
+  bookingsQuery = bookingsQuery.eq('listing_id', '00000000-0000-0000-0000-000000000000');
+}
+const { data: bookings } = await bookingsQuery;
+const allBookings = bookings ?? [];
+
+// ── Fetch views in date range ─────────────────────────────────────────────────
+let viewsQuery = service.from('listing_views')
+  .select('listing_id,viewed_at,country')
+  .gte('viewed_at', fromStr);
+if (listingIds.length > 0) {
+  viewsQuery = viewsQuery.in('listing_id', listingIds);
+} else if (scopeListingIds !== null) {
+  viewsQuery = viewsQuery.eq('listing_id', '00000000-0000-0000-0000-000000000000');
+}
+const { data: views } = await viewsQuery;
+const allViews = views ?? [];
+
+// ── Fetch inquiries in date range ─────────────────────────────────────────────
+let inquiriesQuery = service.from('inquiries')
+  .select('id,listing_id,created_at')
+  .gte('created_at', fromStr);
+if (listingIds.length > 0) {
+  inquiriesQuery = inquiriesQuery.in('listing_id', listingIds);
+} else if (scopeListingIds !== null) {
+  inquiriesQuery = inquiriesQuery.eq('listing_id', '00000000-0000-0000-0000-000000000000');
+}
+const { data: inquiries } = await inquiriesQuery;
+const allInquiries = inquiries ?? [];
+
+// ── Compute metrics ───────────────────────────────────────────────────────────
+const confirmedBookings = allBookings.filter((b: any) => ['confirmed', 'completed'].includes(b.status));
+const cancelledBookings = allBookings.filter((b: any) => b.status === 'cancelled');
+const pendingBookings = allBookings.filter((b: any) => b.status === 'pending');
+
+const totalViews = allViews.length;
+const totalBookingRequests = allBookings.length;
+const totalConfirmed = confirmedBookings.length;
+const totalCancelled = cancelledBookings.length;
+const conversionRate = totalViews > 0 ? ((totalConfirmed / totalViews) * 100) : 0;
+const cancellationRate = totalBookingRequests > 0 ? ((totalCancelled / totalBookingRequests) * 100) : 0;
+
+const grossRevenue = confirmedBookings.reduce((s: number, b: any) => s + Number(b.total_price ?? 0), 0);
+const totalPlatformFees = confirmedBookings.reduce((s: number, b: any) => s + Number(b.platform_fee ?? 0), 0);
+const totalOwnerPayouts = confirmedBookings.reduce((s: number, b: any) => s + Number(b.owner_payout ?? 0), 0);
+
+// Occupancy: count booked nights in the date range
+const msPerDay = 86400000;
+let totalBookedNights = 0;
+for (const b of confirmedBookings) {
+  const ci = new Date(b.check_in).getTime();
+  const co = new Date(b.check_out).getTime();
+  totalBookedNights += Math.round((co - ci) / msPerDay);
+}
+const daysInRange = Math.max(1, Math.round((now.getTime() - from.getTime()) / msPerDay));
+const totalPossibleNights = (listings ?? []).length * daysInRange;
+const occupancyRate = totalPossibleNights > 0 ? ((totalBookedNights / totalPossibleNights) * 100) : 0;
+
+const avgBookingValue = totalConfirmed > 0 ? grossRevenue / totalConfirmed : 0;
+const avgNightlyRate = totalBookedNights > 0 ? grossRevenue / totalBookedNights : 0;
+
+// Payment method breakdown
+const byPaymentMethod: Record<string, number> = {};
+for (const b of confirmedBookings) {
+  const pm = b.payment_method ?? 'unknown';
+  byPaymentMethod[pm] = (byPaymentMethod[pm] ?? 0) + 1;
+}
+
+// Top guest countries
+const countryMap: Record<string, number> = {};
+for (const b of confirmedBookings) {
+  const c = b.guest_country ?? 'Unknown';
+  countryMap[c] = (countryMap[c] ?? 0) + 1;
+}
+const topCountries = Object.entries(countryMap).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+// Monthly revenue trend (last 6 months)
+const monthlyRevenue: { month: string; revenue: number; bookings: number }[] = [];
+for (let i = 5; i >= 0; i--) {
+  const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+  const monthKey = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  const monthLabel = d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
+  const monthBookings = confirmedBookings.filter((b: any) => b.created_at?.startsWith(monthKey));
+  const rev = monthBookings.reduce((s: number, b: any) => s + Number(b.total_price ?? 0), 0);
+  monthlyRevenue.push({ month: monthLabel, revenue: rev, bookings: monthBookings.length });
+}
+const maxMonthlyRevenue = Math.max(...monthlyRevenue.map(m => m.revenue), 1);
+
+// Per-listing breakdown
+const perListing = (listings ?? []).map((l: any) => {
+  const lBookings = confirmedBookings.filter((b: any) => b.listing_id === l.id);
+  const lViews = allViews.filter((v: any) => v.listing_id === l.id).length;
+  const lRevenue = lBookings.reduce((s: number, b: any) => s + Number(b.total_price ?? 0), 0);
+  const lFees = lBookings.reduce((s: number, b: any) => s + Number(b.platform_fee ?? 0), 0);
+  const lNights = lBookings.reduce((s: number, b: any) => {
+    return s + Math.round((new Date(b.check_out).getTime() - new Date(b.check_in).getTime()) / msPerDay);
+  }, 0);
+  return {
+    ...l,
+    views: lViews,
+    bookings: lBookings.length,
+    revenue: lRevenue,
+    fees: lFees,
+    net: lRevenue - lFees,
+    nights: lNights,
+    conversion: lViews > 0 ? ((lBookings.length / lViews) * 100) : 0,
+    avgNightly: lNights > 0 ? lRevenue / lNights : 0,
+  };
+}).sort((a: any, b: any) => b.revenue - a.revenue);
+
+// View trend by country
+const viewCountryMap: Record<string, number> = {};
+for (const v of allViews) {
+  const c = v.country ?? 'Unknown';
+  viewCountryMap[c] = (viewCountryMap[c] ?? 0) + 1;
+}
+const topViewCountries = Object.entries(viewCountryMap).sort((a, b) => b[1] - a[1]).slice(0, 8);
+
+// Super admin: owner leaderboard
+let ownerLeaderboard: any[] = [];
+if (isSuperAdmin && !ownerFilter) {
+  const ownerMap: Record<string, { name: string; revenue: number; bookings: number; fees: number }> = {};
+  for (const b of confirmedBookings) {
+    const listing = (listings ?? []).find((l: any) => l.id === b.listing_id);
+    const oid = listing?.owner_id ?? 'unassigned';
+    if (!ownerMap[oid]) {
+      const owner = allOwners.find((o: any) => o.id === oid);
+      ownerMap[oid] = { name: owner?.company_name ?? owner?.full_name ?? 'Unassigned', revenue: 0, bookings: 0, fees: 0 };
+    }
+    ownerMap[oid].revenue += Number(b.total_price ?? 0);
+    ownerMap[oid].bookings += 1;
+    ownerMap[oid].fees += Number(b.platform_fee ?? 0);
+  }
+  ownerLeaderboard = Object.entries(ownerMap)
+    .map(([id, data]) => ({ id, ...data }))
+    .sort((a, b) => b.revenue - a.revenue);
+}
+
+function fmt(n: number, decimals = 0) {
+  return n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals });
+}
+
+const PM_LABELS: Record<string, string> = {
+  stripe: 'Stripe',
+  bank_transfer: 'Bank Transfer',
+  telegram_direct: 'Telegram Direct',
+};
+const PM_COLORS: Record<string, string> = {
+  stripe: 'bg-violet-500',
+  bank_transfer: 'bg-amber-500',
+  telegram_direct: 'bg-blue-500',
+};
+---
+
+<AdminLayout title="Analytics">
+  <!-- Date range + owner filter -->
+  <div class="flex flex-wrap items-center gap-3 mb-6">
+    <div class="flex items-center gap-1 bg-white border border-gray-200 rounded-xl p-1">
+      {[
+        { value: '7d', label: '7 days' },
+        { value: '30d', label: '30 days' },
+        { value: '90d', label: '90 days' },
+        { value: '12m', label: '12 months' },
+        { value: 'all', label: 'All time' },
+      ].map((r) => (
+        <a
+          href={`/admin/analytics?range=${r.value}${ownerFilter ? `&owner=${ownerFilter}` : ''}`}
+          class={`px-3 py-1.5 min-h-[44px] flex items-center rounded-lg text-xs font-medium transition-colors ${range === r.value ? 'bg-[#1a1a2e] text-white' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'}`}
+        >{r.label}</a>
+      ))}
+    </div>
+
+    {isSuperAdmin && (
+      <select
+        id="owner-filter"
+        class="bg-white border border-gray-200 rounded-xl px-3 py-2 min-h-[44px] text-sm text-gray-700 focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20"
+      >
+        <option value="" selected={!ownerFilter}>All owners (platform)</option>
+        {allOwners.map((o: any) => (
+          <option value={o.id} selected={ownerFilter === o.id}>
+            {o.company_name ?? o.full_name} ({o.email})
+          </option>
+        ))}
+      </select>
+    )}
+  </div>
+
+  <!-- KPI cards -->
+  <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
+    <div class="bg-white rounded-2xl border border-gray-100 p-4">
+      <p class="text-xs text-gray-400 font-medium">Views</p>
+      <p class="text-2xl font-bold text-gray-900 mt-1">{fmt(totalViews)}</p>
+    </div>
+    <div class="bg-white rounded-2xl border border-gray-100 p-4">
+      <p class="text-xs text-gray-400 font-medium">Booking Requests</p>
+      <p class="text-2xl font-bold text-gray-900 mt-1">{fmt(totalBookingRequests)}</p>
+      <p class="text-[10px] text-gray-300 mt-0.5">{fmt(pendingBookings.length)} pending</p>
+    </div>
+    <div class="bg-white rounded-2xl border border-gray-100 p-4">
+      <p class="text-xs text-gray-400 font-medium">Confirmed</p>
+      <p class="text-2xl font-bold text-emerald-600 mt-1">{fmt(totalConfirmed)}</p>
+      <p class="text-[10px] text-gray-300 mt-0.5">{fmt(conversionRate, 1)}% conversion</p>
+    </div>
+    <div class="bg-white rounded-2xl border border-gray-100 p-4">
+      <p class="text-xs text-gray-400 font-medium">Gross Revenue</p>
+      <p class="text-2xl font-bold text-gray-900 mt-1">€{fmt(grossRevenue)}</p>
+      <p class="text-[10px] text-gray-300 mt-0.5">avg €{fmt(avgBookingValue)} / booking</p>
+    </div>
+    {isSuperAdmin && !ownerFilter ? (
+      <div class="bg-white rounded-2xl border border-gray-100 p-4">
+        <p class="text-xs text-gray-400 font-medium">Platform Fees</p>
+        <p class="text-2xl font-bold text-indigo-600 mt-1">€{fmt(totalPlatformFees)}</p>
+      </div>
+    ) : (
+      <div class="bg-white rounded-2xl border border-gray-100 p-4">
+        <p class="text-xs text-gray-400 font-medium">Net Earnings</p>
+        <p class="text-2xl font-bold text-emerald-600 mt-1">€{fmt(totalOwnerPayouts)}</p>
+        <p class="text-[10px] text-gray-300 mt-0.5">fees: €{fmt(totalPlatformFees)}</p>
+      </div>
+    )}
+  </div>
+
+  <!-- Second row KPIs -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+    <div class="bg-white rounded-2xl border border-gray-100 p-4">
+      <p class="text-xs text-gray-400 font-medium">Occupancy Rate</p>
+      <p class="text-xl font-bold text-gray-900 mt-1">{fmt(occupancyRate, 1)}%</p>
+      <p class="text-[10px] text-gray-300 mt-0.5">{fmt(totalBookedNights)} nights booked</p>
+    </div>
+    <div class="bg-white rounded-2xl border border-gray-100 p-4">
+      <p class="text-xs text-gray-400 font-medium">Avg Nightly Rate</p>
+      <p class="text-xl font-bold text-gray-900 mt-1">€{fmt(avgNightlyRate)}</p>
+    </div>
+    <div class="bg-white rounded-2xl border border-gray-100 p-4">
+      <p class="text-xs text-gray-400 font-medium">Cancellation Rate</p>
+      <p class="text-xl font-bold text-gray-900 mt-1">{fmt(cancellationRate, 1)}%</p>
+      <p class="text-[10px] text-gray-300 mt-0.5">{fmt(totalCancelled)} cancelled</p>
+    </div>
+    <div class="bg-white rounded-2xl border border-gray-100 p-4">
+      <p class="text-xs text-gray-400 font-medium">Inquiries</p>
+      <p class="text-xl font-bold text-gray-900 mt-1">{fmt(allInquiries.length)}</p>
+    </div>
+  </div>
+
+  <!-- Charts row -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+    <!-- Revenue trend -->
+    <div class="lg:col-span-2 bg-white rounded-2xl border border-gray-100 p-5">
+      <p class="text-sm font-semibold text-gray-700 mb-4">Revenue Trend (6 months)</p>
+      <div class="flex items-end gap-2 h-40">
+        {monthlyRevenue.map((m) => {
+          const pct = maxMonthlyRevenue > 0 ? (m.revenue / maxMonthlyRevenue) * 100 : 0;
+          return (
+            <div class="flex-1 flex flex-col items-center gap-1">
+              <span class="text-[10px] text-gray-400 font-medium">€{fmt(m.revenue)}</span>
+              <div class="w-full bg-gray-100 rounded-t-lg relative" style="height: 120px;">
+                <div
+                  class="absolute bottom-0 left-0 right-0 bg-[#1a1a2e] rounded-t-lg transition-all"
+                  style={`height: ${Math.max(pct, 2)}%`}
+                ></div>
+              </div>
+              <span class="text-[10px] text-gray-400">{m.month}</span>
+              <span class="text-[10px] text-gray-300">{m.bookings}b</span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+
+    <!-- Payment methods -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-5">
+      <p class="text-sm font-semibold text-gray-700 mb-4">Payment Methods</p>
+      {totalConfirmed > 0 ? (
+        <div class="space-y-3">
+          {Object.entries(byPaymentMethod).sort((a, b) => b[1] - a[1]).map(([method, count]) => {
+            const pct = (count / totalConfirmed) * 100;
+            return (
+              <div>
+                <div class="flex justify-between text-xs mb-1">
+                  <span class="text-gray-600 font-medium">{PM_LABELS[method] ?? method}</span>
+                  <span class="text-gray-400">{count} ({fmt(pct, 0)}%)</span>
+                </div>
+                <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div class={`h-full rounded-full ${PM_COLORS[method] ?? 'bg-gray-400'}`} style={`width: ${pct}%`}></div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        <p class="text-sm text-gray-300 text-center py-8">No confirmed bookings yet</p>
+      )}
+
+      <!-- Guest countries -->
+      {topCountries.length > 0 && (
+        <div class="mt-6 pt-4 border-t border-gray-100">
+          <p class="text-sm font-semibold text-gray-700 mb-3">Top Guest Countries</p>
+          <div class="space-y-1.5">
+            {topCountries.map(([country, count]) => (
+              <div class="flex justify-between text-xs">
+                <span class="text-gray-600">{country}</span>
+                <span class="text-gray-400 font-medium">{count}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  </div>
+
+  <!-- Visitor countries -->
+  {topViewCountries.length > 0 && (
+    <div class="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
+      <p class="text-sm font-semibold text-gray-700 mb-3">Visitor Countries (page views)</p>
+      <div class="flex flex-wrap gap-2">
+        {topViewCountries.map(([country, count]) => (
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 rounded-lg text-xs text-gray-700">
+            <span class="font-semibold">{country}</span>
+            <span class="text-gray-400">{count}</span>
+          </span>
+        ))}
+      </div>
+    </div>
+  )}
+
+  <!-- Super admin: Owner leaderboard -->
+  {isSuperAdmin && !ownerFilter && ownerLeaderboard.length > 0 && (
+    <div class="bg-white rounded-2xl border border-gray-100 p-5 mb-6">
+      <p class="text-sm font-semibold text-gray-700 mb-4">Owner Performance</p>
+
+      <!-- Mobile card view -->
+      <div class="lg:hidden space-y-3">
+        {ownerLeaderboard.map((o: any) => (
+          <div class="bg-gray-50 rounded-xl p-4">
+            <div class="flex items-center justify-between mb-2">
+              <p class="font-medium text-gray-900">{o.name}</p>
+              {o.id !== 'unassigned' && (
+                <a href={`/admin/analytics?range=${range}&owner=${o.id}`}
+                  class="min-h-[44px] px-4 py-2.5 inline-flex items-center text-xs text-[#c9a96e] font-medium hover:underline">
+                  Details →
+                </a>
+              )}
+            </div>
+            <div class="grid grid-cols-3 gap-2 text-sm">
+              <div>
+                <p class="text-xs text-gray-400">Bookings</p>
+                <p class="font-medium text-gray-600">{o.bookings}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400">Revenue</p>
+                <p class="font-semibold text-gray-900">€{fmt(o.revenue)}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400">Platform Fees</p>
+                <p class="font-medium text-indigo-600">€{fmt(o.fees)}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <!-- Desktop table view -->
+      <div class="hidden lg:block overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-xs text-gray-400 border-b border-gray-100">
+              <th class="pb-2 font-medium">Owner</th>
+              <th class="pb-2 font-medium text-right">Bookings</th>
+              <th class="pb-2 font-medium text-right">Revenue</th>
+              <th class="pb-2 font-medium text-right">Platform Fees</th>
+              <th class="pb-2 font-medium text-right"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {ownerLeaderboard.map((o: any) => (
+              <tr class="border-b border-gray-50 hover:bg-gray-50/50">
+                <td class="py-2.5 font-medium text-gray-900">{o.name}</td>
+                <td class="py-2.5 text-right text-gray-600">{o.bookings}</td>
+                <td class="py-2.5 text-right text-gray-900 font-semibold">€{fmt(o.revenue)}</td>
+                <td class="py-2.5 text-right text-indigo-600">€{fmt(o.fees)}</td>
+                <td class="py-2.5 text-right">
+                  {o.id !== 'unassigned' && (
+                    <a href={`/admin/analytics?range=${range}&owner=${o.id}`}
+                      class="text-xs text-[#c9a96e] font-medium hover:underline">
+                      Details →
+                    </a>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )}
+
+  <!-- Per-listing breakdown -->
+  {perListing.length > 0 && (
+    <div class="bg-white rounded-2xl border border-gray-100 p-5">
+      <p class="text-sm font-semibold text-gray-700 mb-4">Per-Listing Breakdown</p>
+
+      <!-- Mobile card view -->
+      <div class="lg:hidden space-y-3">
+        {perListing.map((l: any) => (
+          <div class="bg-gray-50 rounded-xl p-4">
+            <div class="flex items-start justify-between mb-3">
+              <div class="min-w-0 flex-1">
+                <a href={`/admin/listings/${l.id}`} class="font-medium text-gray-900 hover:text-[#c9a96e] transition-colors min-h-[44px] inline-flex items-center">
+                  {l.title}
+                </a>
+                <span class={`ml-1.5 inline-block w-1.5 h-1.5 rounded-full ${l.is_active ? 'bg-emerald-400' : 'bg-gray-300'}`}></span>
+              </div>
+              {l.review_count > 0
+                ? <span class="text-[#c9a96e] text-sm shrink-0 ml-2">★ {Number(l.avg_rating).toFixed(1)}</span>
+                : <span class="text-gray-300 text-sm shrink-0 ml-2">—</span>
+              }
+            </div>
+            <div class="grid grid-cols-3 gap-x-3 gap-y-2 text-sm">
+              <div>
+                <p class="text-xs text-gray-400">Views</p>
+                <p class="font-medium text-gray-600">{fmt(l.views)}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400">Bookings</p>
+                <p class="font-medium text-gray-600">{l.bookings}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400">Conv.</p>
+                <p class="font-medium text-gray-400">{fmt(l.conversion, 1)}%</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400">Revenue</p>
+                <p class="font-semibold text-gray-900">€{fmt(l.revenue)}</p>
+              </div>
+              {!isOwner && (
+                <div>
+                  <p class="text-xs text-gray-400">Fees</p>
+                  <p class="font-medium text-indigo-600">€{fmt(l.fees)}</p>
+                </div>
+              )}
+              <div>
+                <p class="text-xs text-gray-400">Net</p>
+                <p class="font-medium text-emerald-600">€{fmt(l.net)}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400">Nights</p>
+                <p class="font-medium text-gray-600">{l.nights}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400">Avg/Night</p>
+                <p class="font-medium text-gray-600">€{fmt(l.avgNightly)}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <!-- Desktop table view -->
+      <div class="hidden lg:block overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-xs text-gray-400 border-b border-gray-100">
+              <th class="pb-2 font-medium">Listing</th>
+              <th class="pb-2 font-medium text-right">Views</th>
+              <th class="pb-2 font-medium text-right">Bookings</th>
+              <th class="pb-2 font-medium text-right">Conv.</th>
+              <th class="pb-2 font-medium text-right">Revenue</th>
+              {!isOwner && <th class="pb-2 font-medium text-right">Fees</th>}
+              <th class="pb-2 font-medium text-right">Net</th>
+              <th class="pb-2 font-medium text-right">Nights</th>
+              <th class="pb-2 font-medium text-right">Avg/Night</th>
+              <th class="pb-2 font-medium text-right">Rating</th>
+            </tr>
+          </thead>
+          <tbody>
+            {perListing.map((l: any) => (
+              <tr class="border-b border-gray-50 hover:bg-gray-50/50">
+                <td class="py-2.5">
+                  <a href={`/admin/listings/${l.id}`} class="font-medium text-gray-900 hover:text-[#c9a96e] transition-colors">
+                    {l.title}
+                  </a>
+                  <span class={`ml-1.5 inline-block w-1.5 h-1.5 rounded-full ${l.is_active ? 'bg-emerald-400' : 'bg-gray-300'}`}></span>
+                </td>
+                <td class="py-2.5 text-right text-gray-600">{fmt(l.views)}</td>
+                <td class="py-2.5 text-right text-gray-600">{l.bookings}</td>
+                <td class="py-2.5 text-right text-gray-400">{fmt(l.conversion, 1)}%</td>
+                <td class="py-2.5 text-right text-gray-900 font-semibold">€{fmt(l.revenue)}</td>
+                {!isOwner && <td class="py-2.5 text-right text-indigo-600">€{fmt(l.fees)}</td>}
+                <td class="py-2.5 text-right text-emerald-600 font-medium">€{fmt(l.net)}</td>
+                <td class="py-2.5 text-right text-gray-600">{l.nights}</td>
+                <td class="py-2.5 text-right text-gray-600">€{fmt(l.avgNightly)}</td>
+                <td class="py-2.5 text-right">
+                  {l.review_count > 0
+                    ? <span class="text-[#c9a96e]">★ {Number(l.avg_rating).toFixed(1)} <span class="text-gray-300">({l.review_count})</span></span>
+                    : <span class="text-gray-300">—</span>
+                  }
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )}
+
+  {perListing.length === 0 && (
+    <div class="text-center py-20 text-gray-400">
+      <p class="text-4xl mb-3">📊</p>
+      <p class="font-medium">No data yet</p>
+      <p class="text-sm mt-1">Analytics will appear once your listings get views and bookings.</p>
+    </div>
+  )}
+</AdminLayout>
+
+<script>
+  // Owner filter navigation
+  const ownerSelect = document.getElementById('owner-filter') as HTMLSelectElement | null;
+  ownerSelect?.addEventListener('change', () => {
+    const url = new URL(window.location.href);
+    if (ownerSelect.value) {
+      url.searchParams.set('owner', ownerSelect.value);
+    } else {
+      url.searchParams.delete('owner');
+    }
+    window.location.href = url.toString();
+  });
+</script>

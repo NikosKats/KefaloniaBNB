@@ -1,0 +1,49 @@
+{
+  "name": "kefaloniabnb",
+  "type": "module",
+  "version": "0.0.1",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "wrangler pages dev dist",
+    "deploy": "astro build && node scripts/inject-routes.cjs && wrangler deploy",
+    "astro": "astro",
+    "type-check": "astro check",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:report": "playwright show-report",
+    "seed": "node scripts/seed.mjs",
+    "seed:clean": "node scripts/seed.mjs --clean"
+  },
+  "dependencies": {
+    "@astrojs/cloudflare": "^13.1.1",
+    "@supabase/ssr": "^0.9.0",
+    "@supabase/supabase-js": "^2.99.1",
+    "astro": "^6.0.4",
+    "leaflet": "^1.9.4",
+    "nanostores": "^1.2.0",
+    "qrcode-generator": "^2.0.4",
+    "resend": "^6.9.3",
+    "stripe": "^20.4.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.9.1",
+    "@faker-js/faker": "^10.3.0",
+    "@playwright/test": "^1.49.0",
+    "@tailwindcss/vite": "^4.2.1",
+    "@vitest/coverage-v8": "^2.1.8",
+    "dotenv": "^16.4.7",
+    "tailwindcss": "^4.2.1",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.8",
+    "wait-on": "^8.0.1"
+  }
+}

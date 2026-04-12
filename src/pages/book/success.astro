@@ -1,0 +1,206 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { t, type Lang } from '../../i18n/translations.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as Lang;
+const isBg = lang === 'bg';
+const isEl = lang === 'el';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+const bookingId = Astro.url.searchParams.get('id') ?? '';
+const pm = Astro.url.searchParams.get('pm') ?? 'stripe'; // 'stripe' | 'bank' | 'telegram'
+const isBankTransfer = pm === 'bank';
+const isTelegramDirect = pm === 'telegram';
+const BOT_USERNAME = 'kefalonia_rentals_bot';
+
+const tTelegramTitle = isEl ? 'Заявката за резервация е изпратена!' : isBg ? 'Заявката за резервация е изпратена!' : isSr ? 'Захтев за резервацију послат!' : isTr ? 'Rezervasyon talebi gönderildi!' : isRo ? 'Cerere de rezervare trimisă!' : 'Booking Request Sent!';
+const tTelegramBody = isEl ? 'Ο ιδιοκτήτης ειδοποιήθηκε μέσω Telegram και θα απαντήσει σύντομα. Συνδεθείτε παρακάτω για άμεσες ενημερώσεις.' : isBg ? 'Собственикът е уведомен чрез Telegram и ще отговори скоро. Свържете се по-долу за мигновени актуализации.' : isSr ? 'Власник је обавештен путем Телеграма и ускоро ће одговорити. Повежите се испод за тренутна ажурирања.' : isTr ? 'Ev sahibi Telegram üzerinden bilgilendirildi ve kısa sürede yanıt verecek. Anlık güncellemeler için aşağıdan bağlanın.' : isRo ? 'Proprietarul a fost notificat prin Telegram și va răspunde în curând. Conectați-vă mai jos pentru actualizări instantanee.' : 'The owner has been notified via Telegram and will respond shortly. Connect below to receive instant updates.';
+const tCheckEmail = isEl ? 'Ελέγξτε το email σας για να επαληθεύσετε την κράτησή σας' : isBg ? 'Проверете имейла си, за да потвърдите резервацията си' : isSr ? 'Проверите имејл да бисте потврдили резервацију' : isTr ? 'Rezervasyonunuzu doğrulamak için e-postanızı kontrol edin' : isRo ? 'Verificați emailul pentru a confirma rezervarea' : 'Check your email to verify your booking';
+const tCheckEmailDesc = isEl ? 'Σας στείλαμε ένα σύνδεσμο επαλήθευσης. Κάντε κλικ εντός 24 ωρών για να επιβεβαιώσετε. Μη επαληθευμένες κρατήσεις ακυρώνονται αυτόματα.' : isBg ? 'Изпратихме линк за потвърждение до {email}. Моля, натиснете го в рамките на 24 часа. Непотвърдени резервации се отменят автоматично.' : isSr ? 'Послали смо линк за верификацију на {email}. Кликните у року од 24 сата. Неверификоване резервације се аутоматски отказују.' : isTr ? '{email} adresine doğrulama bağlantısı gönderdik. 24 saat içinde tıklayın. Doğrulanmayan rezervasyonlar otomatik olarak iptal edilir.' : isRo ? 'Am trimis un link de verificare la {email}. Faceți clic pe el în 24 de ore pentru a confirma rezervarea. Rezervările neverificate sunt anulate automat.' : "We've sent a verification link to {email}. Please click it within 24 hours to confirm your booking. Unverified bookings are automatically cancelled.";
+const tResend = isEl ? 'Δεν το λάβατε; Αποστολή ξανά' : isBg ? 'Не сте получили? Изпратете отново' : isSr ? 'Нисте примили? Пошаљите поново' : isTr ? 'Almadınız mı? Tekrar gönder' : isRo ? 'Nu l-ați primit? Retrimiteți emailul de verificare' : "Didn't receive it? Resend verification email";
+const tSending = isEl ? 'Αποστολή…' : isBg ? 'Изпращане…' : isSr ? 'Слање…' : isTr ? 'Gönderiliyor…' : isRo ? 'Se trimite…' : 'Sending…';
+const tResendOk = isEl ? 'Το email επαλήθευσης στάλθηκε! Ελέγξτε τα εισερχόμενά σας.' : isBg ? 'Имейлът за потвърждение е изпратен! Проверете входящата си поща.' : isSr ? 'Имејл за верификацију послат! Проверите пријемно сандуче.' : isTr ? 'Doğrulama e-postası gönderildi! Gelen kutunuzu kontrol edin.' : isRo ? 'Email de verificare trimis! Verificați inbox-ul.' : 'Verification email sent! Check your inbox.';
+const tTgUpdates = isEl ? 'Λάβετε άμεσες ενημερώσεις στο Telegram' : isBg ? 'Получавайте мигновени актуализации в Telegram' : isSr ? 'Примајте тренутна ажурирања на Телеграму' : isTr ? 'Telegram\'da anlık güncellemeler alın' : isRo ? 'Primiți actualizări instantanee pe Telegram' : 'Get instant updates on Telegram';
+const tTgDesc = isEl ? 'Πατήστε το κουμπί για σύνδεση με Telegram. Θα ειδοποιηθείτε αμέσως.' : isBg ? 'Натиснете бутона, за да се свържете с Telegram. Ще бъдете уведомени веднага.' : isSr ? 'Додирните дугме да се повежете са Телеграмом. Бићете одмах обавештени.' : isTr ? 'Telegram\'a bağlanmak için düğmeye dokunun. Anında bilgilendirileceksiniz.' : isRo ? 'Apăsați butonul de mai jos pentru a vă conecta la Telegram. Veți fi notificat imediat ce proprietarul acceptă sau refuză cererea.' : "Tap the button below to connect your Telegram. You'll be notified the moment the owner accepts or declines your request.";
+const tTgConnect = isEl ? 'Σύνδεση στο Telegram →' : isBg ? 'Свържете се в Telegram →' : isSr ? 'Повежите се на Телеграму →' : isTr ? 'Telegram\'da bağlan →' : isRo ? 'Conectare pe Telegram →' : 'Connect on Telegram →';
+const tTgOptional = isEl ? 'Θα λάβετε επιβεβαίωση και μέσω email. Το Telegram είναι προαιρετικό.' : isBg ? 'Ще получите потвърждение и по имейл. Telegram е по избор, но препоръчително.' : isSr ? 'Добићете потврду и путем имејла. Телеграм је опционалан.' : isTr ? 'E-posta ile de onay alacaksınız. Telegram isteğe bağlıdır.' : isRo ? 'Veți primi confirmare și prin email. Telegram este opțional dar recomandat.' : "You'll also receive confirmation by email. Telegram is optional but recommended.";
+const tViewManage = isEl ? 'Δείτε ή διαχειριστείτε την κράτησή σας →' : isBg ? 'Вижте или управлявайте резервацията си →' : isSr ? 'Погледајте или управљајте резервацијом →' : isTr ? 'Rezervasyonunuzu görüntüleyin veya yönetin →' : isRo ? 'Vizualizați sau gestionați rezervarea →' : 'View or manage your booking →';
+
+let booking = null;
+if (bookingId) {
+  // Use service role to read back the booking (guest has no session)
+  const { getServiceClient } = await import('../../lib/supabase.ts');
+  const service = getServiceClient();
+  const { data } = await service
+    .from('bookings')
+    .select('*, listings(title,slug,city,check_in_time,check_out_time), guest_token')
+    .eq('id', bookingId)
+    .single();
+  booking = data;
+}
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+const pageTitle = isTelegramDirect ? tTelegramTitle : isBankTransfer ? t(lang, 'success.bank.title') : t(lang, 'success.stripe.title');
+const iconColor = isTelegramDirect ? 'bg-[#0088cc]/10' : isBankTransfer ? 'bg-blue-100' : 'bg-emerald-100';
+const iconTextColor = isTelegramDirect ? 'text-[#0088cc]' : isBankTransfer ? 'text-blue-600' : 'text-emerald-600';
+const heading = pageTitle;
+const subtext = isTelegramDirect
+  ? tTelegramBody
+  : isBankTransfer ? t(lang, 'success.bank.body') : t(lang, 'success.stripe.body');
+---
+
+<BaseLayout title={pageTitle} noIndex>
+  <div class="min-h-[80vh] flex items-center justify-center px-4 py-16">
+    <div class="max-w-lg w-full text-center">
+      <div class={`w-20 h-20 ${iconColor} rounded-full flex items-center justify-center mx-auto mb-6`}>
+        {isTelegramDirect ? (
+          <svg class={`w-10 h-10 ${iconTextColor}`} fill="currentColor" viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+        ) : isBankTransfer ? (
+          <svg class={`w-10 h-10 ${iconTextColor}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+          </svg>
+        ) : (
+          <svg class={`w-10 h-10 ${iconTextColor}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+          </svg>
+        )}
+      </div>
+
+      <h1 class="text-3xl font-bold text-gray-900 mb-2">{heading}</h1>
+      <p class="text-gray-500 mb-8">{subtext}</p>
+
+      {/* ── Email verification banner for non-logged-in guests ──────── */}
+      {booking && !booking.email_verified && (
+        <div class="bg-amber-50 border border-amber-200 rounded-xl p-5 mb-6 text-left">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="text-lg">📧</span>
+            <p class="font-semibold text-amber-900 text-sm">{tCheckEmail}</p>
+          </div>
+          <p class="text-xs text-amber-700 mb-3" set:html={tCheckEmailDesc.replace('{email}', `<strong>${booking.guest_email}</strong>`)} />
+          <button
+            id="resend-verify-btn"
+            class="text-xs font-medium text-amber-800 underline hover:text-amber-900"
+            data-booking-id={booking.id}
+          >
+            {tResend}
+          </button>
+          <p id="resend-status" class="hidden text-xs mt-1"></p>
+        </div>
+      )}
+
+      {/* ── Telegram Direct: connect button ──────────────────────────── */}
+      {isTelegramDirect && bookingId && (
+        <div class="bg-[#0088cc]/8 border border-[#0088cc]/20 rounded-xl p-5 mb-6 text-left">
+          <div class="flex items-center gap-3 mb-3">
+            <svg class="w-6 h-6 text-[#0088cc] shrink-0" fill="currentColor" viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+            <p class="font-semibold text-gray-900 text-sm">{tTgUpdates}</p>
+          </div>
+          <p class="text-xs text-gray-500 mb-4">{tTgDesc}</p>
+          <a href={`https://t.me/${BOT_USERNAME}?start=bk_${bookingId}`}
+            target="_blank" rel="noopener noreferrer"
+            class="inline-flex items-center gap-2 bg-[#0088cc] hover:bg-[#006daa] text-white font-semibold px-5 py-2.5 rounded-xl text-sm transition-colors">
+            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+            {tTgConnect}
+          </a>
+          <p class="text-xs text-gray-400 mt-3">{tTgOptional}</p>
+        </div>
+      )}
+
+      {isBankTransfer && (
+        <div class="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-6 text-sm text-blue-800 text-left">
+          <p class="font-semibold mb-1">{t(lang, 'success.what_next')}</p>
+          <ol class="list-decimal list-inside space-y-1 text-blue-700">
+            <li>{t(lang, 'success.step1')}</li>
+            <li>{t(lang, 'success.step2')}</li>
+            <li>{t(lang, 'success.step3')}</li>
+            <li>{t(lang, 'success.step4')}</li>
+          </ol>
+        </div>
+      )}
+
+      {booking && (
+        <div class="bg-gray-50 rounded-2xl p-6 text-left mb-8 space-y-3 text-sm">
+          <div class="flex justify-between">
+            <span class="text-gray-500">{t(lang, 'success.prop')}</span>
+            <span class="font-medium text-gray-900">{(booking.listings as any)?.title}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-500">{t(lang, 'success.checkin')}</span>
+            <span class="font-medium text-gray-900">{fmtDate(booking.check_in)}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-500">{t(lang, 'success.checkout')}</span>
+            <span class="font-medium text-gray-900">{fmtDate(booking.check_out)}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-500">{t(lang, 'success.guests')}</span>
+            <span class="font-medium text-gray-900">{booking.guests_adults + booking.guests_children}</span>
+          </div>
+          <div class="flex justify-between pt-2 border-t border-gray-200">
+            <span class="text-gray-500">{t(lang, 'success.total')}</span>
+            <span class="font-bold text-gray-900">€{booking.total_price}</span>
+          </div>
+          <div class="pt-2 border-t border-gray-200">
+            <span class="text-gray-400 text-xs">{t(lang, 'success.ref')}: {bookingId.slice(0, 8).toUpperCase()}</span>
+          </div>
+        </div>
+      )}
+
+      <div class="flex flex-col sm:flex-row gap-3 justify-center">
+        {booking?.guest_token && (
+          <a href={`/my-booking?token=${booking.guest_token}`}
+            class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-3 rounded-xl text-sm transition-colors">
+            {tViewManage}
+          </a>
+        )}
+        <a href="/" class="bg-[#1a1a2e] text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">
+          {t(lang, 'common.back_home')}
+        </a>
+        <a href="/contact" class="border border-gray-300 text-gray-700 font-semibold px-6 py-3 rounded-xl text-sm hover:bg-gray-50 transition-colors">
+          {t(lang, 'common.contact_us')}
+        </a>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<script define:vars={{ tSending, tResendOk, tResend }}>
+  const resendBtn = document.getElementById('resend-verify-btn');
+  const resendStatus = document.getElementById('resend-status');
+  resendBtn?.addEventListener('click', async () => {
+    const bookingId = resendBtn.dataset.bookingId;
+    if (!bookingId) return;
+    resendBtn.disabled = true;
+    resendBtn.textContent = tSending;
+    try {
+      const res = await fetch('/api/bookings/resend-verification', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bookingId }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        if (resendStatus) {
+          resendStatus.textContent = tResendOk;
+          resendStatus.className = 'text-xs mt-1 text-emerald-600';
+          resendStatus.classList.remove('hidden');
+        }
+      } else {
+        throw new Error(json.error || 'Failed to resend');
+      }
+    } catch (err) {
+      if (resendStatus) {
+        resendStatus.textContent = err.message;
+        resendStatus.className = 'text-xs mt-1 text-red-600';
+        resendStatus.classList.remove('hidden');
+      }
+    } finally {
+      resendBtn.disabled = false;
+      resendBtn.textContent = tResend;
+    }
+  });
+</script>

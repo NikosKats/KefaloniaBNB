@@ -1,0 +1,197 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isBg = lang === 'bg';
+const isEl = lang === 'el';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const t = {
+  chatWith: (name: string) => isEl ? `Συνομιλία με ${name}` : isBg ? `Чат с ${name}` : isSr ? `Разговор са ${name}` : isTr ? `${name} ile Sohbet` : isRo ? `Conversație cu ${name}` : `Chat with ${name}`,
+  member: isEl ? 'Μέλος' : isBg ? 'Член' : isSr ? 'Члан' : isTr ? 'Üye' : isRo ? 'Membru' : 'Member',
+  typeMessage: isEl ? 'Γράψτε ένα μήνυμα...' : isBg ? 'Напишете съобщение...' : isSr ? 'Напишите поруку...' : isTr ? 'Bir mesaj yazın...' : isRo ? 'Scrie un mesaj...' : 'Type a message...',
+  send: isEl ? 'Αποστολή' : isBg ? 'Изпратете' : isSr ? 'Пошаљи' : isTr ? 'Gönder' : isRo ? 'Trimite' : 'Send',
+};
+
+const session = Astro.locals.session;
+if (!session) return Astro.redirect('/community/join?next=/account/messages');
+
+const { id: convId } = Astro.params;
+const service = getServiceClient();
+const userId = session.user.id;
+
+// Fetch conversation + verify participation
+const { data: conv } = await service
+  .from('conversations')
+  .select('id, participant_1, participant_2, p1:profiles!conversations_participant_1_fkey(id, full_name, avatar_url), p2:profiles!conversations_participant_2_fkey(id, full_name, avatar_url)')
+  .eq('id', convId)
+  .single();
+
+if (!conv || (conv.participant_1 !== userId && conv.participant_2 !== userId)) {
+  return Astro.redirect('/account/messages');
+}
+
+const otherUser = conv.participant_1 === userId ? (conv as any).p2 : (conv as any).p1;
+
+// Fetch messages
+const { data: messages } = await service
+  .from('messages')
+  .select('id, sender_id, body, is_read, created_at')
+  .eq('conversation_id', convId)
+  .order('created_at', { ascending: true })
+  .limit(100);
+
+// Mark unread messages as read
+await service
+  .from('messages')
+  .update({ is_read: true })
+  .eq('conversation_id', convId)
+  .eq('is_read', false)
+  .neq('sender_id', userId);
+
+// Recalculate unread count
+const convIds = (await service
+  .from('conversations')
+  .select('id')
+  .or(`participant_1.eq.${userId},participant_2.eq.${userId}`)
+).data?.map((c: any) => c.id) ?? [];
+
+if (convIds.length > 0) {
+  const { count } = await service
+    .from('messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('is_read', false)
+    .neq('sender_id', userId)
+    .in('conversation_id', convIds);
+  await service.from('profiles').update({ unread_messages_count: count ?? 0 }).eq('id', userId);
+}
+
+const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+const accessToken = session.access_token || '';
+---
+
+<BaseLayout title={t.chatWith(otherUser?.full_name || t.member)} noIndex>
+  <div class="max-w-2xl mx-auto px-4 py-6 flex flex-col" style="height: calc(100vh - 64px);">
+    <!-- Header -->
+    <div class="flex items-center gap-3 pb-4 border-b border-gray-100 shrink-0">
+      <a href="/account/messages" class="text-gray-400 hover:text-gray-600 text-sm">&larr;</a>
+      <a href={`/community/member/${otherUser?.id}`} class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-full bg-gray-200 overflow-hidden shrink-0">
+          {otherUser?.avatar_url ? (
+            <img src={otherUser.avatar_url} alt="" class="w-full h-full object-cover" />
+          ) : (
+            <div class="w-full h-full flex items-center justify-center text-gray-400 text-sm font-bold">
+              {(otherUser?.full_name || '?')[0].toUpperCase()}
+            </div>
+          )}
+        </div>
+        <p class="text-sm font-semibold text-gray-900">{otherUser?.full_name || t.member}</p>
+      </a>
+    </div>
+
+    <!-- Messages -->
+    <div id="messages-container" class="flex-1 overflow-y-auto py-4 space-y-3">
+      {(messages ?? []).map((msg: any) => {
+        const isMine = msg.sender_id === userId;
+        return (
+          <div class={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
+            <div class={`max-w-[75%] px-3.5 py-2.5 rounded-2xl text-sm ${isMine ? 'bg-[#1a1a2e] text-white rounded-br-md' : 'bg-gray-100 text-gray-800 rounded-bl-md'}`}>
+              <p class="whitespace-pre-wrap break-words">{msg.body}</p>
+              <p class={`text-[10px] mt-1 ${isMine ? 'text-gray-400' : 'text-gray-400'}`}>
+                {new Date(msg.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+
+    <!-- Input -->
+    <div class="pt-3 border-t border-gray-100 shrink-0">
+      <div class="flex gap-2">
+        <input
+          id="msg-input"
+          type="text"
+          placeholder={t.typeMessage}
+          class="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40"
+          autofocus
+        />
+        <button id="send-btn" class="bg-[#1a1a2e] text-white px-5 py-2.5 rounded-xl text-sm font-medium hover:bg-[#2d2d4e] transition-colors">
+          {t.send}
+        </button>
+      </div>
+    </div>
+  </div>
+</BaseLayout>
+
+<script is:inline define:vars={{ convId, userId, otherUserId: otherUser?.id, supabaseUrl, supabaseAnonKey, accessToken }}>
+  var container = document.getElementById('messages-container');
+  var input = document.getElementById('msg-input');
+  var sendBtn = document.getElementById('send-btn');
+
+  // Scroll to bottom
+  function scrollBottom() {
+    if (container) container.scrollTop = container.scrollHeight;
+  }
+  scrollBottom();
+
+  // Append a message bubble
+  function addBubble(body, isMine, time) {
+    var wrapper = document.createElement('div');
+    wrapper.className = 'flex ' + (isMine ? 'justify-end' : 'justify-start');
+    var bubble = document.createElement('div');
+    bubble.className = 'max-w-[75%] px-3.5 py-2.5 rounded-2xl text-sm ' +
+      (isMine ? 'bg-[#1a1a2e] text-white rounded-br-md' : 'bg-gray-100 text-gray-800 rounded-bl-md');
+    bubble.innerHTML = '<p class="whitespace-pre-wrap break-words">' + body.replace(/</g, '&lt;') +
+      '</p><p class="text-[10px] mt-1 text-gray-400">' + time + '</p>';
+    wrapper.appendChild(bubble);
+    container.appendChild(wrapper);
+    scrollBottom();
+  }
+
+  // Send message
+  async function sendMessage() {
+    var text = input.value.trim();
+    if (!text) return;
+    input.value = '';
+    var now = new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    addBubble(text, true, now);
+
+    try {
+      await fetch('/api/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ recipient_id: otherUserId, body: text }),
+      });
+    } catch(e) { console.error('Send failed', e); }
+  }
+
+  sendBtn.addEventListener('click', sendMessage);
+  input.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  });
+
+  // Supabase Realtime for incoming messages
+  (async function() {
+    try {
+      var mod = await import('https://esm.sh/@supabase/supabase-js@2');
+      var sb = mod.createClient(supabaseUrl, supabaseAnonKey, {
+        global: { headers: { Authorization: 'Bearer ' + accessToken } },
+      });
+      sb.channel('messages:' + convId)
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages', filter: 'conversation_id=eq.' + convId }, function(payload) {
+          var msg = payload.new;
+          if (msg.sender_id === userId) return; // Already rendered
+          var time = new Date(msg.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+          addBubble(msg.body, false, time);
+          // Mark as read
+          fetch('/api/messages/' + convId, { method: 'PATCH' }).catch(function(){});
+        })
+        .subscribe();
+    } catch(e) { console.error('Realtime setup failed', e); }
+  })();
+</script>

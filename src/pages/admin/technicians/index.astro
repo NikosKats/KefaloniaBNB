@@ -1,0 +1,430 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+const service = getServiceClient();
+
+const { data: categories } = await service
+  .from('technician_categories')
+  .select('*')
+  .order('sort_order');
+
+const { data: technicians } = await service
+  .from('technicians')
+  .select('*, technician_categories(slug, name_en, icon)')
+  .order('created_at', { ascending: false });
+
+// Pending reviews for moderation
+const { data: pendingReviews } = await service
+  .from('technician_reviews')
+  .select('*, technicians(name)')
+  .eq('is_approved', false)
+  .order('created_at', { ascending: false });
+
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+
+<AdminLayout title="Technicians">
+  <div class="space-y-6">
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl font-bold text-white">Technicians</h1>
+      <button id="add-btn" class="bg-[#c9a96e] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#b89556]">+ Add Technician</button>
+    </div>
+
+    <!-- Add/Edit form (hidden by default) -->
+    <div id="tech-form-wrap" class="hidden bg-white/5 rounded-xl border border-white/10 p-6">
+      <h2 class="text-lg font-semibold text-white mb-4" id="form-title">Add Technician</h2>
+      <form id="tech-form" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <input type="hidden" name="id" />
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Name *</label>
+          <input type="text" name="name" required class="w-full bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Phone *</label>
+          <input type="text" name="phone" required class="w-full bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Email</label>
+          <input type="email" name="email" class="w-full bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Category *</label>
+          <select name="category_id" required class="w-full bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e]">
+            {(categories ?? []).map((c: any) => (
+              <option value={c.id} class="text-black">{c.icon} {c.name_en}</option>
+            ))}
+          </select>
+        </div>
+        <div class="sm:col-span-2">
+          <label class="block text-xs text-gray-400 mb-1">Bio</label>
+          <textarea name="bio" rows="2" class="w-full bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e] resize-y"></textarea>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Service Areas (comma-separated)</label>
+          <input type="text" name="service_areas" placeholder="Keramoti, Kefalonia, Nea Peramos" class="w-full bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Website</label>
+          <input type="url" name="website" placeholder="https://..." class="w-full bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Google Maps URL</label>
+          <input type="url" name="google_maps_url" placeholder="https://maps.google.com/..." class="w-full bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Google Business URL</label>
+          <input type="url" name="google_business_url" placeholder="https://g.co/..." class="w-full bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Facebook URL</label>
+          <input type="url" name="facebook_url" placeholder="https://facebook.com/..." class="w-full bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Instagram URL</label>
+          <input type="url" name="instagram_url" placeholder="https://instagram.com/..." class="w-full bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+        </div>
+        <div class="flex items-center gap-4">
+          <label class="flex items-center gap-2 text-sm text-gray-300">
+            <input type="checkbox" name="is_verified" class="rounded" /> Verified
+          </label>
+        </div>
+        <div class="sm:col-span-2 flex gap-2">
+          <button type="submit" class="bg-[#c9a96e] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b89556]">Save</button>
+          <button type="button" id="cancel-btn" class="bg-white/10 text-gray-300 px-6 py-2 rounded-lg text-sm hover:bg-white/20">Cancel</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- List -->
+    {(!technicians || technicians.length === 0) ? (
+      <div class="text-center py-16 text-gray-500">
+        <p class="text-4xl mb-2">🛠️</p>
+        <p>No technicians yet</p>
+      </div>
+    ) : (
+      <div class="space-y-3">
+        {(technicians ?? []).map((t: any) => (
+          <div class="bg-white/5 rounded-xl border border-white/10 tech-row" data-id={t.id}
+            data-json={JSON.stringify({ id: t.id, name: t.name, phone: t.phone, email: t.email ?? '', bio: t.bio ?? '', category_id: t.category_id, service_areas: (t.service_areas ?? []).join(', '), is_verified: t.is_verified, website: t.website ?? '', google_maps_url: t.google_maps_url ?? '', google_business_url: t.google_business_url ?? '', facebook_url: t.facebook_url ?? '', instagram_url: t.instagram_url ?? '', cover_photo: t.cover_photo ?? '', photo_urls: t.photo_urls ?? [] })}>
+            <div class="p-4 flex items-center justify-between gap-4">
+              <div class="flex items-center gap-3 min-w-0">
+                {t.cover_photo ? (
+                  <img src={t.cover_photo} alt={t.name} class="w-10 h-10 rounded-lg object-cover flex-shrink-0" />
+                ) : (
+                  <span class="text-2xl">{(t as any).technician_categories?.icon ?? '🛠️'}</span>
+                )}
+                <div class="min-w-0">
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-semibold text-white truncate">{t.name}</span>
+                    {t.is_verified && <span class="text-blue-400 text-xs">✓</span>}
+                    {!t.is_active && <span class="text-xs bg-red-900/30 text-red-400 px-1.5 py-0.5 rounded">Inactive</span>}
+                  </div>
+                  <div class="text-xs text-gray-400 flex items-center gap-2 flex-wrap">
+                    <span>{(t as any).technician_categories?.name_en ?? ''}</span>
+                    <span>📞 {t.phone}</span>
+                    {t.service_areas?.length > 0 && <span>📍 {t.service_areas.join(', ')}</span>}
+                    <span class="text-gray-500">· {(t.photo_urls ?? []).length + (t.cover_photo ? 1 : 0)} photos</span>
+                  </div>
+                </div>
+              </div>
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <button class="photos-btn text-xs text-blue-400 hover:underline" data-id={t.id}>Photos</button>
+                <button class="edit-btn text-xs text-[#c9a96e] hover:underline" data-id={t.id}>Edit</button>
+                <button class="toggle-btn text-xs text-gray-400 hover:text-white" data-id={t.id} data-active={t.is_active}>{t.is_active ? 'Deactivate' : 'Activate'}</button>
+                <button class="del-btn text-xs text-red-400 hover:text-red-300" data-id={t.id}>Delete</button>
+              </div>
+            </div>
+
+            {/* Photo manager panel */}
+            <div class="photos-panel hidden border-t border-white/10 p-4" data-id={t.id}>
+              <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-semibold text-white">Photos</h3>
+                <label class="cursor-pointer bg-[#c9a96e] text-white px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-[#b89556]">
+                  + Upload Photo
+                  <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple class="hidden upload-photo-input" data-id={t.id} />
+                </label>
+              </div>
+              <div class="upload-status text-xs text-gray-400 hidden mb-2" data-id={t.id}></div>
+              <div class="photo-grid grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-2" data-id={t.id}>
+                {t.cover_photo && (
+                  <div class="relative group">
+                    <img src={t.cover_photo} alt="Cover" class="w-full aspect-square object-cover rounded-lg" />
+                    <span class="absolute top-1 left-1 bg-[#c9a96e] text-white text-[10px] px-1.5 py-0.5 rounded font-medium">Cover</span>
+                    <button class="remove-photo-btn absolute top-1 right-1 bg-red-600/80 text-white w-5 h-5 rounded-full text-xs opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center" data-tech-id={t.id} data-url={t.cover_photo} data-type="cover">&times;</button>
+                  </div>
+                )}
+                {(t.photo_urls ?? []).map((url: string, idx: number) => (
+                  <div class="relative group">
+                    <img src={url} alt={`Photo ${idx + 1}`} class="w-full aspect-square object-cover rounded-lg" />
+                    <div class="absolute top-1 right-1 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <button class="set-cover-btn bg-[#c9a96e]/80 text-white w-5 h-5 rounded-full text-[10px] flex items-center justify-center" data-tech-id={t.id} data-url={url} title="Set as cover">★</button>
+                      <button class="remove-photo-btn bg-red-600/80 text-white w-5 h-5 rounded-full text-xs flex items-center justify-center" data-tech-id={t.id} data-url={url} data-type="gallery">&times;</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              {!t.cover_photo && (t.photo_urls ?? []).length === 0 && (
+                <p class="text-xs text-gray-500 text-center py-4">No photos yet. Upload some!</p>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+
+    {/* ── Review Moderation ───────────────────────────────────────────── */}
+    <div class="mt-10">
+      <h2 class="text-xl font-bold text-white mb-4">Pending Reviews ({(pendingReviews ?? []).length})</h2>
+      {(!pendingReviews || pendingReviews.length === 0) ? (
+        <p class="text-gray-500 text-sm">No reviews pending approval.</p>
+      ) : (
+        <div class="space-y-3">
+          {(pendingReviews ?? []).map((r: any) => (
+            <div class="bg-white/5 rounded-xl border border-white/10 p-4 review-row" data-id={r.id}>
+              <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="text-amber-400 text-sm">{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</span>
+                    <span class="text-white font-medium text-sm">{r.reviewer_name}</span>
+                    {r.reviewer_email && <span class="text-gray-500 text-xs">{r.reviewer_email}</span>}
+                  </div>
+                  <p class="text-xs text-gray-400 mb-1">
+                    For: <span class="text-gray-300 font-medium">{(r as any).technicians?.name ?? 'Unknown'}</span>
+                    &nbsp;·&nbsp; {new Date(r.created_at).toLocaleDateString()}
+                  </p>
+                  {r.body && <p class="text-sm text-gray-300">{r.body}</p>}
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                  <button class="approve-review-btn bg-green-600/20 text-green-400 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-green-600/30" data-id={r.id}>
+                    Approve
+                  </button>
+                  <button class="delete-review-btn bg-red-600/20 text-red-400 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-600/30" data-id={r.id}>
+                    Delete
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+</AdminLayout>
+
+<script>
+  const formWrap = document.getElementById('tech-form-wrap')!;
+  const form = document.getElementById('tech-form') as HTMLFormElement;
+  const formTitle = document.getElementById('form-title')!;
+
+  document.getElementById('add-btn')?.addEventListener('click', () => {
+    form.reset();
+    (form.querySelector('[name="id"]') as HTMLInputElement).value = '';
+    formTitle.textContent = 'Add Technician';
+    formWrap.classList.remove('hidden');
+  });
+
+  document.getElementById('cancel-btn')?.addEventListener('click', () => {
+    formWrap.classList.add('hidden');
+  });
+
+  document.querySelectorAll('.edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const row = (btn as HTMLElement).closest('.tech-row') as HTMLElement;
+      const data = JSON.parse(row.dataset.json!);
+      (form.querySelector('[name="id"]') as HTMLInputElement).value = data.id;
+      (form.querySelector('[name="name"]') as HTMLInputElement).value = data.name;
+      (form.querySelector('[name="phone"]') as HTMLInputElement).value = data.phone;
+      (form.querySelector('[name="email"]') as HTMLInputElement).value = data.email;
+      (form.querySelector('[name="bio"]') as HTMLTextAreaElement).value = data.bio;
+      (form.querySelector('[name="category_id"]') as HTMLSelectElement).value = data.category_id;
+      (form.querySelector('[name="service_areas"]') as HTMLInputElement).value = data.service_areas;
+      (form.querySelector('[name="is_verified"]') as HTMLInputElement).checked = data.is_verified;
+      (form.querySelector('[name="website"]') as HTMLInputElement).value = data.website;
+      (form.querySelector('[name="google_maps_url"]') as HTMLInputElement).value = data.google_maps_url;
+      (form.querySelector('[name="google_business_url"]') as HTMLInputElement).value = data.google_business_url;
+      (form.querySelector('[name="facebook_url"]') as HTMLInputElement).value = data.facebook_url;
+      (form.querySelector('[name="instagram_url"]') as HTMLInputElement).value = data.instagram_url;
+      formTitle.textContent = 'Edit Technician';
+      formWrap.classList.remove('hidden');
+      formWrap.scrollIntoView({ behavior: 'smooth' });
+    });
+  });
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const id = fd.get('id') as string;
+    const areas = (fd.get('service_areas') as string).split(',').map(s => s.trim()).filter(Boolean);
+    const body = {
+      name: fd.get('name'), phone: fd.get('phone'), email: fd.get('email') || null,
+      bio: fd.get('bio') || null, category_id: fd.get('category_id'),
+      service_areas: areas, is_verified: !!(fd.get('is_verified')),
+      website: fd.get('website') || null,
+      google_maps_url: fd.get('google_maps_url') || null,
+      google_business_url: fd.get('google_business_url') || null,
+      facebook_url: fd.get('facebook_url') || null,
+      instagram_url: fd.get('instagram_url') || null,
+    };
+
+    try {
+      const url = id ? `/api/admin/technicians/${id}` : '/api/admin/technicians';
+      const method = id ? 'PATCH' : 'POST';
+      const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (res.ok) location.reload();
+      else { const d = await res.json(); alert(d.error || 'Failed'); }
+    } catch { alert('Error'); }
+  });
+
+  document.querySelectorAll('.toggle-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = (btn as HTMLElement).dataset.id;
+      const isActive = (btn as HTMLElement).dataset.active === 'true';
+      const res = await fetch(`/api/admin/technicians/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: !isActive }),
+      });
+      if (res.ok) location.reload();
+    });
+  });
+
+  document.querySelectorAll('.del-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete this technician?')) return;
+      const id = (btn as HTMLElement).dataset.id;
+      const res = await fetch(`/api/admin/technicians/${id}`, { method: 'DELETE' });
+      if (res.ok) (btn as HTMLElement).closest('.tech-row')?.remove();
+    });
+  });
+
+  // Toggle photos panel
+  document.querySelectorAll('.photos-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = (btn as HTMLElement).dataset.id;
+      const panel = document.querySelector(`.photos-panel[data-id="${id}"]`) as HTMLElement;
+      panel?.classList.toggle('hidden');
+    });
+  });
+
+  // Upload photos
+  document.querySelectorAll('.upload-photo-input').forEach(input => {
+    input.addEventListener('change', async (e) => {
+      const el = e.target as HTMLInputElement;
+      const id = el.dataset.id!;
+      const files = el.files;
+      if (!files || files.length === 0) return;
+
+      const status = document.querySelector(`.upload-status[data-id="${id}"]`) as HTMLElement;
+      status.classList.remove('hidden');
+
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        status.textContent = `Uploading ${i + 1}/${files.length}: ${file.name}...`;
+
+        const fd = new FormData();
+        fd.append('file', file);
+        fd.append('technician_id', id);
+        if (i === 0) {
+          const row = el.closest('.tech-row') as HTMLElement;
+          const data = JSON.parse(row.dataset.json!);
+          if (!data.cover_photo) fd.append('is_cover', 'true');
+        }
+
+        try {
+          const res = await fetch('/api/admin/upload/technician-photo', { method: 'POST', body: fd });
+          if (!res.ok) {
+            const d = await res.json();
+            status.textContent = `Failed: ${d.error || 'Upload error'}`;
+            status.classList.add('text-red-400');
+            return;
+          }
+        } catch {
+          status.textContent = 'Network error';
+          status.classList.add('text-red-400');
+          return;
+        }
+      }
+
+      status.textContent = `Uploaded ${files.length} photo(s). Refreshing...`;
+      setTimeout(() => location.reload(), 500);
+    });
+  });
+
+  // Set as cover
+  document.querySelectorAll('.set-cover-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = (btn as HTMLElement).dataset.techId!;
+      const url = (btn as HTMLElement).dataset.url!;
+      const res = await fetch(`/api/admin/technicians/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cover_photo: url }),
+      });
+      if (res.ok) location.reload();
+    });
+  });
+
+  // Remove photo
+  document.querySelectorAll('.remove-photo-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Remove this photo?')) return;
+      const id = (btn as HTMLElement).dataset.techId!;
+      const url = (btn as HTMLElement).dataset.url!;
+      const type = (btn as HTMLElement).dataset.type!;
+
+      const row = (btn as HTMLElement).closest('.tech-row') as HTMLElement;
+      const updates: Record<string, any> = {};
+      if (type === 'cover') {
+        updates.cover_photo = null;
+      } else {
+        const allPhotoBtns = row.querySelectorAll('.remove-photo-btn[data-type="gallery"]');
+        const urls: string[] = [];
+        allPhotoBtns.forEach(b => {
+          const u = (b as HTMLElement).dataset.url!;
+          if (u !== url) urls.push(u);
+        });
+        updates.photo_urls = urls;
+      }
+
+      const res = await fetch(`/api/admin/technicians/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      if (res.ok) location.reload();
+    });
+  });
+
+  // Review moderation
+  document.querySelectorAll('.approve-review-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = (btn as HTMLElement).dataset.id;
+      const res = await fetch(`/api/admin/technicians/reviews/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_approved: true }),
+      });
+      if (res.ok) {
+        (btn as HTMLElement).closest('.review-row')?.remove();
+        // Update count in heading
+        const remaining = document.querySelectorAll('.review-row').length;
+        const heading = document.querySelector('h2:last-of-type');
+        if (heading) heading.textContent = `Pending Reviews (${remaining})`;
+      }
+    });
+  });
+
+  document.querySelectorAll('.delete-review-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete this review permanently?')) return;
+      const id = (btn as HTMLElement).dataset.id;
+      const res = await fetch(`/api/admin/technicians/reviews/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        (btn as HTMLElement).closest('.review-row')?.remove();
+        const remaining = document.querySelectorAll('.review-row').length;
+        const heading = document.querySelector('h2:last-of-type');
+        if (heading) heading.textContent = `Pending Reviews (${remaining})`;
+      }
+    });
+  });
+</script>

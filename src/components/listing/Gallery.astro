@@ -1,0 +1,136 @@
+---
+import type { ListingImage } from '../../types/index.ts';
+
+interface Props {
+  images: ListingImage[];
+  title: string;
+}
+const { images, title } = Astro.props;
+const cover = images.find((i) => i.is_cover) ?? images[0];
+const rest = images.filter((i) => i.id !== cover?.id).slice(0, 4);
+---
+
+<!-- Desktop grid gallery -->
+<div class="hidden md:grid grid-cols-4 grid-rows-2 gap-2 rounded-2xl overflow-hidden h-[480px]">
+  <!-- Main cover (spans 2 rows) -->
+  <div class="col-span-2 row-span-2 relative">
+    {cover && (
+      <img
+        src={cover.url}
+        alt={cover.alt_text ?? title}
+        class="w-full h-full object-cover cursor-pointer hover:brightness-95 transition-all"
+        width="800"
+        height="600"
+        loading="eager"
+        id="gallery-trigger"
+      />
+    )}
+  </div>
+  <!-- Thumbnails -->
+  {rest.map((img, i) => (
+    <div class="relative overflow-hidden">
+      <img
+        src={img.url}
+        alt={img.alt_text ?? `${title} – photo ${i + 2}`}
+        class="w-full h-full object-cover cursor-pointer hover:brightness-95 transition-all"
+        width="400"
+        height="280"
+        loading="lazy"
+      />
+      {i === 3 && images.length > 5 && (
+        <button
+          id="gallery-all-btn"
+          class="absolute inset-0 bg-black/40 flex items-center justify-center text-white font-semibold text-sm hover:bg-black/50 transition-colors"
+        >
+          +{images.length - 5} photos
+        </button>
+      )}
+    </div>
+  ))}
+</div>
+
+<!-- Mobile: single scrollable strip -->
+<div class="md:hidden">
+  <div class="flex gap-2 overflow-x-auto snap-x snap-mandatory pb-2 -mx-4 px-4 scrollbar-hide">
+    {images.map((img, i) => (
+      <div class="snap-center shrink-0 w-[85vw] aspect-[4/3] rounded-xl overflow-hidden">
+        <img
+          src={img.url}
+          alt={img.alt_text ?? `${title} ${i + 1}`}
+          class="w-full h-full object-cover"
+          width="400"
+          height="300"
+          loading={i === 0 ? 'eager' : 'lazy'}
+        />
+      </div>
+    ))}
+  </div>
+</div>
+
+<!-- Lightbox overlay -->
+<div id="lightbox" class="fixed inset-0 z-[200] bg-black/95 hidden items-center justify-center" role="dialog" aria-modal="true">
+  <button id="lightbox-close" class="absolute top-4 right-4 text-white/80 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10">
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+    </svg>
+  </button>
+  <button id="lightbox-prev" class="absolute left-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10">
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+    </svg>
+  </button>
+  <div id="lightbox-img-wrap" class="max-w-5xl max-h-screen p-8 flex items-center justify-center">
+    <img id="lightbox-img" src="" alt="" class="max-w-full max-h-[85vh] object-contain rounded-lg" />
+  </div>
+  <div id="lightbox-counter" class="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/60 text-sm"></div>
+  <button id="lightbox-next" class="absolute right-4 top-1/2 -translate-y-1/2 text-white/80 hover:text-white p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors z-10">
+    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+    </svg>
+  </button>
+</div>
+
+<script define:vars={{ images }}>
+  const lightbox = document.getElementById('lightbox');
+  const lbImg = document.getElementById('lightbox-img');
+  const lbCounter = document.getElementById('lightbox-counter');
+  let current = 0;
+
+  function open(idx) {
+    current = idx;
+    lightbox.classList.remove('hidden');
+    lightbox.classList.add('flex');
+    document.body.style.overflow = 'hidden';
+    show();
+  }
+
+  function close() {
+    lightbox.classList.add('hidden');
+    lightbox.classList.remove('flex');
+    document.body.style.overflow = '';
+  }
+
+  function show() {
+    const img = images[current];
+    lbImg.src = img.url;
+    lbImg.alt = img.alt_text ?? `Photo ${current + 1}`;
+    lbCounter.textContent = `${current + 1} / ${images.length}`;
+  }
+
+  function prev() { current = (current - 1 + images.length) % images.length; show(); }
+  function next() { current = (current + 1) % images.length; show(); }
+
+  document.getElementById('gallery-trigger')?.addEventListener('click', () => open(0));
+  document.getElementById('gallery-all-btn')?.addEventListener('click', () => open(0));
+  document.getElementById('lightbox-close')?.addEventListener('click', close);
+  document.getElementById('lightbox-prev')?.addEventListener('click', prev);
+  document.getElementById('lightbox-next')?.addEventListener('click', next);
+  lightbox?.addEventListener('click', (e) => { if (e.target === lightbox) close(); });
+  document.addEventListener('keydown', (e) => {
+    if (!lightbox.classList.contains('hidden')) {
+      if (e.key === 'Escape') close();
+      if (e.key === 'ArrowLeft') prev();
+      if (e.key === 'ArrowRight') next();
+    }
+  });
+</script>

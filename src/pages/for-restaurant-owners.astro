@@ -1,0 +1,294 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://kefaloniabnb.com';
+
+const faqSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'How much does it cost to list my restaurant?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Listing your restaurant on kefaloniabnb.com is completely free. There are no monthly fees or commissions — we promote your restaurant to our growing community of travellers and locals.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How do guests make reservations?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Guests can reserve a table directly through your restaurant page on kefaloniabnb.com. You manage reservations through your dedicated owner portal — approve, reject, or modify bookings in seconds.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Can I manage my own tables and availability?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Yes. Your restaurant dashboard lets you configure tables, set opening hours, manage reservations, and track guest reviews — all in one place.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Do you provide QR codes for my restaurant?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Yes! We generate printable QR codes for table reservations, Google reviews, and your restaurant page. Place them on menus, tables, or storefronts to drive traffic.',
+      },
+    },
+  ],
+};
+---
+
+<BaseLayout
+  title="List Your Restaurant in Kefalonia — Get Discovered on KefaloniaBNB"
+  description="Partner with KefaloniaBNB to list your restaurant in Kefalonia or Keramoti, Greece. Free listing, table reservations, reviews, and QR codes — reach travellers and locals."
+  schema={faqSchema}
+>
+
+  <!-- Hero -->
+  <section class="relative bg-[#1a1a2e] text-white overflow-hidden">
+    <div class="absolute inset-0 bg-gradient-to-br from-[#1a1a2e] via-[#1a1a2e] to-[#2d2d4e] opacity-90"></div>
+    <div class="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32">
+      <div class="grid lg:grid-cols-2 gap-12 items-center">
+        <div>
+          <div class="inline-flex items-center gap-2 bg-[#c9a96e]/20 text-[#c9a96e] px-4 py-1.5 rounded-full text-sm font-semibold mb-6">
+            <span>🍽️</span> {isEl ? 'Για Ιδιοκτήτες Εστιατορίων' : isBg ? 'За Собственици на Ресторанти' : isSr ? 'За Власнике Ресторана' : isTr ? 'Restoran Sahipleri İçin' : isRo ? 'Pentru Proprietarii de Restaurante' : 'For Restaurant Owners'}
+          </div>
+          <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-6">
+            {isEl ? 'Προσελκύστε Περισσότερους' : isBg ? 'Привлечете Повече' : isSr ? 'Привуците Више' : isTr ? 'Daha Fazla Müşteri' : isRo ? 'Atrageți Mai Mulți' : 'Attract More'}<br/>{isEl ? 'Πελάτες στο Εστιατόριό σας' : isBg ? 'Клиенти в Ресторанта ви' : isSr ? 'Гостију у Ваш Ресторан' : isTr ? 'Restoranınıza Çekin' : isRo ? 'Oaspeți la Restaurantul Dvs.' : 'Guests to Your Restaurant'}<br/>
+            <span class="text-[#c9a96e]">{isEl ? 'στην Καβάλα' : isBg ? 'в Kefalonia' : isSr ? 'у Кавали' : isTr ? "Kefalonia'da" : isRo ? 'în Kefalonia' : 'in Kefalonia'}</span>
+          </h1>
+          <p class="text-gray-300 text-xl leading-relaxed mb-8 max-w-lg">
+            {isEl ? 'Δωρεάν καταχώριση, online κρατήσεις τραπεζιών, κριτικές πελατών και εκτυπώσιμα QR codes — όλα μέσα από μια πλατφόρμα που προσελκύει τουρίστες και τοπικούς.' : isBg ? 'Безплатна обява, онлайн резервации на маси, отзиви на клиенти и QR кодове за печат — всичко от платформа, която привлича туристи и местни.' : isSr ? 'Бесплатно оглашавање, онлајн резервације столова, рецензије гостију и QR кодови за штампу — све са платформе која привлачи туристе и локалне.' : isTr ? 'Ücretsiz listeleme, çevrimiçi masa rezervasyonu, müşteri yorumları ve yazdırılabilir QR kodlar — gezginleri ve yerel halkı çeken bir platformdan.' : isRo ? 'Listare gratuită, rezervări de masă online, recenzii ale oaspeților și coduri QR imprimabile — totul de pe o platformă care atrage călători și localnici.' : 'Free listing, online table reservations, guest reviews, and printable QR codes — all from a platform that attracts travellers and locals.'}
+          </p>
+          <div class="flex flex-col sm:flex-row gap-4">
+            <a href="/partner-with-us"
+              class="inline-flex items-center justify-center gap-2 bg-[#c9a96e] text-white font-bold px-8 py-4 rounded-2xl text-lg hover:bg-[#b8935d] transition-colors">
+              {isEl ? 'Ξεκινήστε Δωρεάν →' : isBg ? 'Започнете безплатно →' : isSr ? 'Почните бесплатно →' : isTr ? 'Ücretsiz Başlayın →' : isRo ? 'Începeți Gratuit →' : 'Get Started Free →'}
+            </a>
+            <a href="/contact"
+              class="inline-flex items-center justify-center gap-2 bg-white/10 text-white font-semibold px-8 py-4 rounded-2xl text-lg hover:bg-white/20 transition-colors">
+              {isEl ? 'Μιλήστε μαζί μας' : isBg ? 'Говорете с нас' : isSr ? 'Разговарајте са нама' : isTr ? 'Bizimle Konuşun' : isRo ? 'Vorbiți cu Noi' : 'Talk to Us'}
+            </a>
+          </div>
+        </div>
+        <div class="hidden lg:block">
+          <div class="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-8 space-y-6">
+            <div class="flex items-start gap-4">
+              <div class="w-12 h-12 rounded-2xl bg-[#c9a96e]/20 flex items-center justify-center shrink-0 text-2xl">📅</div>
+              <div>
+                <p class="font-semibold text-lg">{isEl ? 'Online κρατήσεις τραπεζιών' : isBg ? 'Онлайн резервации на маси' : isSr ? 'Онлајн резервације столова' : isTr ? 'Çevrimiçi masa rezervasyonu' : isRo ? 'Rezervări de masă online' : 'Online table reservations'}</p>
+                <p class="text-gray-400 text-sm mt-1">{isEl ? 'Οι πελάτες κλείνουν τραπέζι απευθείας από τη σελίδα σας — χωρίς τηλεφωνήματα, χωρίς τρίτους.' : isBg ? 'Клиентите резервират маса директно от вашата страница — без обаждания, без посредници.' : isSr ? 'Гости резервишу сто директно са ваше странице — без позива, без посредника.' : isTr ? 'Müşteriler doğrudan sayfanızdan masa ayırtır — telefon araması yok, aracı yok.' : isRo ? 'Oaspeții rezervă o masă direct de pe pagina dvs. — fără apeluri telefonice, fără intermediari.' : 'Guests book a table directly from your page — no phone calls, no middlemen.'}</p>
+              </div>
+            </div>
+            <div class="flex items-start gap-4">
+              <div class="w-12 h-12 rounded-2xl bg-[#c9a96e]/20 flex items-center justify-center shrink-0 text-2xl">⭐</div>
+              <div>
+                <p class="font-semibold text-lg">{isEl ? 'Κριτικές & αξιολογήσεις' : isBg ? 'Отзиви и рейтинги' : isSr ? 'Рецензије и оцене' : isTr ? 'Yorumlar ve değerlendirmeler' : isRo ? 'Recenzii și evaluări' : 'Reviews & ratings'}</p>
+                <p class="text-gray-400 text-sm mt-1">{isEl ? 'Συλλέξτε αυθεντικές κριτικές από πελάτες και χτίστε τη φήμη σας online.' : isBg ? 'Събирайте автентични отзиви от клиенти и изградете онлайн репутацията си.' : isSr ? 'Прикупљајте аутентичне рецензије од гостију и градите онлајн репутацију.' : isTr ? 'Müşterilerden gerçek yorumlar toplayın ve çevrimiçi itibarınızı oluşturun.' : isRo ? 'Colectați recenzii autentice de la oaspeți și construiți-vă reputația online.' : 'Collect authentic reviews from guests and build your online reputation.'}</p>
+              </div>
+            </div>
+            <div class="flex items-start gap-4">
+              <div class="w-12 h-12 rounded-2xl bg-[#c9a96e]/20 flex items-center justify-center shrink-0 text-2xl">📱</div>
+              <div>
+                <p class="font-semibold text-lg">{isEl ? 'QR codes για κάθε χρήση' : isBg ? 'QR кодове за всичко' : isSr ? 'QR кодови за све' : isTr ? 'Her kullanım için QR kodlar' : isRo ? 'Coduri QR pentru orice' : 'QR codes for everything'}</p>
+                <p class="text-gray-400 text-sm mt-1">{isEl ? 'Εκτυπώστε QR codes για κρατήσεις, κριτικές Google και τη σελίδα σας — βάλτε τα σε μενού, τραπέζια ή βιτρίνες.' : isBg ? 'Отпечатайте QR кодове за резервации, Google отзиви и вашата страница — поставете ги на менюта, маси или витрини.' : isSr ? 'Одштампајте QR кодове за резервације, Google рецензије и вашу страницу — ставите их на меније, столове или излоге.' : isTr ? 'Rezervasyonlar, Google yorumları ve sayfanız için QR kodlar yazdırın — menülere, masalara veya vitrislere yerleştirin.' : isRo ? 'Imprimați coduri QR pentru rezervări, recenzii Google și pagina dvs. — plasați-le pe meniuri, mese sau vitrine.' : 'Print QR codes for reservations, Google reviews, and your page — place them on menus, tables, or storefronts.'}</p>
+              </div>
+            </div>
+            <div class="flex items-start gap-4">
+              <div class="w-12 h-12 rounded-2xl bg-[#c9a96e]/20 flex items-center justify-center shrink-0 text-2xl">🌐</div>
+              <div>
+                <p class="font-semibold text-lg">{isEl ? 'Ορατότητα σε τουρίστες' : isBg ? 'Видимост за туристи' : isSr ? 'Видљивост за туристе' : isTr ? 'Turist görünürlüğü' : isRo ? 'Vizibilitate pentru turiști' : 'Visibility to tourists'}</p>
+                <p class="text-gray-400 text-sm mt-1">{isEl ? 'Το εστιατόριό σας εμφανίζεται σε χιλιάδες επισκέπτες που αναζητούν φαγητό στην Καβάλα.' : isBg ? 'Вашият ресторант се показва на хиляди посетители, търсещи храна в Кавала.' : isSr ? 'Ваш ресторан се приказује хиљадама посетилаца који траже храну у Кавали.' : isTr ? "Restoranınız Kefalonia'da yemek arayan binlerce ziyaretçiye görünür." : isRo ? 'Restaurantul dvs. este afișat miilor de vizitatori care caută unde să mănânce în Kefalonia.' : 'Your restaurant is shown to thousands of visitors looking for dining in Kefalonia.'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats bar -->
+  <section class="bg-[#c9a96e] text-white">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-8 text-center">
+        {[
+          { value: '€0', label: isEl ? 'Κόστος καταχώρισης' : isBg ? 'Такса за регистрация' : isSr ? 'Накнада за листање' : isTr ? 'Listeleme ücreti' : isRo ? 'Taxă de listare' : 'Listing fee' },
+          { value: '24h', label: isEl ? 'Ενεργοποίηση' : isBg ? 'Активиране' : isSr ? 'Активација' : isTr ? 'Aktivasyon' : isRo ? 'Timp de activare' : 'Activation time' },
+          { value: 'QR', label: isEl ? 'Εκτυπώσιμα codes' : isBg ? 'Кодове за печат' : isSr ? 'Кодови за штампу' : isTr ? 'Yazdırılabilir kodlar' : isRo ? 'Coduri imprimabile' : 'Printable codes' },
+          { value: '100%', label: isEl ? 'Δωρεάν για πάντα' : isBg ? 'Безплатно завинаги' : isSr ? 'Бесплатно заувек' : isTr ? 'Sonsuza dek ücretsiz' : isRo ? 'Gratuit pentru totdeauna' : 'Free forever' },
+        ].map((s) => (
+          <div>
+            <p class="text-3xl font-bold">{s.value}</p>
+            <p class="text-sm font-medium opacity-80 mt-1">{s.label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <div class="text-center mb-14">
+      <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-widest mb-3">{isEl ? 'Απλή διαδικασία' : isBg ? 'Опростен процес' : isSr ? 'Једноставан процес' : isTr ? 'Basit süreç' : isRo ? 'Proces simplu' : 'Simple process'}</p>
+      <h2 class="text-3xl sm:text-4xl font-bold text-gray-900">{isEl ? 'Πώς λειτουργεί' : isBg ? 'Как работи' : isSr ? 'Како то функционише' : isTr ? 'Nasıl çalışır' : isRo ? 'Cum funcționează' : 'How it works'}</h2>
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
+      {[
+        {
+          step: '1',
+          icon: '📋',
+          title: isEl ? 'Επικοινωνήστε μαζί μας' : isBg ? 'Свържете се с нас' : isSr ? 'Контактирајте нас' : isTr ? 'Bizimle iletişime geçin' : isRo ? 'Contactați-ne' : 'Contact us',
+          desc: isEl ? 'Στείλτε μας τα στοιχεία του εστιατορίου σας — όνομα, τοποθεσία, μενού, φωτογραφίες. Μπορούμε να τα ρυθμίσουμε μέσα σε λίγες ώρες.' : isBg ? 'Изпратете ни данните на ресторанта си — име, местоположение, меню, снимки. Можем да настроим всичко за часове.' : isSr ? 'Пошаљите нам податке о ресторану — назив, локацију, мени, фотографије. Можемо да подесимо све за неколико сати.' : isTr ? 'Bize restoranınızın bilgilerini gönderin — ad, konum, menü, fotoğraflar. Birkaç saat içinde kurulumu yapabiliriz.' : isRo ? 'Trimiteți-ne detaliile restaurantului — nume, locație, meniu, fotografii. Putem configura totul în câteva ore.' : 'Send us your restaurant details — name, location, menu, photos. We can set everything up within hours.',
+        },
+        {
+          step: '2',
+          icon: '✅',
+          title: isEl ? 'Δημοσιεύουμε τη σελίδα σας' : isBg ? 'Публикуваме страницата ви' : isSr ? 'Објављујемо вашу страницу' : isTr ? 'Sayfanızı yayınlıyoruz' : isRo ? 'Publicăm pagina dvs.' : 'We publish your page',
+          desc: isEl ? 'Δημιουργούμε μια πλήρη σελίδα εστιατορίου με κριτικές, φωτογραφίες, χάρτη και φόρμα κρατήσεων.' : isBg ? 'Създаваме пълна страница за ресторанта с отзиви, снимки, карта и форма за резервация.' : isSr ? 'Креирамо комплетну страницу ресторана са рецензијама, фотографијама, мапом и формом за резервацију.' : isTr ? 'Yorumlar, fotoğraflar, harita ve rezervasyon formu ile tam bir restoran sayfası oluşturuyoruz.' : isRo ? 'Creăm o pagină completă de restaurant cu recenzii, fotografii, hartă și formular de rezervare.' : 'We create a full restaurant page with reviews, photos, a map, and a reservation form.',
+        },
+        {
+          step: '3',
+          icon: '📱',
+          title: isEl ? 'Λάβετε QR codes' : isBg ? 'Получете QR кодове' : isSr ? 'Добијте QR кодове' : isTr ? 'QR kodlarınızı alın' : isRo ? 'Primiți codurile QR' : 'Get your QR codes',
+          desc: isEl ? 'Εκτυπώστε QR codes για κρατήσεις τραπεζιών και κριτικές Google — τοποθετήστε τα στα μενού ή τα τραπέζια σας.' : isBg ? 'Отпечатайте QR кодове за резервации на маси и Google отзиви — поставете ги на менюта или маси.' : isSr ? 'Одштампајте QR кодове за резервације столова и Google рецензије — ставите их на меније или столове.' : isTr ? 'Masa rezervasyonları ve Google yorumları için QR kodlar yazdırın — menülere veya masalara yerleştirin.' : isRo ? 'Imprimați coduri QR pentru rezervări de masă și recenzii Google — plasați-le pe meniuri sau mese.' : 'Print QR codes for table reservations and Google reviews — place them on your menus or tables.',
+        },
+        {
+          step: '4',
+          icon: '🎉',
+          title: isEl ? 'Δεχτείτε κρατήσεις' : isBg ? 'Получавайте резервации' : isSr ? 'Примајте резервације' : isTr ? 'Rezervasyonları alın' : isRo ? 'Acceptați rezervări' : 'Accept reservations',
+          desc: isEl ? 'Διαχειριστείτε κρατήσεις, κριτικές και τα τραπέζια σας μέσα από τον δικό σας πίνακα ελέγχου.' : isBg ? 'Управлявайте резервации, отзиви и масите си от вашето табло за управление.' : isSr ? 'Управљајте резервацијама, рецензијама и столовима са своје контролне табле.' : isTr ? 'Rezervasyonları, yorumları ve masaları kontrol panelinizden yönetin.' : isRo ? 'Gestionați rezervările, recenziile și mesele din panoul dvs. de control.' : 'Manage reservations, reviews, and your tables from your own dashboard.',
+        },
+      ].map((item) => (
+        <div class="relative">
+          <div class="bg-white border border-gray-100 rounded-2xl p-6 h-full hover:shadow-md transition-shadow">
+            <div class="w-10 h-10 bg-[#1a1a2e] text-white rounded-xl flex items-center justify-center text-sm font-bold mb-4">
+              {item.step}
+            </div>
+            <div class="text-3xl mb-3">{item.icon}</div>
+            <h3 class="font-bold text-gray-900 text-lg mb-2">{item.title}</h3>
+            <p class="text-gray-500 text-sm leading-relaxed">{item.desc}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- Benefits -->
+  <section class="bg-gray-50 border-y border-gray-100 py-20 px-4">
+    <div class="max-w-6xl mx-auto">
+      <div class="text-center mb-14">
+        <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-widest mb-3">{isEl ? 'Τι κερδίζετε' : isBg ? 'Какво получавате' : isSr ? 'Шта добијате' : isTr ? 'Ne kazanırsınız' : isRo ? 'Ce primiți' : 'What you get'}</p>
+        <h2 class="text-3xl sm:text-4xl font-bold text-gray-900">{isEl ? 'Όλα δωρεάν' : isBg ? 'Всичко безплатно' : isSr ? 'Све бесплатно' : isTr ? 'Her şey ücretsiz' : isRo ? 'Totul gratuit' : 'Everything free'}</h2>
+      </div>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[
+          {
+            icon: '🌐',
+            title: isEl ? 'Σελίδα εστιατορίου με SEO' : isBg ? 'Страница на ресторанта със SEO' : isSr ? 'Страница ресторана са SEO' : isTr ? 'SEO optimizeli restoran sayfası' : isRo ? 'Pagină de restaurant optimizată SEO' : 'SEO-optimised restaurant page',
+            desc: isEl ? 'Μια πλήρης σελίδα με φωτογραφίες, μενού, χάρτη και ωράριο — βρίσκεται εύκολα στο Google.' : isBg ? 'Пълна страница със снимки, меню, карта и работно време — лесно откриваема в Google.' : isSr ? 'Комплетна страница са фотографијама, менијем, мапом и радним временом — лако се проналази на Google.' : isTr ? 'Fotoğraflar, menü, harita ve çalışma saatleri içeren tam sayfa — Google\'da kolayca bulunur.' : isRo ? 'O pagină completă cu fotografii, meniu, hartă și program — ușor de găsit pe Google.' : 'A full page with photos, menu, map, and opening hours — easily found on Google.',
+          },
+          {
+            icon: '📅',
+            title: isEl ? 'Online κρατήσεις τραπεζιών' : isBg ? 'Онлайн резервации на маси' : isSr ? 'Онлајн резервације столова' : isTr ? 'Çevrimiçi masa rezervasyonu' : isRo ? 'Rezervări de masă online' : 'Online table reservations',
+            desc: isEl ? 'Οι πελάτες κάνουν κράτηση τραπεζιού απευθείας μέσω της σελίδας σας — χωρίς τηλεφωνήματα.' : isBg ? 'Клиентите резервират маса директно от вашата страница — без обаждания.' : isSr ? 'Гости резервишу сто директно преко ваше странице — без позива.' : isTr ? 'Müşteriler doğrudan sayfanızdan masa ayırtır — telefon araması gerekmez.' : isRo ? 'Oaspeții rezervă o masă direct prin pagina dvs. — fără apeluri telefonice.' : 'Guests reserve a table directly through your page — no phone calls needed.',
+          },
+          {
+            icon: '⭐',
+            title: isEl ? 'Σύστημα κριτικών' : isBg ? 'Система за отзиви' : isSr ? 'Систем рецензија' : isTr ? 'Yorum sistemi' : isRo ? 'Sistem de recenzii' : 'Review system',
+            desc: isEl ? 'Συλλέξτε αυθεντικές κριτικές πελατών και αυξήστε τη φήμη σας στο διαδίκτυο.' : isBg ? 'Събирайте автентични отзиви на клиенти и увеличете онлайн репутацията си.' : isSr ? 'Прикупљајте аутентичне рецензије гостију и повећајте онлајн репутацију.' : isTr ? 'Gerçek müşteri yorumları toplayın ve çevrimiçi itibarınızı artırın.' : isRo ? 'Colectați recenzii autentice de la oaspeți și creșteți-vă reputația online.' : 'Collect authentic guest reviews and boost your online reputation.',
+          },
+          {
+            icon: '📱',
+            title: isEl ? 'Εκτυπώσιμα QR codes' : isBg ? 'QR кодове за печат' : isSr ? 'QR кодови за штампу' : isTr ? 'Yazdırılabilir QR kodlar' : isRo ? 'Coduri QR imprimabile' : 'Printable QR codes',
+            desc: isEl ? 'QR codes για κρατήσεις, κριτικές Google και τη σελίδα σας — έτοιμα για μενού και τραπέζια.' : isBg ? 'QR кодове за резервации, Google отзиви и вашата страница — готови за менюта и маси.' : isSr ? 'QR кодови за резервације, Google рецензије и вашу страницу — спремни за меније и столове.' : isTr ? 'Rezervasyonlar, Google yorumları ve sayfanız için QR kodlar — menüler ve masalar için hazır.' : isRo ? 'Coduri QR pentru rezervări, recenzii Google și pagina dvs. — gata pentru meniuri și mese.' : 'QR codes for reservations, Google reviews, and your page — ready for menus and tables.',
+          },
+          {
+            icon: '📊',
+            title: isEl ? 'Πίνακας ελέγχου ιδιοκτήτη' : isBg ? 'Табло за управление' : isSr ? 'Контролна табла' : isTr ? 'Yönetim paneli' : isRo ? 'Panou de control' : 'Owner dashboard',
+            desc: isEl ? 'Διαχειριστείτε κρατήσεις, τραπέζια, ωράρια και κριτικές από ένα μέρος.' : isBg ? 'Управлявайте резервации, маси, работно време и отзиви от едно място.' : isSr ? 'Управљајте резервацијама, столовима, радним временом и рецензијама са једног места.' : isTr ? 'Rezervasyonları, masaları, çalışma saatlerini ve yorumları tek yerden yönetin.' : isRo ? 'Gestionați rezervările, mesele, programul și recenziile dintr-un singur loc.' : 'Manage reservations, tables, opening hours, and reviews from one place.',
+          },
+          {
+            icon: '📣',
+            title: isEl ? 'Προβολή σε τουρίστες' : isBg ? 'Промоция за туристи' : isSr ? 'Промоција за туристе' : isTr ? 'Turist promosyonu' : isRo ? 'Promovare turistică' : 'Tourist promotion',
+            desc: isEl ? 'Το εστιατόριό σας εμφανίζεται σε χιλιάδες τουρίστες που αναζητούν φαγητό στην Καβάλα.' : isBg ? 'Ресторантът ви се показва на хиляди туристи, търсещи храна в Кавала.' : isSr ? 'Ваш ресторан се приказује хиљадама туриста који траже храну у Кавали.' : isTr ? "Restoranınız Kefalonia'da yemek arayan binlerce turiste gösterilir." : isRo ? 'Restaurantul dvs. este afișat miilor de turiști care caută unde să mănânce în Kefalonia.' : 'Your restaurant is shown to thousands of tourists looking for dining in Kefalonia.',
+          },
+        ].map((b) => (
+          <div class="bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-md transition-shadow">
+            <div class="text-3xl mb-3">{b.icon}</div>
+            <h3 class="font-bold text-gray-900 mb-2">{b.title}</h3>
+            <p class="text-gray-500 text-sm leading-relaxed">{b.desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <div class="text-center mb-12">
+      <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-widest mb-3">{isEl ? 'Συχνές Ερωτήσεις' : isBg ? 'Често задавани въпроси' : isSr ? 'Честа питања' : isTr ? 'SSS' : isRo ? 'Întrebări frecvente' : 'FAQ'}</p>
+      <h2 class="text-3xl font-bold text-gray-900">{isEl ? 'Κοινές ερωτήσεις' : isBg ? 'Общи въпроси' : isSr ? 'Уобичајена питања' : isTr ? 'Sık sorulan sorular' : isRo ? 'Întrebări frecvente' : 'Common questions'}</h2>
+    </div>
+    <div class="space-y-4" id="faq">
+      {[
+        {
+          q: isEl ? 'Πόσο κοστίζει η καταχώριση του εστιατορίου μου;' : isBg ? 'Колко струва регистрирането на ресторанта ми?' : isSr ? 'Колико кошта листање мог ресторана?' : isTr ? 'Restoranımı listelemek ne kadara mal olur?' : isRo ? 'Cât costă să listez restaurantul meu?' : 'How much does it cost to list my restaurant?',
+          a: isEl ? 'Η καταχώριση είναι εντελώς δωρεάν — χωρίς μηνιαία τέλη, χωρίς προμήθειες, χωρίς κρυφές χρεώσεις. Προωθούμε το εστιατόριό σας σε ταξιδιώτες και τοπικούς δωρεάν.' : isBg ? 'Регистрацията е напълно безплатна — без месечни такси, без комисионни, без скрити разходи. Ние промотираме ресторанта ви сред туристи и местни безплатно.' : isSr ? 'Листање је потпуно бесплатно — без месечних накнада, без провизија, без скривених трошкова. Промовишемо ваш ресторан путницима и локалним становницима бесплатно.' : isTr ? 'Listeleme tamamen ücretsizdir — aylık ücret yok, komisyon yok, gizli maliyet yok. Restoranınızı gezginlere ve yerel halka ücretsiz olarak tanıtıyoruz.' : isRo ? 'Listarea este complet gratuită — fără taxe lunare, fără comisioane, fără costuri ascunse. Promovăm restaurantul dvs. călătorilor și localnicilor gratuit.' : 'Listing is completely free — no monthly fees, no commissions, no hidden costs. We promote your restaurant to travellers and locals at no charge.',
+        },
+        {
+          q: isEl ? 'Πώς κάνουν κράτηση οι πελάτες;' : isBg ? 'Как клиентите правят резервация?' : isSr ? 'Како гости праве резервацију?' : isTr ? 'Müşteriler nasıl rezervasyon yapar?' : isRo ? 'Cum fac oaspeții rezervări?' : 'How do guests make reservations?',
+          a: isEl ? 'Οι πελάτες κλείνουν τραπέζι απευθείας μέσω της σελίδας του εστιατορίου σας στο kefaloniabnb.com. Εσείς εγκρίνετε ή απορρίπτετε κρατήσεις μέσω του πίνακα ελέγχου σας.' : isBg ? 'Клиентите резервират маса директно чрез страницата на ресторанта ви в kefaloniabnb.com. Вие одобрявате или отхвърляте резервации чрез вашето табло.' : isSr ? 'Гости резервишу сто директно преко странице вашег ресторана на kefaloniabnb.com. Ви одобравате или одбијате резервације преко своје контролне табле.' : isTr ? 'Müşteriler kefaloniabnb.com\'daki restoran sayfanız üzerinden doğrudan masa ayırtır. Kontrol panelinizden rezervasyonları onaylar veya reddedersiniz.' : isRo ? 'Oaspeții rezervă o masă direct prin pagina restaurantului dvs. pe kefaloniabnb.com. Aprobați sau respingeți rezervările din panoul dvs. de control.' : 'Guests reserve a table directly through your restaurant page on kefaloniabnb.com. You approve or reject reservations through your dashboard.',
+        },
+        {
+          q: isEl ? 'Μπορώ να διαχειρίζομαι τα τραπέζια και τη διαθεσιμότητά μου;' : isBg ? 'Мога ли да управлявам масите и наличността си?' : isSr ? 'Могу ли да управљам столовима и доступношћу?' : isTr ? 'Masalarımı ve müsaitliğimi yönetebilir miyim?' : isRo ? 'Pot să îmi gestionez mesele și disponibilitatea?' : 'Can I manage my own tables and availability?',
+          a: isEl ? 'Ναι. Ο πίνακας ελέγχου σας σάς επιτρέπει να ρυθμίσετε τραπέζια, ωράρια λειτουργίας, χωρητικότητα και ώρες κρατήσεων — όλα σε ένα μέρος.' : isBg ? 'Да. Таблото ви позволява да настроите маси, работно време, капацитет и часове за резервации — всичко на едно място.' : isSr ? 'Да. Ваша контролна табла вам омогућава да подесите столове, радно време, капацитет и сате за резервације — све на једном месту.' : isTr ? 'Evet. Kontrol paneliniz masaları, çalışma saatlerini, kapasiteyi ve rezervasyon saatlerini ayarlamanıza olanak tanır — hepsi tek yerden.' : isRo ? 'Da. Panoul dvs. de control vă permite să configurați mesele, programul, capacitatea și orele de rezervare — totul într-un singur loc.' : 'Yes. Your dashboard lets you configure tables, opening hours, capacity, and reservation hours — all in one place.',
+        },
+        {
+          q: isEl ? 'Μου δίνετε QR codes;' : isBg ? 'Предоставяте ли QR кодове?' : isSr ? 'Да ли дајете QR кодове?' : isTr ? 'QR kodlar veriyor musunuz?' : isRo ? 'Oferiți coduri QR?' : 'Do you provide QR codes?',
+          a: isEl ? 'Ναι! Δημιουργούμε εκτυπώσιμα QR codes για κρατήσεις τραπεζιών, κριτικές Google και τη σελίδα σας. Τοποθετήστε τα σε μενού, τραπέζια, βιτρίνες ή φυλλάδια.' : isBg ? 'Да! Генерираме QR кодове за печат за резервации на маси, Google отзиви и вашата страница. Поставете ги на менюта, маси, витрини или флаери.' : isSr ? 'Да! Генеришемо QR кодове за штампу за резервације столова, Google рецензије и вашу страницу. Ставите их на меније, столове, излоге или летке.' : isTr ? 'Evet! Masa rezervasyonları, Google yorumları ve sayfanız için yazdırılabilir QR kodlar oluşturuyoruz. Menülere, masalara, vitrislere veya el ilanlarına yerleştirin.' : isRo ? 'Da! Generăm coduri QR imprimabile pentru rezervări de masă, recenzii Google și pagina dvs. Plasați-le pe meniuri, mese, vitrine sau pliante.' : 'Yes! We generate printable QR codes for table reservations, Google reviews, and your page. Place them on menus, tables, storefronts, or flyers.',
+        },
+      ].map((item) => (
+        <details class="bg-white border border-gray-100 rounded-2xl overflow-hidden group">
+          <summary class="flex items-center justify-between px-6 py-5 cursor-pointer font-semibold text-gray-900 hover:bg-gray-50 transition-colors list-none">
+            {item.q}
+            <span class="text-gray-400 text-xl group-open:rotate-45 transition-transform duration-200">+</span>
+          </summary>
+          <div class="px-6 pb-5 text-gray-600 text-sm leading-relaxed">{item.a}</div>
+        </details>
+      ))}
+    </div>
+  </section>
+
+  <!-- Final CTA -->
+  <section class="bg-[#1a1a2e] text-white py-20 px-4">
+    <div class="max-w-2xl mx-auto text-center">
+      <h2 class="text-3xl sm:text-4xl font-bold mb-4">{isEl ? 'Καταχωρίστε το εστιατόριό σας σήμερα' : isBg ? 'Регистрирайте ресторанта си днес' : isSr ? 'Листајте свој ресторан данас' : isTr ? 'Restoranınızı bugün listeleyin' : isRo ? 'Listați restaurantul dvs. astăzi' : 'List your restaurant today'}</h2>
+      <p class="text-gray-300 text-lg mb-8">
+        {isEl ? 'Ενταχθείτε στα εστιατόρια της Καβάλας και του Κεραμωτί που αποκτούν νέους πελάτες μέσω του kefaloniabnb.com.' : isBg ? 'Присъединете се към ресторантите в Кавала и Керамоти, които привличат нови клиенти чрез kefaloniabnb.com.' : isSr ? 'Придружите се ресторанима у Кавали и Керамотију који привлаче нове госте преко kefaloniabnb.com.' : isTr ? "Kefalonia ve Keramoti'deki restoranlara katılın — kefaloniabnb.com üzerinden yeni müşteriler kazanıyorlar." : isRo ? 'Alăturați-vă restaurantelor din Kefalonia și Keramoti care câștigă noi oaspeți prin kefaloniabnb.com.' : 'Join restaurants in Kefalonia and Keramoti that are gaining new guests through kefaloniabnb.com.'}
+      </p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <a href="/partner-with-us"
+          class="inline-flex items-center justify-center gap-2 bg-[#c9a96e] text-white font-bold px-8 py-4 rounded-2xl text-lg hover:bg-[#b8935d] transition-colors">
+          {isEl ? 'Καταχωρίστε το Εστιατόριό μου →' : isBg ? 'Регистрирайте Ресторанта ми →' : isSr ? 'Листај мој Ресторан →' : isTr ? 'Restoranımı Listele →' : isRo ? 'Listează Restaurantul Meu →' : 'List My Restaurant →'}
+        </a>
+        <a href="/contact"
+          class="inline-flex items-center justify-center gap-2 bg-white/10 text-white font-semibold px-8 py-4 rounded-2xl text-lg hover:bg-white/20 transition-colors">
+          {isEl ? 'Κάντε μια Ερώτηση' : isBg ? 'Задайте въпрос' : isSr ? 'Поставите питање' : isTr ? 'Soru Sorun' : isRo ? 'Puneți o Întrebare' : 'Ask a Question'}
+        </a>
+      </div>
+    </div>
+  </section>
+
+</BaseLayout>

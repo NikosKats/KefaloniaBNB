@@ -1,0 +1,659 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import ListingCard from '../components/listing/ListingCard.astro';
+import type { ListingWithDetails, Review } from '../types/index.ts';
+import { t, type Lang } from '../i18n/translations.ts';
+import { getActiveFeaturedListingIds } from '../lib/featured.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as Lang;
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+const supabase = Astro.locals.supabase;
+const siteUrl  = import.meta.env.PUBLIC_SITE_URL ?? 'https://kefaloniabnb.com';
+
+const [listingsRes, reviewsRes, statsRes, featuredIds] = await Promise.all([
+  supabase
+    .from('listings')
+    .select('*, listing_images(*), listing_amenities(amenities(*))')
+    .eq('is_active', true)
+    .order('avg_rating', { ascending: false }),
+  supabase
+    .from('reviews')
+    .select('*')
+    .eq('is_published', true)
+    .order('created_at', { ascending: false })
+    .limit(3),
+  supabase
+    .from('bookings')
+    .select('id', { count: 'exact', head: true })
+    .in('status', ['confirmed', 'completed']),
+  getActiveFeaturedListingIds(),
+]);
+
+const featuredSet = new Set(featuredIds);
+
+const allListings: ListingWithDetails[] = (listingsRes.data ?? []).map((l: any) => ({
+  ...l,
+  listing_images: l.listing_images ?? [],
+  amenities: (l.listing_amenities ?? []).map((la: any) => la.amenities).filter(Boolean),
+}));
+
+const listings: ListingWithDetails[] = [
+  ...allListings.filter((l) => featuredSet.has(l.id)),
+  ...allListings.filter((l) => !featuredSet.has(l.id)),
+];
+
+const reviews: Review[] = reviewsRes.data ?? [];
+const totalBookings = statsRes.count ?? 0;
+
+const activePropCount  = listings.length;
+const uniqueCities     = [...new Set(listings.map((l) => l.city).filter(Boolean))].length;
+const avgRatingAll     = listings.filter((l) => l.review_count > 0).length > 0
+  ? (listings.reduce((s, l) => s + Number(l.avg_rating ?? 0), 0) / listings.filter(l => l.review_count > 0).length)
+  : 4.9;
+
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'RealEstateAgent',
+    '@id': `${siteUrl}/#site`,
+    name: 'KefaloniaBNB',
+    description: 'Vacation rental marketplace for Greece. Book villas, apartments and holiday homes direct — no platform fees, best rates guaranteed.',
+    url: siteUrl,
+    logo: `${siteUrl}/favicon.svg`,
+    image: `${siteUrl}/og-default.jpg`,
+    paymentAccepted: 'Credit Card, Bank Transfer',
+    currenciesAccepted: 'EUR',
+    priceRange: '€€',
+    areaServed: { '@type': 'Country', name: 'Greece' },
+    sameAs: [],
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebSite',
+    '@id': `${siteUrl}/#website`,
+    name: 'KefaloniaBNB',
+    url: siteUrl,
+    potentialAction: {
+      '@type': 'SearchAction',
+      target: { '@type': 'EntryPoint', urlTemplate: `${siteUrl}/rentals?q={search_term_string}` },
+      'query-input': 'required name=search_term_string',
+    },
+  },
+];
+---
+
+<BaseLayout
+  title="KefaloniaBNB – Book Direct. No Fees. Kefalonia & Keramoti Villas."
+  description="Book villas in Kefalonia & Keramoti with zero booking fees. Direct contact with owners. Cheaper than OTA platforms, better than agencies."
+  schema={schema}
+>
+
+  <!-- ── HERO ────────────────────────────────────────────────────────────── -->
+  <section class="relative min-h-[92vh] flex items-center justify-center overflow-hidden bg-[#1a1a2e]">
+    <div class="absolute inset-0 bg-gradient-to-br from-[#0f3460] via-[#16213e] to-[#1a1a2e]"></div>
+    <div class="absolute inset-0 opacity-[0.03]"
+      style="background-image: linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px); background-size: 40px 40px;">
+    </div>
+
+    <div class="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 text-center text-white">
+      <div class="inline-flex items-center gap-2 bg-[#c9a96e]/20 border border-[#c9a96e]/40 rounded-full px-4 py-1.5 text-sm text-[#c9a96e] font-medium mb-6">
+        <span class="w-1.5 h-1.5 rounded-full bg-[#c9a96e] animate-pulse"></span>
+        {lang === 'el' ? '#1 Πλατφόρμα Κρατήσεων για Καβάλα & Θάσο' : lang === 'bg' ? '#1 Платформа за резервации за Kefalonia & Thassos' : isSr ? '#1 Платформа за резервације за Kefalonia & Thassos' : isTr ? "Kefalonia & Thassos için #1 Rezervasyon Platformu" : isRo ? 'Platforma #1 de Rezervări pentru Kefalonia & Thassos' : '#1 Booking Platform for Kefalonia & Thassos'}
+      </div>
+
+      <h1 class="text-4xl sm:text-6xl lg:text-7xl font-bold tracking-tight mb-6 leading-tight">
+        {lang === 'el'
+          ? 'Κλείστε απευθείας. Χωρίς προμήθειες.'
+          : lang === 'bg'
+          ? 'Резервирайте директно.\nБез такси.'
+          : isSr
+          ? 'Резервишите директно.\nБез накнада.'
+          : isTr
+          ? 'Doğrudan Rezerve Edin.\nÜcretsiz.'
+          : isRo
+          ? 'Rezervați Direct.\nFără Comisioane.'
+          : 'Book Direct.\nNo Fees.'}
+      </h1>
+      <p class="text-lg sm:text-xl text-white/70 max-w-2xl mx-auto mb-5 leading-relaxed">
+        {lang === 'el'
+          ? 'Βίλες και καταλύματα σε όλο τον Νομό Καβάλας — απευθείας από τον ιδιοκτήτη. Φτηνότερα από άλλες πλατφόρμες. Χωρίς μεσάζοντες.'
+          : lang === 'bg'
+          ? 'Вили и апартаменти в района на Kefalonia — директно от собствениците. Гостите спестяват пари. Собствениците запазват 95%.'
+          : isSr ? 'Виле и апартмани у региону Кавале — директно од власника. Гости штеде новац. Власници задржавају 95%.'
+          : isTr ? 'Kefalonia bölgesinde villalar ve daireler — sahipleriyle doğrudan rezerve edilmiş. Misafirler tasarruf eder. Sahipler %95 kazanır.'
+          : isRo ? 'Vile și apartamente în regiunea Kefalonia — rezervate direct cu proprietarii. Oaspeții economisesc. Proprietarii păstrează 95%.'
+          : 'Villas and apartments across the Kefalonia region — booked directly with owners. Guests save money. Owners keep 95%.'}
+      </p>
+      <!-- Location strip — clickable -->
+      <div class="flex flex-wrap justify-center gap-2 mb-10 text-xs">
+        {([
+          { label: 'Keramoti', slug: 'keramoti' },
+          { label: 'Kefalonia', slug: 'kefalonia' },
+          { label: 'Thassos', slug: 'thassos' },
+          { label: 'Nea Peramos', slug: 'nea-peramos' },
+          { label: 'Nea Iraklitsa', slug: 'nea-iraklitsa' },
+          { label: 'Golden Beach', slug: 'golden-beach' },
+          { label: 'Potos', slug: 'potos' },
+        ] as { label: string; slug: string }[]).map(({ label, slug }) => (
+          <a
+            href={`/locations/${slug}`}
+            class="bg-white/10 border border-white/10 hover:bg-white/20 hover:border-white/30 text-white/60 hover:text-white/90 rounded-full px-3 py-1 transition-colors"
+          >
+            {label}
+          </a>
+        ))}
+        <a href="/locations" class="bg-white/10 border border-white/10 hover:bg-white/20 text-white/40 hover:text-white/70 rounded-full px-3 py-1 transition-colors">
+          All destinations →
+        </a>
+      </div>
+
+      <!-- Search box -->
+      <div class="bg-white rounded-2xl p-4 max-w-3xl mx-auto shadow-2xl">
+        <form action="/rentals" method="GET" class="grid grid-cols-1 sm:grid-cols-4 gap-3">
+          <div class="text-left">
+            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 px-1">Destination</label>
+            <select name="region" class="w-full px-3 py-2 text-sm text-gray-900 bg-gray-50 rounded-xl outline-none focus:ring-2 focus:ring-[#1a1a2e] cursor-pointer">
+              <option value="">Anywhere</option>
+              <option value="kefalonia">Kefalonia Region</option>
+              <option value="thassos">Thassos Island</option>
+            </select>
+          </div>
+          <div class="text-left">
+            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 px-1">{t(lang, 'listing.check_in')}</label>
+            <input type="date" name="check_in" class="w-full px-3 py-2 text-sm text-gray-900 bg-gray-50 rounded-xl outline-none focus:ring-2 focus:ring-[#1a1a2e]" />
+          </div>
+          <div class="text-left">
+            <label class="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 px-1">{t(lang, 'listing.check_out')}</label>
+            <input type="date" name="check_out" class="w-full px-3 py-2 text-sm text-gray-900 bg-gray-50 rounded-xl outline-none focus:ring-2 focus:ring-[#1a1a2e]" />
+          </div>
+          <button type="submit" class="bg-[#1a1a2e] text-white font-semibold rounded-xl py-2.5 px-6 hover:bg-[#2d2d4e] transition-colors text-sm mt-auto cursor-pointer flex items-center justify-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            {t(lang, 'home.hero.cta')}
+          </button>
+        </form>
+      </div>
+
+      <!-- Stats -->
+      <div class="flex flex-wrap justify-center gap-8 mt-10 text-white/60 text-sm">
+        {activePropCount > 0 && (
+          <div>
+            <p class="text-white text-2xl font-bold">{activePropCount}+</p>
+            <p>{lang === 'el' ? 'Καταλύματα' : lang === 'bg' ? 'Имоти' : isSr ? 'Некретнине' : isTr ? 'Mülkler' : isRo ? 'Proprietăți' : 'Properties'}</p>
+          </div>
+        )}
+        {uniqueCities > 0 && (
+          <div>
+            <p class="text-white text-2xl font-bold">{uniqueCities}</p>
+            <p>{lang === 'el' ? 'Τοποθεσίες' : lang === 'bg' ? 'Локации' : isSr ? 'Локације' : isTr ? 'Lokasyonlar' : isRo ? 'Locații' : 'Locations'}</p>
+          </div>
+        )}
+        {totalBookings > 0 && (
+          <div>
+            <p class="text-white text-2xl font-bold">{totalBookings}+</p>
+            <p>{lang === 'el' ? 'Κρατήσεις' : lang === 'bg' ? 'Резервации' : isSr ? 'Резервације' : isTr ? 'Rezervasyonlar' : isRo ? 'Rezervări' : 'Bookings'}</p>
+          </div>
+        )}
+        <div>
+          <p class="text-white text-2xl font-bold">{avgRatingAll.toFixed(1)}★</p>
+          <p>{lang === 'el' ? 'Μ.Ο. Βαθμολογία' : lang === 'bg' ? 'Средна оценка' : isSr ? 'Просечна оцена' : isTr ? 'Ort. puan' : isRo ? 'Evaluare medie' : 'Avg. rating'}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── AUDIENCE SPLIT ───────────────────────────────────────────────────── -->
+  <section class="bg-white border-b border-gray-100 py-12">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6">
+      <p class="text-center text-xs font-semibold text-gray-400 uppercase tracking-widest mb-8">
+        {lang === 'el' ? 'Ποιος είσαι;' : lang === 'bg' ? 'Кой си ти?' : isSr ? 'Ко си ти?' : isTr ? 'Kim için buradasın?' : isRo ? 'Cine ești?' : "Who are you here for?"}
+      </p>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <!-- Guest -->
+        <a href="/rentals" class="group flex flex-col items-start gap-3 bg-gray-50 hover:bg-[#1a1a2e] border border-gray-100 hover:border-[#1a1a2e] rounded-2xl p-6 transition-all">
+          <span class="text-3xl">🏖️</span>
+          <div>
+            <p class="font-bold text-gray-900 group-hover:text-white text-lg transition-colors">
+              {lang === 'el' ? "Είμαι επισκέπτης" : lang === 'bg' ? "Аз съм гост" : isSr ? "Ја сам гост" : isTr ? "Ben bir Misafirim" : isRo ? "Sunt Oaspete" : "I'm a Guest"}
+            </p>
+            <p class="text-sm text-gray-500 group-hover:text-white/70 mt-1 transition-colors">
+              {lang === 'el' ? 'Κλείστε βίλες χωρίς χρεώσεις' : lang === 'bg' ? 'Резервирайте вили без такси за резервация' : isSr ? 'Резервишите виле без накнада за резервацију' : isTr ? 'Sıfır rezervasyon ücreti ile villa rezerve edin' : isRo ? 'Rezervați vile fără comisioane de rezervare' : 'Book villas with zero booking fees'}
+            </p>
+          </div>
+          <span class="text-xs font-semibold text-[#c9a96e] group-hover:text-[#c9a96e] mt-auto">
+            {lang === 'el' ? 'Βρείτε κατάλυμα →' : lang === 'bg' ? 'Намерете вила →' : isSr ? 'Пронађи вилу →' : isTr ? 'Villa Bul →' : isRo ? 'Găsește o Vilă →' : 'Find a Villa →'}
+          </span>
+        </a>
+
+        <!-- Owner -->
+        <a href="/contact" class="group flex flex-col items-start gap-3 bg-gray-50 hover:bg-[#1a1a2e] border border-gray-100 hover:border-[#1a1a2e] rounded-2xl p-6 transition-all">
+          <span class="text-3xl">🏡</span>
+          <div>
+            <p class="font-bold text-gray-900 group-hover:text-white text-lg transition-colors">
+              {lang === 'el' ? "Είμαι ιδιοκτήτης" : lang === 'bg' ? "Аз съм собственик на имот" : isSr ? "Ја сам власник некретнине" : isTr ? "Ben bir Mülk Sahibiyim" : isRo ? "Sunt Proprietar" : "I'm a Property Owner"}
+            </p>
+            <p class="text-sm text-gray-500 group-hover:text-white/70 mt-1 transition-colors">
+              {lang === 'el' ? 'Καταχωρίστε το ακίνητό σας, κρατήστε το 95%' : lang === 'bg' ? 'Публикувайте имота си, запазете до 95%' : isSr ? 'Огласите некретнину, задржите до 95%' : isTr ? 'Mülkünüzü listeleyin, %95\'e kadar kazanın' : isRo ? 'Listați proprietatea, păstrați până la 95%' : 'List your property, keep up to 95%'}
+            </p>
+          </div>
+          <span class="text-xs font-semibold text-[#c9a96e] group-hover:text-[#c9a96e] mt-auto">
+            {lang === 'el' ? 'Καταχωρίστε το ακίνητό σας →' : lang === 'bg' ? 'Публикувайте имота си →' : isSr ? 'Огласи моју некретнину →' : isTr ? 'Mülkümü Listele →' : isRo ? 'Listează Proprietatea →' : 'List My Property →'}
+          </span>
+        </a>
+
+        <!-- Cleaner -->
+        <a href="/cleaner/signup" class="group flex flex-col items-start gap-3 bg-gray-50 hover:bg-[#1a1a2e] border border-gray-100 hover:border-[#1a1a2e] rounded-2xl p-6 transition-all">
+          <span class="text-3xl">🧹</span>
+          <div>
+            <p class="font-bold text-gray-900 group-hover:text-white text-lg transition-colors">
+              {lang === 'el' ? "Είμαι καθαριστής" : lang === 'bg' ? "Аз съм почистващ" : isSr ? "Ја сам чистач/чистачица" : isTr ? "Ben bir Temizlikçiyim" : isRo ? "Sunt Personal de Curățenie" : "I'm a Cleaner"}
+            </p>
+            <p class="text-sm text-gray-500 group-hover:text-white/70 mt-1 transition-colors">
+              {lang === 'el' ? 'Κάντε προσφορές σε εργασίες, πληρωθείτε αυτόματα' : lang === 'bg' ? 'Наддавайте за задачи. Получавайте плащане автоматично.' : isSr ? 'Нудите за послове. Примайте плаћање аутоматски.' : isTr ? 'İşler için teklif verin. Otomatik ödeme alın.' : isRo ? 'Licitați pentru lucrări. Plată automată.' : 'Bid on jobs. Get paid automatically.'}
+            </p>
+          </div>
+          <span class="text-xs font-semibold text-[#c9a96e] group-hover:text-[#c9a96e] mt-auto">
+            {lang === 'el' ? 'Βρείτε εργασία →' : lang === 'bg' ? 'Намерете работа →' : isSr ? 'Пронађи посао →' : isTr ? 'İş Bul →' : isRo ? 'Găsește Lucrări →' : 'Find Work →'}
+          </span>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FEATURED LISTINGS ───────────────────────────────────────────────── -->
+  {listings.length > 0 && (
+    <section class="py-20 bg-gray-50">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="flex items-end justify-between mb-10">
+          <div>
+            <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-wider mb-2">{t(lang, 'home.featured.badge')}</p>
+            <h2 class="text-3xl sm:text-4xl font-bold text-gray-900">{t(lang, 'home.featured.title')}</h2>
+          </div>
+          <a href="/rentals" class="hidden sm:inline-flex items-center gap-1.5 text-sm font-medium text-[#1a1a2e] hover:text-[#c9a96e] transition-colors">
+            {t(lang, 'home.featured.all')}
+          </a>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+          {listings.slice(0, 3).map((listing) => (
+            <ListingCard listing={listing} featured={featuredSet.has(listing.id)} />
+          ))}
+        </div>
+        <div class="mt-8 text-center sm:hidden">
+          <a href="/rentals" class="inline-flex items-center gap-2 border border-gray-200 bg-white text-gray-700 font-medium px-6 py-3 rounded-xl hover:bg-gray-50 transition-colors text-sm">
+            {t(lang, 'home.featured.all')}
+          </a>
+        </div>
+      </div>
+    </section>
+  )}
+
+  <!-- ── FOR GUESTS ───────────────────────────────────────────────────────── -->
+  <section class="py-20 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+        <div>
+          <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-wider mb-3">
+            {lang === 'el' ? 'Για Επισκέπτες' : lang === 'bg' ? 'За гости' : isSr ? 'За госте' : isTr ? 'Misafirler İçin' : isRo ? 'Pentru Oaspeți' : 'For Guests'}
+          </p>
+          <h2 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+            {lang === 'el' ? 'Πληρώστε λιγότερο.\nΜείνετε καλύτερα.' : lang === 'bg' ? 'Платете по-малко.\nОстанете по-добре.' : isSr ? 'Платите мање.\nОстаните боље.' : isTr ? 'Daha az ödeyin.\nDaha iyi kalın.' : isRo ? 'Plătiți mai puțin.\nStați mai bine.' : 'Pay less.\nStay better.'}
+          </h2>
+          <p class="text-gray-500 text-lg mb-8 leading-relaxed">
+            {lang === 'el'
+              ? 'Σε άλλες πλατφόρμες πληρώνετε έως 14% επιπλέον. Εδώ δεν πληρώνετε τίποτα παραπάνω. Επιπλέον, οι ιδιοκτήτες μας πληρώνουν μόνο 5% προμήθεια — οπότε μπορούν να προσφέρουν καλύτερες τιμές. Μιλήστε απευθείας με τον ιδιοκτήτη — όχι με ένα bot.'
+              : lang === 'bg'
+              ? 'В други платформи плащате до 14% повече. Тук не плащате нищо допълнително. Освен това собствениците ни плащат само 5% комисионна — така могат да предлагат по-добри цени. Говорете директно със собственика — не с бот.'
+              : isSr ? 'На другим платформама плаћате до 14% више. Овде не плаћате ништа додатно. Поврх тога, наши власници плаћају само 5% провизију — тако могу да понуде боље цене. Разговарајте директно са власником — не са ботом.'
+              : isTr ? 'Diğer platformlarda %14\'e kadar fazla ödersiniz. Burada hiçbir şey ödemezsiniz. Üstelik sahiplerimiz yalnızca %5 komisyon öder — bu yüzden daha rekabetçi fiyatlar sunabilirler. Sahibiyle doğrudan konuşun — botla değil.'
+              : isRo ? 'Pe alte platforme plătiți până la 14% în plus. Aici nu plătiți nimic în plus. Iar proprietarii plătesc doar 5% comision — deci pot oferi prețuri mai competitive. Vorbiți direct cu proprietarul — nu cu un bot.'
+              : 'On other platforms you pay up to 14% extra. Here you pay nothing extra. And because owners only pay a 5% commission, they can price more competitively. Talk directly to the owner — not a bot.'}
+          </p>
+          <ul class="space-y-3 mb-10">
+            {[
+              lang === 'el' ? '✓ Μηδενικές χρεώσεις επισκέπτη' : lang === 'bg' ? '✓ Нулеви такси за резервация' : isSr ? '✓ Нула накнада за резервацију' : isTr ? '✓ Sıfır misafir rezervasyon ücreti' : isRo ? '✓ Zero comisioane de rezervare' : '✓ Zero guest booking fees',
+              lang === 'el' ? '✓ Μόνο επαληθευμένα, υψηλής ποιότητας καταλύματα' : lang === 'bg' ? '✓ Само проверени имоти с високо качество' : isSr ? '✓ Само проверене, висококвалитетне некретнине' : isTr ? '✓ Yalnızca doğrulanmış, yüksek kaliteli mülkler' : isRo ? '✓ Doar proprietăți verificate, de înaltă calitate' : '✓ Verified, high-quality properties only',
+              lang === 'el' ? '✓ Άμεση επικοινωνία με τον ιδιοκτήτη' : lang === 'bg' ? '✓ Директна връзка със собственика — WhatsApp, телефон' : isSr ? '✓ Директан контакт са власником — WhatsApp, телефон' : isTr ? '✓ Sahibiyle doğrudan iletişim — WhatsApp, telefon' : isRo ? '✓ Contact direct cu proprietarul — WhatsApp, telefon' : '✓ Direct contact with the owner — WhatsApp, phone',
+              lang === 'el' ? '✓ Ασφαλής πληρωμή Stripe ή τραπεζική μεταφορά' : lang === 'bg' ? '✓ Сигурно плащане чрез Stripe или банков превод' : isSr ? '✓ Сигурно плаћање Stripe или банковни трансфер' : isTr ? '✓ Güvenli Stripe ödeme veya banka transferi' : isRo ? '✓ Plată securizată Stripe sau transfer bancar' : '✓ Secure Stripe checkout or bank transfer',
+            ].map(item => (
+              <li class="flex items-center gap-3 text-gray-700 text-sm font-medium">{item}</li>
+            ))}
+          </ul>
+          <a href="/rentals" class="inline-flex items-center gap-2 bg-[#1a1a2e] text-white font-semibold px-6 py-3 rounded-xl hover:bg-[#2d2d4e] transition-colors text-sm">
+            {lang === 'el' ? 'Δείτε όλα τα καταλύματα' : lang === 'bg' ? 'Разгледайте всички вили' : isSr ? 'Прегледај све виле' : isTr ? 'Tüm Vilları Gez' : isRo ? 'Răsfoiește Toate Vilele' : 'Browse All Villas'}
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+          </a>
+        </div>
+        <div class="grid grid-cols-2 gap-4">
+          <div class="bg-gray-50 rounded-2xl p-6 text-center">
+            <p class="text-4xl font-bold text-[#1a1a2e] mb-1">0%</p>
+            <p class="text-sm text-gray-500">{lang === 'el' ? 'Χρεώσεις επισκέπτη' : lang === 'bg' ? 'Такса за резервация' : isSr ? 'Накнада за резервацију' : isTr ? 'Misafir rezervasyon ücreti' : isRo ? 'Comision de rezervare' : 'Guest booking fee'}</p>
+          </div>
+          <div class="bg-[#c9a96e]/10 rounded-2xl p-6 text-center">
+            <p class="text-4xl font-bold text-[#c9a96e] mb-1">14%</p>
+            <p class="text-sm text-gray-500">{lang === 'el' ? 'Χρεώσεις άλλων πλατφορμών' : lang === 'bg' ? 'Такса на OTA платформи' : isSr ? 'Накнада OTA платформи' : isTr ? 'OTA platform ücreti' : isRo ? 'Comision platformă OTA' : "OTA platform fee"}</p>
+          </div>
+          <div class="bg-emerald-50 rounded-2xl p-6 text-center col-span-2">
+            <p class="text-3xl font-bold text-emerald-700 mb-1">{lang === 'el' ? 'Εξοικονομείτε' : lang === 'bg' ? 'Спестявате' : isSr ? 'Уштедите' : isTr ? 'Tasarruf edersiniz' : isRo ? 'Economisiți' : 'You save'} ~€28</p>
+            <p class="text-sm text-gray-500">{lang === 'el' ? 'σε κράτηση €200 σε σχέση με άλλες πλατφόρμες' : lang === 'bg' ? 'при резервация от €200 спрямо други платформи' : isSr ? 'на резервацији од €200 у поређењу са другим платформама' : isTr ? '€200\'lük rezervasyonda diğer platformlara kıyasla' : isRo ? 'la o rezervare de €200 față de alte platforme' : 'on a €200 booking vs other platforms'}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FOR OWNERS ───────────────────────────────────────────────────────── -->
+  <section class="py-20 bg-[#1a1a2e] text-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+        <div class="order-2 lg:order-1 grid grid-cols-1 gap-4">
+          {[
+            { icon: '💰', title: lang === 'el' ? 'Κρατήστε έως 95%' : lang === 'bg' ? 'Запазете до 95%' : isSr ? 'Задржите до 95%' : isTr ? '%95\'e kadar kazanın' : isRo ? 'Păstrați până la 95%' : 'Keep up to 95%', desc: lang === 'el' ? 'Χωρίς πρακτορεία που παίρνουν 30%. Χωρίς πλατφόρμες που παίρνουν 16%.' : lang === 'bg' ? 'Без агенции, вземащи 30%. Без платформи, вземащи 16%. Вашите приходи, вашият джоб.' : isSr ? 'Без агенција које узимају 30%. Без платформи које узимају 16%. Ваш приход, ваш џеп.' : isTr ? 'Yüzde 30 alan ajans yok. Yüzde 16 alan platform yok. Geliriniz, cebinizde.' : isRo ? 'Fără agenții care iau 30%. Fără platforme care iau 16%. Venitul dvs., buzunarul dvs.' : 'No agency taking 30%. No OTA platform taking 16%. Your revenue, your pocket.' },
+            { icon: '🤝', title: lang === 'el' ? 'Δικοί σας επισκέπτες' : lang === 'bg' ? 'Вашите гости, вашата връзка' : isSr ? 'Ваши гости, ваш однос' : isTr ? 'Sizin misafirleriniz, sizin ilişkiniz' : isRo ? 'Oaspeții dvs., relația dvs.' : 'Your guests, your relationship', desc: lang === 'el' ? 'Άμεση επικοινωνία. Χωρίς αλγόριθμους που ελέγχουν την προβολή σας.' : lang === 'bg' ? 'Директна комуникация. Никакъв алгоритъм не решава кой вижда обявата ви.' : isSr ? 'Директна комуникација. Ниједан алгоритам не одлучује ко види ваш оглас.' : isTr ? 'Doğrudan iletişim. Listenizi kimin gördüğüne karar veren algoritma yok.' : isRo ? 'Comunicare directă. Niciun algoritm nu decide cine vede anunțul dvs.' : 'Direct communication. No algorithm deciding who sees your listing.' },
+            { icon: '🧹', title: lang === 'el' ? 'Ενσωματωμένη αγορά καθαρισμού' : lang === 'bg' ? 'Вградена платформа за почистване' : isSr ? 'Уграђено тржиште чишћења' : isTr ? 'Yerleşik temizlik pazarı' : isRo ? 'Piață de curățenie integrată' : 'Built-in cleaning marketplace', desc: lang === 'el' ? 'Δημοσιεύστε εργασίες καθαρισμού. Ελεγμένοι καθαριστές κάνουν προσφορές. Εσείς επιλέγετε.' : lang === 'bg' ? 'Публикувайте задачи за почистване. Проверени почистващи наддават. Вие избирате. Плаща се автоматично.' : isSr ? 'Објавите послове чишћења. Проверени чистачи нуде понуде. Ви бирате. Плаћање аутоматски.' : isTr ? 'Temizlik işleri yayınlayın. Denetlenmiş temizlikçiler teklif verir. Siz seçin. Otomatik ödeme.' : isRo ? 'Publicați lucrări de curățenie. Personalul verificat licitează. Dvs. alegeți. Plată automată.' : 'Post cleaning jobs. Vetted cleaners bid. You choose. Paid automatically.' },
+            { icon: '⚡', title: lang === 'el' ? 'Πληρωμή μέσω Stripe' : lang === 'bg' ? 'Плащания чрез Stripe' : isSr ? 'Плаћања преко Stripe' : isTr ? 'Stripe destekli ödemeler' : isRo ? 'Plăți prin Stripe' : 'Stripe-powered payments', desc: lang === 'el' ? 'Ασφαλείς πληρωμές, αυτόματες μεταφορές. Χωρίς χειροκίνητες διαδικασίες.' : lang === 'bg' ? 'Сигурни резервации. Автоматични преводи. Без гонене на плащания.' : isSr ? 'Сигурне резервације. Аутоматски трансфери. Без гоњења плаћања.' : isTr ? 'Güvenli rezervasyonlar. Otomatik transferler. Ödeme takibi yok.' : isRo ? 'Rezervări securizate. Transferuri automate. Fără urmărire plăți.' : 'Secure bookings. Automatic transfers. No chasing payments.' },
+          ].map(item => (
+            <div class="flex gap-4 bg-white/5 border border-white/10 rounded-2xl p-5">
+              <span class="text-2xl flex-shrink-0 mt-0.5">{item.icon}</span>
+              <div>
+                <p class="font-semibold text-white mb-1">{item.title}</p>
+                <p class="text-white/60 text-sm leading-relaxed">{item.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div class="order-1 lg:order-2">
+          <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-wider mb-3">
+            {lang === 'el' ? 'Για Ιδιοκτήτες' : lang === 'bg' ? 'За собственици на имоти' : isSr ? 'За власнике некретнина' : isTr ? 'Mülk Sahipleri İçin' : isRo ? 'Pentru Proprietari' : 'For Property Owners'}
+          </p>
+          <h2 class="text-3xl sm:text-4xl font-bold mb-4">
+            {lang === 'el' ? 'Το ακίνητό σας.\nΟι κανόνες σας.\nΤα έσοδά σας.' : lang === 'bg' ? 'Вашият имот.\nВашите правила.\nВашите приходи.' : isSr ? 'Ваша некретнина.\nВаша правила.\nВаши приходи.' : isTr ? 'Sizin mülkünüz.\nSizin kurallarınız.\nSizin geliriniz.' : isRo ? 'Proprietatea dvs.\nRegulile dvs.\nVenitul dvs.' : 'Your property.\nYour rules.\nYour revenue.'}
+          </h2>
+          <p class="text-white/70 text-lg mb-8 leading-relaxed">
+            {lang === 'el'
+              ? 'Σταματήστε να δίνετε 30% σε πρακτορεία που διαχειρίζονται το ακίνητό σας με τους δικούς τους όρους. Εσείς αποφασίζετε για τιμές, επισκέπτες και ημερολόγιο.'
+              : lang === 'bg'
+              ? 'Спрете да давате 30% на агенции, управляващи имота ви по техен начин. Без обвързващи договори. Отказ по всяко време.'
+              : isSr ? 'Престаните давати 30% агенцијама које управљају вашом некретнином на свој начин. Без обавезујућих уговора. Откажите у сваком тренутку.'
+              : isTr ? 'Mülkünüzü kendi yöntemleriyle yöneten ajanslara %30 vermeyi bırakın. Bağlayıcı sözleşme yok. İstediğiniz zaman iptal edin.'
+              : isRo ? 'Nu mai dați 30% agențiilor care vă administrează proprietatea în felul lor. Fără contracte obligatorii. Anulați oricând.'
+              : "Stop giving 30% to agencies that run your property their way. No lock-in contracts. Cancel anytime."}
+          </p>
+          <div class="flex flex-col sm:flex-row gap-3">
+            <a href="/contact" class="inline-flex items-center justify-center gap-2 bg-[#c9a96e] text-white font-semibold px-6 py-3 rounded-xl hover:bg-[#b8934a] transition-colors text-sm">
+              {lang === 'el' ? 'Καταχωρίστε το ακίνητό σας — Δωρεάν' : lang === 'bg' ? 'Публикувайте имота си — Безплатно' : isSr ? 'Огласи моју некретнину — Бесплатно' : isTr ? 'Mülkümü Listele — Ücretsiz' : isRo ? 'Listează Proprietatea — Gratuit' : 'List My Property — Free'}
+            </a>
+            <a href="/why-not-airbnb" class="inline-flex items-center justify-center gap-2 border border-white/30 text-white/80 hover:border-white/60 font-semibold px-6 py-3 rounded-xl transition-colors text-sm">
+              {lang === 'el' ? 'Δείτε τη σύγκριση →' : lang === 'bg' ? 'Вижте сравнението →' : isSr ? 'Погледај поређење →' : isTr ? 'Karşılaştırmayı Gör →' : isRo ? 'Vezi Comparația →' : 'See How We Compare →'}
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FOR CLEANERS ─────────────────────────────────────────────────────── -->
+  <section class="py-20 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+        <div>
+          <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-wider mb-3">
+            {lang === 'el' ? 'Για Καθαριστές' : lang === 'bg' ? 'За почистващи' : isSr ? 'За чистаче/чистачице' : isTr ? 'Temizlikçiler İçin' : isRo ? 'Pentru Personal de Curățenie' : 'For Cleaners'}
+          </p>
+          <h2 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+            {lang === 'el' ? 'Σταθερές εργασίες.\nΑυτόματη πληρωμή.' : lang === 'bg' ? 'Редовна работа.\nАвтоматично заплащане.' : isSr ? 'Стални послови.\nАутоматска исплата.' : isTr ? 'Düzenli iş.\nOtomatik ödeme.' : isRo ? 'Lucrări constante.\nPlată automată.' : 'Steady work.\nAutomatic pay.'}
+          </h2>
+          <p class="text-gray-500 text-lg mb-8 leading-relaxed">
+            {lang === 'el'
+              ? 'Ιδιοκτήτες ακινήτων στην Καβάλα και το Κεραμωτί αναθέτουν εργασίες καθαρισμού. Κάνετε προσφορά. Κερδίζετε. Πληρώνεστε αυτόματα στον τραπεζικό σας λογαριασμό.'
+              : lang === 'bg'
+              ? 'Собственици на имоти в Kefalonia и Keramoti публикуват задачи за почистване. Вие наддавате. Печелите. Получавате плащане — автоматично на банковата ви сметка. Без фактури. Без гонене.'
+              : isSr ? 'Власници некретнина у Kefalonia и Keramoti објављују послове чишћења. Ви нудите. Побеђујете. Плаћање стиже — аутоматски на ваш банковни рачун. Без фактура. Без гоњења.'
+              : isTr ? 'Kefalonia ve Keramoti\'deki mülk sahipleri temizlik işleri yayınlar. Teklif verirsiniz. Kazanırsınız. Ödeme — otomatik olarak banka hesabınıza. Fatura yok. Takip yok.'
+              : isRo ? 'Proprietarii din Kefalonia și Keramoti publică lucrări de curățenie. Licitați. Câștigați. Primiți plata — automat în contul bancar. Fără facturi. Fără urmărire.'
+              : 'Property owners in Kefalonia & Keramoti post cleaning jobs. You bid. You win. You get paid — automatically to your bank account. No invoices. No chasing.'}
+          </p>
+          <ul class="space-y-3 mb-10">
+            {[
+              lang === 'el' ? '✓ Δείτε όλες τις διαθέσιμες εργασίες στην περιοχή σας' : lang === 'bg' ? '✓ Вижте всички налични задачи в района си' : isSr ? '✓ Погледај све доступне послове у вашем подручју' : isTr ? '✓ Bölgenizdeki tüm mevcut işleri görün' : isRo ? '✓ Vedeți toate lucrările disponibile în zona dvs.' : '✓ See all available jobs in your area',
+              lang === 'el' ? '✓ Ορίστε τη δική σας τιμή' : lang === 'bg' ? '✓ Определете собствената си цена — вие контролирате тарифата' : isSr ? '✓ Поставите своју цену — ви контролишете своју тарифу' : isTr ? '✓ Kendi fiyatınızı belirleyin — tarifinizi siz kontrol edersiniz' : isRo ? '✓ Stabiliți-vă propriul preț — dvs. controlați tariful' : '✓ Set your own price — you control your rate',
+              lang === 'el' ? '✓ Stripe μεταφορές απευθείας σε σας' : lang === 'bg' ? '✓ Преводи чрез Stripe директно към вас след одобрение' : isSr ? '✓ Stripe трансфери директно на вас након одобрења' : isTr ? '✓ Onaydan sonra doğrudan size Stripe transferi' : isRo ? '✓ Transferuri Stripe direct către dvs. după aprobare' : '✓ Stripe transfers straight to you after approval',
+              lang === 'el' ? '✓ Χτίστε φήμη και αποκτήστε επαναλαμβανόμενους πελάτες' : lang === 'bg' ? '✓ Изградете репутация и получете редовни клиенти' : isSr ? '✓ Изградите репутацију и добијте сталне клијенте' : isTr ? '✓ İtibar oluşturun, tekrar eden müşteriler edinin' : isRo ? '✓ Construiți reputația, obțineți clienți recurenți' : '✓ Build reputation, get repeat clients',
+            ].map(item => (
+              <li class="flex items-center gap-3 text-gray-700 text-sm font-medium">{item}</li>
+            ))}
+          </ul>
+          <a href="/cleaner/signup" class="inline-flex items-center gap-2 bg-emerald-600 text-white font-semibold px-6 py-3 rounded-xl hover:bg-emerald-700 transition-colors text-sm">
+            {lang === 'el' ? 'Ξεκινήστε να κάνετε προσφορές' : lang === 'bg' ? 'Започнете да наддавате за задачи' : isSr ? 'Почните да нудите за послове' : isTr ? 'İşlere Teklif Vermeye Başlayın' : isRo ? 'Începeți să Licitați pentru Lucrări' : 'Start Bidding on Jobs'}
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+          </a>
+        </div>
+        <div class="bg-white border border-gray-100 rounded-3xl p-8 shadow-sm">
+          <p class="text-xs font-semibold text-gray-400 uppercase tracking-widest mb-5">
+            {lang === 'el' ? 'Πώς λειτουργεί' : lang === 'bg' ? 'Как работи' : isSr ? 'Како функционише' : isTr ? 'Nasıl çalışır' : isRo ? 'Cum funcționează' : 'How it works'}
+          </p>
+          {[
+            { n: '1', title: lang === 'el' ? 'Δείτε διαθέσιμες εργασίες' : lang === 'bg' ? 'Разгледайте налични задачи' : isSr ? 'Прегледај доступне послове' : isTr ? 'Mevcut işlere göz atın' : isRo ? 'Răsfoiți lucrările disponibile' : 'Browse available jobs', desc: lang === 'el' ? 'Ιδιοκτήτες δημοσιεύουν εργασίες με ημερομηνία, ώρα και λεπτομέρειες ακινήτου.' : lang === 'bg' ? 'Собствениците публикуват задачи с дата, час и детайли за имота.' : isSr ? 'Власници објављују послове са датумом, временом и детаљима некретнине.' : isTr ? 'Sahipler tarih, saat ve mülk detaylarıyla iş yayınlar.' : isRo ? 'Proprietarii publică lucrări cu dată, oră și detalii proprietate.' : 'Owners post jobs with date, time and property details.' },
+            { n: '2', title: lang === 'el' ? 'Κάντε προσφορά με τη δική σας τιμή' : lang === 'bg' ? 'Наддайте с вашата цена' : isSr ? 'Понудите своју цену' : isTr ? 'Kendi fiyatınızla teklif verin' : isRo ? 'Licitați la prețul dvs.' : 'Bid at your price', desc: lang === 'el' ? 'Ορίστε την τιμή σας. Ο ιδιοκτήτης επιλέγει την καλύτερη προσφορά.' : lang === 'bg' ? 'Задайте тарифата си. Собственикът избира най-добрата оферта.' : isSr ? 'Поставите своју тарифу. Власник бира најбољу понуду.' : isTr ? 'Tarifinizi belirleyin. Sahip en iyi teklifi seçer.' : isRo ? 'Stabiliți tariful. Proprietarul alege cea mai bună ofertă.' : 'Set your rate. The owner picks the best bid.' },
+            { n: '3', title: lang === 'el' ? 'Κάντε την εργασία, πληρωθείτε' : lang === 'bg' ? 'Изпълнете задачата, получете плащане' : isSr ? 'Обавите посао, примите плаћање' : isTr ? 'İşi yapın, ödemenizi alın' : isRo ? 'Faceți lucrarea, primiți plata' : 'Do the job, get paid', desc: lang === 'el' ? 'Ολοκληρώστε τη λίστα ελέγχου. Ανεβάστε φωτογραφίες. Η πληρωμή μεταφέρεται αυτόματα.' : lang === 'bg' ? 'Попълнете контролния списък. Качете снимки. Плащането се прехвърля автоматично.' : isSr ? 'Попуните контролну листу. Отпремите фотографије. Плаћање се аутоматски преноси.' : isTr ? 'Kontrol listesini tamamlayın. Fotoğraf yükleyin. Ödeme otomatik aktarılır.' : isRo ? 'Completați lista de verificare. Încărcați fotografii. Plata se transferă automat.' : 'Complete the checklist. Upload photos. Payment transfers automatically.' },
+          ].map(step => (
+            <div class="flex gap-4 mb-6 last:mb-0">
+              <div class="w-8 h-8 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">{step.n}</div>
+              <div>
+                <p class="font-semibold text-gray-900 text-sm mb-0.5">{step.title}</p>
+                <p class="text-gray-500 text-sm">{step.desc}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── NOT AIRBNB. NOT AN AGENCY. ──────────────────────────────────────── -->
+  <section class="py-20 bg-white border-y border-gray-100">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 text-center">
+      <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-wider mb-4">
+        {lang === 'el' ? 'Η διαφορά μας' : lang === 'bg' ? 'Нашата разлика' : isSr ? 'Наша разлика' : isTr ? 'Farkımız' : isRo ? 'Diferența noastră' : 'The difference'}
+      </p>
+      <h2 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+        {lang === 'el' ? 'Δεν είμαστε πλατφόρμα.\nΔεν είμαστε πρακτορείο.' : lang === 'bg' ? 'Не сме платформа.\nНе сме агенция.' : isSr ? 'Нисмо платформа.\nНисмо агенција.' : isTr ? 'Bir platform değil.\nBir acente değil.' : isRo ? 'Nu suntem platformă.\nNu suntem agenție.' : "Not a platform.\nNot an agency."}
+      </h2>
+      <p class="text-gray-500 text-lg mb-12 max-w-2xl mx-auto">
+        {lang === 'el'
+          ? 'Οι πλατφόρμες παίρνουν χρήματα και από τις δύο πλευρές. Τα πρακτορεία παίρνουν τον έλεγχο του ακινήτου σας. Εμείς φτιάξαμε κάτι διαφορετικό.'
+          : lang === 'bg'
+          ? 'OTA платформите вземат пари от двете страни. Агенциите вземат вашия имот и контрола ви. Ние изградихме нещо различно: директен пазар, където собственици, гости и почистващи печелят.'
+          : isSr
+          ? 'OTA платформе узимају новац са обе стране. Агенције преузимају вашу некретнину и контролу. Направили смо нешто другачије: директно тржиште где власници, гости и чистачи сви побеђују.'
+          : isTr
+          ? 'OTA platformları her iki taraftan para alır. Acenteler mülkünüzü ve kontrolünüzü alır. Biz farklı bir şey inşa ettik: sahipler, misafirler ve temizlikçilerin kazandığı doğrudan bir pazar.'
+          : isRo
+          ? 'Platformele OTA iau bani din ambele părți. Agențiile vă iau proprietatea și controlul. Am construit ceva diferit: o piață directă unde proprietarii, oaspeții și personalul de curățenie câștigă.'
+          : "OTA platforms take money from both sides. Agencies take your property and your control. We built something different: a direct marketplace where owners, guests, and cleaners all win."}
+      </p>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-100">
+              <th class="text-left py-3 px-4 text-gray-400 font-medium"></th>
+              <th class="py-3 px-4 text-gray-500 font-semibold">{lang === 'el' ? 'Άλλες Πλατφόρμες' : lang === 'bg' ? 'Други платформи' : isSr ? 'Друге платформе' : isTr ? 'Diğer Platformlar' : isRo ? 'Alte Platforme' : 'Other Platforms'}</th>
+              <th class="py-3 px-4 text-gray-500 font-semibold">{lang === 'el' ? 'Τοπικό Πρακτορείο' : lang === 'bg' ? 'Местна агенция' : isSr ? 'Локална агенција' : isTr ? 'Yerel Acente' : isRo ? 'Agenție Locală' : 'Local Agency'}</th>
+              <th class="py-3 px-4 font-bold text-[#1a1a2e] bg-[#f8f6f2] rounded-t-xl">KefaloniaBNB</th>
+            </tr>
+          </thead>
+          <tbody>
+            {[
+              [lang === 'el' ? 'Χρεώσεις επισκέπτη' : lang === 'bg' ? 'Такса за резервация' : isSr ? 'Накнада за резервацију' : isTr ? 'Misafir rezervasyon ücreti' : isRo ? 'Comision de rezervare' : 'Guest booking fee', '~14%', '0%', '0%'],
+              [lang === 'el' ? 'Προμήθεια ιδιοκτήτη' : lang === 'bg' ? 'Комисионна за собственика' : isSr ? 'Провизија власника' : isTr ? 'Sahip komisyonu' : isRo ? 'Comision proprietar' : 'Owner commission', 'up to 16%', '20–35%', '5%'],
+              [lang === 'el' ? 'Ιδιοκτήτης ελέγχει τιμές' : lang === 'bg' ? 'Собственикът контролира цените' : isSr ? 'Власник контролише цене' : isTr ? 'Sahip fiyatları kontrol eder' : isRo ? 'Proprietarul controlează prețurile' : 'Owner controls pricing', '✓', '✗', '✓'],
+              [lang === 'el' ? 'Άμεση επικοινωνία ιδιοκτήτη-επισκέπτη' : lang === 'bg' ? 'Директна връзка собственик–гост' : isSr ? 'Власник директно контактира госта' : isTr ? 'Sahip misafirle direkt iletişim kurar' : isRo ? 'Proprietarul contactează oaspetele direct' : 'Owner contacts guest directly', '⚠ Limited', '✗', '✓'],
+              [lang === 'el' ? 'Αγορά καθαρισμού' : lang === 'bg' ? 'Вградена платформа за почистване' : isSr ? 'Уграђено тржиште чишћења' : isTr ? 'Dahili temizlik pazarı' : isRo ? 'Piață de curățenie integrată' : 'Built-in cleaning marketplace', '✗', '✗', '✓'],
+              [lang === 'el' ? 'Αυτόματες πληρωμές' : lang === 'bg' ? 'Автоматични плащания' : isSr ? 'Аутоматске исплате' : isTr ? 'Otomatik ödemeler' : isRo ? 'Plăți automate' : 'Automatic payouts', '✓', 'Manual', '✓'],
+              [lang === 'el' ? 'Τοπικός ειδικός' : lang === 'bg' ? 'Местен специалист' : isSr ? 'Локални специјалиста' : isTr ? 'Yerel uzman' : isRo ? 'Specialist local' : 'Local specialist', '✗', 'Sometimes', '✓ Kefalonia only'],
+            ].map(([label, airbnb, agency, us], i) => (
+              <tr class={`border-b border-gray-50 ${i % 2 === 0 ? '' : 'bg-gray-50/50'}`}>
+                <td class="py-3 px-4 text-gray-700 font-medium text-left">{label}</td>
+                <td class="py-3 px-4 text-center text-gray-400">{airbnb}</td>
+                <td class="py-3 px-4 text-center text-gray-400">{agency}</td>
+                <td class={`py-3 px-4 text-center font-semibold bg-[#f8f6f2] ${us === '✓' || us.startsWith('✓') ? 'text-emerald-600' : 'text-[#1a1a2e]'}`}>{us}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-10">
+        <a href="/why-not-airbnb" class="inline-flex items-center gap-2 border border-gray-200 text-gray-700 hover:border-[#1a1a2e] hover:text-[#1a1a2e] font-semibold px-6 py-3 rounded-xl transition-colors text-sm">
+          {lang === 'el' ? 'Δείτε την πλήρη σύγκριση →' : lang === 'bg' ? 'Вижте пълното сравнение →' : isSr ? 'Погледај пуно поређење →' : isTr ? 'Tam karşılaştırmayı gör →' : isRo ? 'Vezi comparația completă →' : 'See the full comparison →'}
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── HOW IT WORKS (for guests) ───────────────────────────────────────── -->
+  <section class="py-20 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-14">
+        <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-wider mb-2">{t(lang, 'home.how.badge')}</p>
+        <h2 class="text-3xl sm:text-4xl font-bold text-gray-900">{t(lang, 'home.how.title')}</h2>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
+        <div class="hidden md:block absolute top-10 left-1/3 right-1/3 h-px bg-gradient-to-r from-[#c9a96e]/30 via-[#c9a96e]/60 to-[#c9a96e]/30"></div>
+        {[
+          { step: '1', icon: '🔍', title: t(lang,'home.how.s1_t'), desc: t(lang,'home.how.s1_d') },
+          { step: '2', icon: '💳', title: t(lang,'home.how.s2_t'), desc: t(lang,'home.how.s2_d') },
+          { step: '3', icon: '🏡', title: t(lang,'home.how.s3_t'), desc: t(lang,'home.how.s3_d') },
+        ].map((s) => (
+          <div class="relative text-center">
+            <div class="relative z-10 w-20 h-20 bg-white border-2 border-[#c9a96e]/30 rounded-2xl flex flex-col items-center justify-center mx-auto mb-5 shadow-sm">
+              <span class="text-2xl">{s.icon}</span>
+              <span class="text-xs font-bold text-[#c9a96e] mt-0.5">Step {s.step}</span>
+            </div>
+            <h3 class="font-bold text-gray-900 text-lg mb-3">{s.title}</h3>
+            <p class="text-gray-500 text-sm leading-relaxed max-w-xs mx-auto">{s.desc}</p>
+          </div>
+        ))}
+      </div>
+      <div class="text-center mt-12">
+        <a href="/rentals" class="inline-flex items-center gap-2 bg-[#1a1a2e] text-white font-semibold px-8 py-3.5 rounded-xl hover:bg-[#2d2d4e] transition-colors text-sm">
+          {t(lang, 'home.hero.cta')}
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"/></svg>
+        </a>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── PROPERTY TYPES ───────────────────────────────────────────────────── -->
+  <section class="py-20 bg-white">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-12">
+        <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-wider mb-2">
+          {lang === 'el' ? 'Βρείτε το κατάλυμά σας' : lang === 'bg' ? 'Намерете вашето настаняване' : isSr ? 'Пронађите смештај' : isTr ? 'Konaklama bulun' : isRo ? 'Găsiți sejurul' : 'Find your stay'}
+        </p>
+        <h2 class="text-3xl sm:text-4xl font-bold text-gray-900">
+          {lang === 'el' ? 'Τύποι καταλυμάτων' : lang === 'bg' ? 'Разгледайте по тип' : isSr ? 'Прегледај по врсти' : isTr ? 'Türe göre incele' : isRo ? 'Răsfoiți după tip' : 'Browse by type'}
+        </h2>
+      </div>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
+        {[
+          { icon: '🏡', label: lang === 'el' ? 'Βίλες' : lang === 'bg' ? 'Вили' : isSr ? 'Виле' : isTr ? 'Villalar' : isRo ? 'Vile' : 'Villas',      type: 'villa' },
+          { icon: '🏢', label: lang === 'el' ? 'Διαμερίσματα' : lang === 'bg' ? 'Апартаменти' : isSr ? 'Апартмани' : isTr ? 'Daireler' : isRo ? 'Apartamente' : 'Apartments', type: 'apartment' },
+          { icon: '🏠', label: lang === 'el' ? 'Σπίτια' : lang === 'bg' ? 'Къщи' : isSr ? 'Куће' : isTr ? 'Evler' : isRo ? 'Case' : 'Houses',     type: 'house' },
+          { icon: '🏚️', label: lang === 'el' ? 'Εξοχικά' : lang === 'bg' ? 'Вили за почивка' : isSr ? 'Викендице' : isTr ? 'Yazlıklar' : isRo ? 'Cabane' : 'Cottages',  type: 'cottage' },
+          { icon: '🛏️', label: lang === 'el' ? 'Studio' : lang === 'bg' ? 'Студия' : isSr ? 'Студији' : isTr ? 'Stüdyolar' : isRo ? 'Studiouri' : 'Studios',    type: 'studio' },
+        ].map((c) => (
+          <a href={`/rentals?type=${c.type}`}
+            class="group flex flex-col items-center gap-3 p-5 bg-gray-50 hover:bg-[#1a1a2e] rounded-2xl transition-all text-center">
+            <span class="text-3xl group-hover:scale-110 transition-transform">{c.icon}</span>
+            <span class="text-sm font-semibold text-gray-800 group-hover:text-white transition-colors">{c.label}</span>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ── REVIEWS ─────────────────────────────────────────────────────────── -->
+  {reviews.length > 0 && (
+    <section class="py-20 bg-[#1a1a2e] text-white">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div class="text-center mb-12">
+          <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-wider mb-2">{t(lang, 'home.reviews.badge')}</p>
+          <h2 class="text-3xl sm:text-4xl font-bold">{t(lang, 'home.reviews.title')}</h2>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
+          {reviews.map((review) => (
+            <div class="bg-white/5 border border-white/10 rounded-2xl p-6 flex flex-col">
+              <div class="flex items-center gap-0.5 mb-3">
+                {Array.from({ length: review.rating }).map(() => (
+                  <svg class="w-4 h-4 text-amber-400 fill-current" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                ))}
+              </div>
+              {review.title && <p class="font-semibold text-white mb-2 text-sm">{review.title}</p>}
+              <p class="text-white/70 text-sm leading-relaxed line-clamp-4 flex-1">{review.body}</p>
+              <p class="mt-4 text-white/40 text-xs font-medium">
+                {review.guest_name}{review.guest_country ? ` · ${review.guest_country}` : ''}
+              </p>
+            </div>
+          ))}
+        </div>
+        <div class="text-center">
+          <a href="/rentals" class="inline-flex items-center gap-2 border border-white/20 text-white/80 hover:text-white hover:border-white/40 px-6 py-3 rounded-xl text-sm font-medium transition-colors">
+            {t(lang, 'home.reviews.all')}
+          </a>
+        </div>
+      </div>
+    </section>
+  )}
+
+  <!-- ── TRUST BADGES ────────────────────────────────────────────────────── -->
+  <section class="py-14 bg-white border-y border-gray-100">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
+        {[
+          { icon: '🔒', label: lang === 'el' ? 'Ασφαλής πληρωμή' : lang === 'bg' ? 'Сигурно плащане' : isSr ? 'Сигурно плаћање' : isTr ? 'Güvenli ödeme' : isRo ? 'Plată securizată' : 'Secure payment',      sub: 'Stripe' },
+          { icon: '✅', label: lang === 'el' ? 'Επαληθευμένα καταλύματα' : lang === 'bg' ? 'Проверени обяви' : isSr ? 'Верификовани огласи' : isTr ? 'Onaylı ilanlar' : isRo ? 'Anunțuri verificate' : 'Verified listings', sub: lang === 'el' ? 'Εγγυημένη ποιότητα' : lang === 'bg' ? 'Одобрено качество' : isSr ? 'Квалитет одобрен од администратора' : isTr ? 'Yönetici onaylı kalite' : isRo ? 'Calitate aprobată de admin' : 'Admin-approved quality' },
+          { icon: '💬', label: lang === 'el' ? 'Άμεση επικοινωνία' : lang === 'bg' ? 'Директна комуникация' : isSr ? 'Директна комуникација' : isTr ? 'Doğrudan mesajlaşma' : isRo ? 'Mesagerie directă' : 'Direct messaging',   sub: lang === 'el' ? 'Μιλήστε με τον ιδιοκτήτη' : lang === 'bg' ? 'Говорете директно със собственика' : isSr ? 'Разговарајте са власником' : isTr ? 'Sahiple konuşun' : isRo ? 'Vorbiți cu proprietarul' : 'Talk to the owner' },
+          { icon: '↩️', label: lang === 'el' ? 'Πολιτική ακυρώσεων' : lang === 'bg' ? 'Ясна политика за анулиране' : isSr ? 'Јасна политика отказивања' : isTr ? 'Net iptal politikası' : isRo ? 'Politică clară de anulare' : 'Clear cancellation policy', sub: lang === 'el' ? 'Σαφείς όροι' : lang === 'bg' ? 'Без скрити условия' : isSr ? 'Нема скривених услова' : isTr ? 'Gizli koşul yok' : isRo ? 'Fără termeni ascunși' : 'No hidden terms' },
+        ].map((b) => (
+          <div>
+            <div class="text-3xl mb-2">{b.icon}</div>
+            <p class="font-semibold text-gray-900 text-sm">{b.label}</p>
+            <p class="text-gray-400 text-xs mt-0.5">{b.sub}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- ── FINAL CTA ───────────────────────────────────────────────────────── -->
+  <section class="py-24 bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] text-white">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 text-center">
+      <h2 class="text-3xl sm:text-5xl font-bold mb-4">
+        {lang === 'el' ? 'Έτοιμοι να ξεκινήσετε;' : lang === 'bg' ? 'Готови ли сте да започнете?' : isSr ? 'Спремни да почнете?' : isTr ? 'Başlamaya hazır mısınız?' : isRo ? 'Sunteți pregătiți?' : 'Ready to start?'}
+      </h2>
+      <p class="text-white/60 text-lg mb-12">
+        {lang === 'el' ? 'Επιλέξτε τον ρόλο σας.' : lang === 'bg' ? 'Изберете своя път.' : isSr ? 'Изаберите свој пут.' : isTr ? 'Yolunuzu seçin.' : isRo ? 'Alegeți calea dvs.' : 'Choose your path.'}
+      </p>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <a href="/rentals" class="flex flex-col items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/40 rounded-2xl p-6 transition-all">
+          <span class="text-2xl">🏖️</span>
+          <p class="font-bold text-white">{lang === 'el' ? 'Κλείστε κατάλυμα' : lang === 'bg' ? 'Резервирайте вила' : isSr ? 'Резервишите вилу' : isTr ? 'Villa Rezervasyonu' : isRo ? 'Rezervați o Vilă' : 'Book a Villa'}</p>
+          <p class="text-xs text-white/50">{lang === 'el' ? 'Χωρίς χρεώσεις' : lang === 'bg' ? 'Нулеви такси' : isSr ? 'Нула такси за резервацију' : isTr ? 'Sıfır rezervasyon ücreti' : isRo ? 'Zero comisioane' : 'Zero booking fees'}</p>
+        </a>
+        <a href="/contact" class="flex flex-col items-center gap-2 bg-[#c9a96e] hover:bg-[#b8934a] rounded-2xl p-6 transition-all">
+          <span class="text-2xl">🏡</span>
+          <p class="font-bold text-white">{lang === 'el' ? 'Καταχωρίστε ακίνητο' : lang === 'bg' ? 'Публикувайте имот' : isSr ? 'Огласите некретнину' : isTr ? 'Mülkünüzü Listeleyin' : isRo ? 'Listați Proprietatea' : 'List Your Property'}</p>
+          <p class="text-xs text-white/80">{lang === 'el' ? 'Κρατήστε το 95%' : lang === 'bg' ? 'Запазете до 95%' : isSr ? 'Задржите до 95%' : isTr ? '%95\'e kadar kazanın' : isRo ? 'Păstrați până la 95%' : 'Keep up to 95%'}</p>
+        </a>
+        <a href="/cleaner/signup" class="flex flex-col items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/40 rounded-2xl p-6 transition-all">
+          <span class="text-2xl">🧹</span>
+          <p class="font-bold text-white">{lang === 'el' ? 'Βρείτε εργασία' : lang === 'bg' ? 'Намерете работа за почистване' : isSr ? 'Нађите посао чишћења' : isTr ? 'Temizlik İşi Bulun' : isRo ? 'Găsiți Lucrări de Curățenie' : 'Find Cleaning Work'}</p>
+          <p class="text-xs text-white/50">{lang === 'el' ? 'Πληρωθείτε αυτόματα' : lang === 'bg' ? 'Получавайте плащане автоматично' : isSr ? 'Добијајте плаћање аутоматски' : isTr ? 'Otomatik ödeme alın' : isRo ? 'Plată automată' : 'Get paid automatically'}</p>
+        </a>
+      </div>
+    </div>
+  </section>
+
+</BaseLayout>

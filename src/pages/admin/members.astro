@@ -1,0 +1,466 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const service = getServiceClient();
+
+const { data: members, count } = await service
+  .from('profiles')
+  .select('id, full_name, email, avatar_url, phone, location, hometown, bio, role, is_active, auth_provider, created_at, last_seen_at', { count: 'exact' })
+  .eq('role', 'member')
+  .order('created_at', { ascending: false });
+
+// Count posts per member
+const memberIds = (members ?? []).map((m: any) => m.id);
+let postCounts: Record<string, number> = {};
+if (memberIds.length > 0) {
+  const { data: posts } = await service
+    .from('community_posts')
+    .select('author_id')
+    .in('author_id', memberIds);
+  for (const p of posts ?? []) {
+    postCounts[p.author_id] = (postCounts[p.author_id] ?? 0) + 1;
+  }
+}
+
+const providerIcon: Record<string, string> = {
+  google: '🔵',
+  facebook: '🟦',
+  email: '✉️',
+};
+const providerLabel: Record<string, string> = {
+  google: 'Google',
+  facebook: 'Facebook',
+  email: 'Email',
+};
+
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+
+<AdminLayout title="Community Members">
+  <div class="space-y-6">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+      <h1 class="text-2xl font-bold text-white">Community Members ({count ?? 0})</h1>
+      <input id="search-input" type="text" placeholder="Search by name or email..."
+        class="bg-white/10 text-white text-sm px-4 py-2 rounded-xl border border-white/20 outline-none focus:border-[#c9a96e] w-64" />
+    </div>
+
+    {/* Stats */}
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <div class="bg-white/5 rounded-xl border border-white/10 p-4 text-center">
+        <p class="text-2xl font-bold text-white">{count ?? 0}</p>
+        <p class="text-xs text-gray-400">Total</p>
+      </div>
+      <div class="bg-white/5 rounded-xl border border-white/10 p-4 text-center">
+        <p class="text-2xl font-bold text-green-400">{(members ?? []).filter((m: any) => m.is_active !== false).length}</p>
+        <p class="text-xs text-gray-400">Active</p>
+      </div>
+      <div class="bg-white/5 rounded-xl border border-white/10 p-4 text-center">
+        <p class="text-2xl font-bold text-blue-400">{(members ?? []).filter((m: any) => m.auth_provider === 'google').length}</p>
+        <p class="text-xs text-gray-400">🔵 Google</p>
+      </div>
+      <div class="bg-white/5 rounded-xl border border-white/10 p-4 text-center">
+        <p class="text-2xl font-bold text-blue-500">{(members ?? []).filter((m: any) => m.auth_provider === 'facebook').length}</p>
+        <p class="text-xs text-gray-400">🟦 Facebook</p>
+      </div>
+    </div>
+
+    {/* Edit modal */}
+    <div id="edit-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+      <div class="bg-[#1e1e3a] rounded-2xl p-6 w-full max-w-md border border-white/10">
+        <h3 class="font-semibold text-white mb-4">Edit Member</h3>
+        <input type="hidden" id="edit-id" />
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Full name</label>
+            <input id="edit-name" type="text" class="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-sm text-white outline-none focus:border-[#c9a96e]" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Email</label>
+            <input id="edit-email" type="email" class="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-sm text-white outline-none focus:border-[#c9a96e]" />
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Phone</label>
+              <input id="edit-phone" type="text" class="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-sm text-white outline-none focus:border-[#c9a96e]" />
+            </div>
+            <div>
+              <label class="block text-xs text-gray-400 mb-1">Location</label>
+              <input id="edit-location" type="text" class="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-sm text-white outline-none focus:border-[#c9a96e]" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Hometown</label>
+            <input id="edit-hometown" type="text" class="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-sm text-white outline-none focus:border-[#c9a96e]" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Bio</label>
+            <textarea id="edit-bio" rows="2" class="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-sm text-white outline-none focus:border-[#c9a96e] resize-y"></textarea>
+          </div>
+        </div>
+        <div id="edit-error" class="hidden mt-3 text-sm text-red-400"></div>
+        <div class="flex gap-3 mt-5">
+          <button id="edit-cancel" class="flex-1 px-4 py-2 border border-white/20 rounded-xl text-sm text-gray-400 hover:bg-white/5 transition-colors">Cancel</button>
+          <button id="edit-submit" class="flex-1 bg-[#c9a96e] text-white font-semibold px-4 py-2 rounded-xl text-sm hover:bg-[#b89556] transition-colors">Save</button>
+        </div>
+      </div>
+    </div>
+
+    {/* Set Password modal */}
+    <div id="pw-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+      <div class="bg-[#1e1e3a] rounded-2xl p-6 w-full max-w-sm border border-white/10">
+        <h3 class="font-semibold text-white mb-1">Set Password</h3>
+        <p id="pw-desc" class="text-sm text-gray-400 mb-4"></p>
+        <input type="hidden" id="pw-id" />
+        <div class="space-y-3">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">New password</label>
+            <input id="pw-input" type="text" minlength="6" placeholder="Min 6 characters"
+              class="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-xl text-sm text-white outline-none focus:border-[#c9a96e]" />
+          </div>
+          <button id="pw-generate" type="button" class="text-xs text-purple-400 hover:text-purple-300 transition-colors">
+            Generate random password
+          </button>
+        </div>
+        <div id="pw-error" class="hidden mt-3 text-sm text-red-400"></div>
+        <div class="flex gap-3 mt-5">
+          <button id="pw-cancel" class="flex-1 px-4 py-2 border border-white/20 rounded-xl text-sm text-gray-400 hover:bg-white/5 transition-colors">Cancel</button>
+          <button id="pw-submit" class="flex-1 bg-purple-600 text-white font-semibold px-4 py-2 rounded-xl text-sm hover:bg-purple-700 transition-colors">Set Password</button>
+        </div>
+      </div>
+    </div>
+
+    {/* Delete modal */}
+    <div id="delete-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+      <div class="bg-[#1e1e3a] rounded-2xl p-6 w-full max-w-sm border border-white/10">
+        <div class="flex items-center gap-3 mb-4">
+          <div class="w-10 h-10 rounded-full bg-red-900/30 flex items-center justify-center shrink-0">
+            <span class="text-red-400 text-lg">⚠</span>
+          </div>
+          <div>
+            <h3 class="font-semibold text-white">Delete Member</h3>
+            <p id="delete-desc" class="text-sm text-gray-400 mt-0.5"></p>
+          </div>
+        </div>
+        <div class="bg-red-900/20 border border-red-500/20 rounded-xl px-4 py-3 mb-5 text-sm text-red-300">
+          This will permanently delete the member's account, all their posts, comments, and likes. This cannot be undone.
+        </div>
+        <div class="flex gap-3">
+          <button id="delete-cancel" class="flex-1 px-4 py-2 border border-white/20 rounded-xl text-sm text-gray-400 hover:bg-white/5">Cancel</button>
+          <button id="delete-confirm" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-xl text-sm">Delete</button>
+        </div>
+      </div>
+    </div>
+
+    {/* Members list */}
+    {(!members || members.length === 0) ? (
+      <div class="text-center py-16 text-gray-500">
+        <p class="text-4xl mb-2">👥</p>
+        <p>No community members yet</p>
+      </div>
+    ) : (
+      <div class="space-y-2" id="members-list">
+        {(members ?? []).map((m: any) => (
+          <div class="bg-white/5 rounded-xl border border-white/10 p-4 flex items-center justify-between gap-4 member-row"
+            data-id={m.id}
+            data-name={m.full_name ?? ''}
+            data-email={m.email ?? ''}
+            data-phone={m.phone ?? ''}
+            data-location={m.location ?? ''}
+            data-hometown={m.hometown ?? ''}
+            data-bio={m.bio ?? ''}
+            data-active={m.is_active !== false}
+            data-search={`${m.full_name ?? ''} ${m.email ?? ''}`.toLowerCase()}>
+            <div class="flex items-center gap-3 min-w-0">
+              <div class="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white text-sm font-bold flex-shrink-0 overflow-hidden">
+                {m.avatar_url ? (
+                  <img src={m.avatar_url} alt={m.full_name} class="w-full h-full object-cover" />
+                ) : (
+                  m.full_name?.[0]?.toUpperCase() ?? '?'
+                )}
+              </div>
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="font-semibold text-white truncate">{m.full_name ?? 'No name'}</span>
+                  <span class="text-[10px] px-1.5 py-0.5 rounded bg-white/10 text-gray-300"
+                    title={providerLabel[m.auth_provider] ?? 'Email'}>
+                    {providerIcon[m.auth_provider] ?? '✉️'} {providerLabel[m.auth_provider] ?? 'Email'}
+                  </span>
+                  {m.is_active === false && <span class="text-xs bg-red-900/30 text-red-400 px-1.5 py-0.5 rounded">Banned</span>}
+                </div>
+                <div class="text-xs text-gray-400 flex items-center gap-2 flex-wrap">
+                  <span>{m.email}</span>
+                  {m.phone && <span>📞 {m.phone}</span>}
+                  {m.location && <span>📍 {m.location}</span>}
+                  <span>📝 {postCounts[m.id] ?? 0} posts</span>
+                  <span>Joined {new Date(m.created_at).toLocaleDateString()}</span>
+                </div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <a href={`/community/member/${m.id}`} target="_blank"
+                class="text-xs text-blue-400 hover:text-blue-300 px-2 py-1 border border-white/10 rounded-lg">View</a>
+              <button class="edit-btn text-xs text-[#c9a96e] hover:text-[#e0c080] px-2 py-1 border border-white/10 rounded-lg" data-id={m.id}>Edit</button>
+              <button class="reset-pw-btn text-xs text-purple-400 hover:text-purple-300 px-2 py-1 border border-white/10 rounded-lg" data-email={m.email} data-name={m.full_name ?? m.email}>🔑 Reset PW</button>
+              <button class="set-pw-btn text-xs text-violet-400 hover:text-violet-300 px-2 py-1 border border-white/10 rounded-lg" data-id={m.id} data-name={m.full_name ?? m.email}>🔒 Set PW</button>
+              <button class="ban-btn text-xs px-2 py-1 border border-white/10 rounded-lg"
+                data-id={m.id} data-active={m.is_active !== false}
+                class:list={[m.is_active === false ? 'text-green-400 hover:text-green-300' : 'text-amber-400 hover:text-amber-300']}>
+                {m.is_active === false ? 'Unban' : 'Ban'}
+              </button>
+              <button class="delete-btn text-xs text-red-400 hover:text-red-300 px-2 py-1" data-id={m.id} data-name={m.full_name ?? m.email}>
+                ✕
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+
+  {/* Toast */}
+  <div id="toast" class="fixed bottom-6 right-6 z-[100] flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl text-sm font-medium text-white translate-y-16 opacity-0 transition-all duration-300 pointer-events-none max-w-xs">
+    <span id="toast-msg"></span>
+  </div>
+</AdminLayout>
+
+<script>
+  // ── Toast ──────────────────────────────────────────────────────────────────
+  const toast = document.getElementById('toast')!;
+  const toastMsg = document.getElementById('toast-msg')!;
+  let toastTimer: ReturnType<typeof setTimeout>;
+  function showToast(msg: string, type: 'success' | 'error' = 'success') {
+    clearTimeout(toastTimer);
+    toastMsg.textContent = msg;
+    toast.className = toast.className.replace(/bg-\S+/g, '').replace(/translate-y-\S+/g, '').replace(/opacity-\S+/g, '');
+    toast.classList.add(type === 'success' ? 'bg-emerald-600' : 'bg-red-600', 'translate-y-0', 'opacity-100');
+    toastTimer = setTimeout(() => { toast.classList.remove('translate-y-0', 'opacity-100'); toast.classList.add('translate-y-16', 'opacity-0'); }, 4000);
+  }
+
+  // ── Search ─────────────────────────────────────────────────────────────────
+  document.getElementById('search-input')?.addEventListener('input', (e) => {
+    const q = (e.target as HTMLInputElement).value.toLowerCase().trim();
+    document.querySelectorAll('.member-row').forEach(row => {
+      const search = (row as HTMLElement).dataset.search ?? '';
+      (row as HTMLElement).style.display = !q || search.includes(q) ? '' : 'none';
+    });
+  });
+
+  // ── Ban/Unban ──────────────────────────────────────────────────────────────
+  document.querySelectorAll('.ban-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = (btn as HTMLElement).dataset.id!;
+      const isActive = (btn as HTMLElement).dataset.active === 'true';
+      const action = isActive ? 'ban' : 'unban';
+      if (!confirm(`${action.charAt(0).toUpperCase() + action.slice(1)} this member?`)) return;
+      const res = await fetch(`/api/admin/members/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: !isActive }),
+      });
+      if (res.ok) {
+        showToast(`Member ${action}ned`);
+        setTimeout(() => location.reload(), 800);
+      } else {
+        showToast('Failed', 'error');
+      }
+    });
+  });
+
+  // ── Edit modal ─────────────────────────────────────────────────────────────
+  const editModal = document.getElementById('edit-modal')!;
+  const editId = document.getElementById('edit-id') as HTMLInputElement;
+  const editName = document.getElementById('edit-name') as HTMLInputElement;
+  const editEmail = document.getElementById('edit-email') as HTMLInputElement;
+  const editPhone = document.getElementById('edit-phone') as HTMLInputElement;
+  const editLocation = document.getElementById('edit-location') as HTMLInputElement;
+  const editHometown = document.getElementById('edit-hometown') as HTMLInputElement;
+  const editBio = document.getElementById('edit-bio') as HTMLTextAreaElement;
+  const editErr = document.getElementById('edit-error')!;
+  const editSubmit = document.getElementById('edit-submit') as HTMLButtonElement;
+
+  document.getElementById('edit-cancel')!.addEventListener('click', () => editModal.classList.add('hidden'));
+  editModal.addEventListener('click', (e) => { if (e.target === editModal) editModal.classList.add('hidden'); });
+
+  document.querySelectorAll('.edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const row = (btn as HTMLElement).closest('.member-row') as HTMLElement;
+      editId.value = row.dataset.id!;
+      editName.value = row.dataset.name ?? '';
+      editEmail.value = row.dataset.email ?? '';
+      editPhone.value = row.dataset.phone ?? '';
+      editLocation.value = row.dataset.location ?? '';
+      editHometown.value = row.dataset.hometown ?? '';
+      editBio.value = row.dataset.bio ?? '';
+      editErr.classList.add('hidden');
+      editModal.classList.remove('hidden');
+    });
+  });
+
+  editSubmit.addEventListener('click', async () => {
+    editSubmit.disabled = true;
+    editSubmit.textContent = 'Saving…';
+    editErr.classList.add('hidden');
+
+    const res = await fetch(`/api/admin/members/${editId.value}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        full_name: editName.value.trim(),
+        email: editEmail.value.trim(),
+        phone: editPhone.value.trim() || null,
+        location: editLocation.value.trim() || null,
+        hometown: editHometown.value.trim() || null,
+        bio: editBio.value.trim() || null,
+      }),
+    });
+
+    if (res.ok) {
+      editModal.classList.add('hidden');
+      showToast('Member updated');
+      setTimeout(() => location.reload(), 800);
+    } else {
+      const data = await res.json();
+      editErr.textContent = data.error ?? 'Update failed';
+      editErr.classList.remove('hidden');
+      editSubmit.disabled = false;
+      editSubmit.textContent = 'Save';
+    }
+  });
+
+  // ── Delete modal ───────────────────────────────────────────────────────────
+  const deleteModal = document.getElementById('delete-modal')!;
+  const deleteDesc = document.getElementById('delete-desc')!;
+  const deleteConfirm = document.getElementById('delete-confirm') as HTMLButtonElement;
+  let pendingDeleteId: string | null = null;
+
+  document.getElementById('delete-cancel')!.addEventListener('click', () => { deleteModal.classList.add('hidden'); pendingDeleteId = null; });
+  deleteModal.addEventListener('click', (e) => { if (e.target === deleteModal) { deleteModal.classList.add('hidden'); pendingDeleteId = null; } });
+
+  document.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const el = btn as HTMLElement;
+      pendingDeleteId = el.dataset.id!;
+      deleteDesc.textContent = `Delete ${el.dataset.name ?? 'this member'}?`;
+      deleteModal.classList.remove('hidden');
+    });
+  });
+
+  // ── Set Password modal ─────────────────────────────────────────────────────
+  const pwModal = document.getElementById('pw-modal')!;
+  const pwId = document.getElementById('pw-id') as HTMLInputElement;
+  const pwInput = document.getElementById('pw-input') as HTMLInputElement;
+  const pwDesc = document.getElementById('pw-desc')!;
+  const pwErr = document.getElementById('pw-error')!;
+  const pwSubmit = document.getElementById('pw-submit') as HTMLButtonElement;
+
+  document.getElementById('pw-cancel')!.addEventListener('click', () => pwModal.classList.add('hidden'));
+  pwModal.addEventListener('click', (e) => { if (e.target === pwModal) pwModal.classList.add('hidden'); });
+
+  document.getElementById('pw-generate')!.addEventListener('click', () => {
+    const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKMNPQRSTUVWXYZ23456789!@#$';
+    let pw = '';
+    for (let i = 0; i < 12; i++) pw += chars[Math.floor(Math.random() * chars.length)];
+    pwInput.value = pw;
+  });
+
+  document.querySelectorAll('.set-pw-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const el = btn as HTMLElement;
+      pwId.value = el.dataset.id!;
+      pwDesc.textContent = `Set a new password for ${el.dataset.name}`;
+      pwInput.value = '';
+      pwErr.classList.add('hidden');
+      pwModal.classList.remove('hidden');
+      pwInput.focus();
+    });
+  });
+
+  pwSubmit.addEventListener('click', async () => {
+    pwErr.classList.add('hidden');
+    const password = pwInput.value.trim();
+    if (password.length < 6) {
+      pwErr.textContent = 'Password must be at least 6 characters';
+      pwErr.classList.remove('hidden');
+      return;
+    }
+
+    pwSubmit.disabled = true;
+    pwSubmit.textContent = 'Setting…';
+
+    try {
+      const res = await fetch(`/api/admin/members/${pwId.value}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      });
+      if (res.ok) {
+        pwModal.classList.add('hidden');
+        showToast('Password set successfully');
+      } else {
+        const data = await res.json();
+        pwErr.textContent = data.error ?? 'Failed to set password';
+        pwErr.classList.remove('hidden');
+      }
+    } catch {
+      pwErr.textContent = 'Network error';
+      pwErr.classList.remove('hidden');
+    }
+
+    pwSubmit.disabled = false;
+    pwSubmit.textContent = 'Set Password';
+  });
+
+  // ── Reset Password ─────────────────────────────────────────────────────────
+  document.querySelectorAll('.reset-pw-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const el = btn as HTMLButtonElement;
+      const email = el.dataset.email!;
+      const name = el.dataset.name ?? email;
+      if (!confirm(`Send password reset email to ${name} (${email})?`)) return;
+
+      el.disabled = true;
+      el.textContent = 'Sending…';
+
+      try {
+        const res = await fetch('/api/auth/forgot-password', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, context: 'community' }),
+        });
+        if (res.ok) {
+          showToast(`Password reset email sent to ${email}`);
+        } else {
+          showToast('Failed to send reset email', 'error');
+        }
+      } catch {
+        showToast('Network error', 'error');
+      }
+
+      el.disabled = false;
+      el.textContent = '🔑 Reset PW';
+    });
+  });
+
+  deleteConfirm.addEventListener('click', async () => {
+    if (!pendingDeleteId) return;
+    deleteConfirm.disabled = true;
+    deleteConfirm.textContent = 'Deleting…';
+
+    const res = await fetch(`/api/admin/members/${pendingDeleteId}`, { method: 'DELETE' });
+    if (res.ok) {
+      deleteModal.classList.add('hidden');
+      showToast('Member deleted');
+      document.querySelector(`.member-row[data-id="${pendingDeleteId}"]`)?.remove();
+      pendingDeleteId = null;
+      deleteConfirm.disabled = false;
+      deleteConfirm.textContent = 'Delete';
+    } else {
+      deleteModal.classList.add('hidden');
+      showToast('Failed to delete', 'error');
+      pendingDeleteId = null;
+      deleteConfirm.disabled = false;
+      deleteConfirm.textContent = 'Delete';
+    }
+  });
+</script>

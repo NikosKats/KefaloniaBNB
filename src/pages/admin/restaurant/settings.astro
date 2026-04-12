@@ -1,0 +1,151 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+const profile = Astro.locals.profile!;
+const role = profile.role;
+const service = getServiceClient();
+
+let restaurantIds = Astro.locals.ownerRestaurantIds ?? [];
+if (role === 'admin' || role === 'super_admin') {
+  const { data } = await service.from('restaurants').select('id');
+  restaurantIds = (data ?? []).map((r: any) => r.id);
+}
+
+const restaurantId = restaurantIds[0];
+if (!restaurantId) return Astro.redirect('/admin/restaurant');
+
+const { data: restaurant } = await service.from('restaurants').select('*').eq('id', restaurantId).single();
+if (!restaurant) return Astro.redirect('/admin/restaurant');
+
+const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+const dayLabels: Record<string, string> = { mon: 'Monday', tue: 'Tuesday', wed: 'Wednesday', thu: 'Thursday', fri: 'Friday', sat: 'Saturday', sun: 'Sunday' };
+const hours = restaurant.opening_hours_reservation ?? restaurant.opening_hours ?? {};
+
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+
+<AdminLayout title="Restaurant Settings">
+  <div class="space-y-6">
+    <h1 class="text-2xl font-bold text-white">Reservation Settings</h1>
+
+    <form id="settings-form" class="space-y-6">
+      <!-- Toggle -->
+      <div class="bg-white/5 rounded-xl border border-white/10 p-5">
+        <label class="flex items-center justify-between">
+          <div>
+            <p class="font-semibold text-white">Accept Online Reservations</p>
+            <p class="text-xs text-gray-400 mt-0.5">Shows "Reserve" button on your restaurant page</p>
+          </div>
+          <input type="checkbox" name="accepts_reservations" class="w-5 h-5 rounded"
+            checked={restaurant.accepts_reservations} />
+        </label>
+      </div>
+
+      <!-- Slot Settings -->
+      <div class="bg-white/5 rounded-xl border border-white/10 p-5 space-y-4">
+        <h2 class="font-semibold text-white">Slot Configuration</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Slot interval (minutes)</label>
+            <select name="reservation_slot_minutes" class="w-full bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e]">
+              {[15, 30, 45, 60].map(v => (
+                <option value={v} selected={restaurant.reservation_slot_minutes === v} class="text-black">{v} min</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Max advance booking (days)</label>
+            <input type="number" name="reservation_max_advance_days" min="1" max="365"
+              value={restaurant.reservation_max_advance_days ?? 30}
+              class="w-full bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Min hours ahead</label>
+            <input type="number" name="reservation_min_hours_ahead" min="0" max="48"
+              value={restaurant.reservation_min_hours_ahead ?? 2}
+              class="w-full bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Opening Hours for Reservations -->
+      <div class="bg-white/5 rounded-xl border border-white/10 p-5 space-y-3">
+        <h2 class="font-semibold text-white">Reservation Hours</h2>
+        <p class="text-xs text-gray-400">Format: HH:MM-HH:MM (e.g. 12:00-23:00). Leave blank for days you don't accept reservations.</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          {days.map(d => (
+            <div class="flex items-center gap-3">
+              <span class="text-sm text-gray-300 w-24">{dayLabels[d]}</span>
+              <input type="text" name={`hours_${d}`} value={hours[d] ?? ''} placeholder="12:00-23:00"
+                class="flex-1 bg-white/10 text-white px-3 py-1.5 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <!-- Telegram -->
+      <div class="bg-white/5 rounded-xl border border-white/10 p-5">
+        <h2 class="font-semibold text-white mb-3">Telegram Notifications</h2>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Telegram Chat ID</label>
+          <input type="text" name="telegram_chat_id" value={restaurant.telegram_chat_id ?? ''}
+            placeholder="e.g. -1001234567890"
+            class="w-full bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+          <p class="text-xs text-gray-500 mt-1">Get this from @userinfobot on Telegram or use your group chat ID</p>
+        </div>
+      </div>
+
+      <div id="form-msg" class="hidden text-sm p-3 rounded-lg"></div>
+
+      <button type="submit" class="bg-[#c9a96e] text-white px-8 py-2.5 rounded-xl font-semibold hover:bg-[#b89556] transition-colors">
+        Save Settings
+      </button>
+    </form>
+  </div>
+</AdminLayout>
+
+<script define:vars={{ restaurantId }}>
+  const form = document.getElementById('settings-form');
+  const days = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const msgEl = document.getElementById('form-msg');
+
+    // Build hours object
+    const opening_hours_reservation = {};
+    for (const d of days) {
+      const val = fd.get(`hours_${d}`)?.toString().trim();
+      if (val && /^\d{2}:\d{2}-\d{2}:\d{2}$/.test(val)) {
+        opening_hours_reservation[d] = val;
+      }
+    }
+
+    const payload = {
+      accepts_reservations: form.querySelector('[name="accepts_reservations"]').checked,
+      reservation_slot_minutes: parseInt(fd.get('reservation_slot_minutes')),
+      reservation_max_advance_days: parseInt(fd.get('reservation_max_advance_days')),
+      reservation_min_hours_ahead: parseInt(fd.get('reservation_min_hours_ahead')),
+      telegram_chat_id: fd.get('telegram_chat_id')?.toString().trim() || null,
+      opening_hours_reservation,
+    };
+
+    try {
+      const res = await fetch('/api/admin/restaurant/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restaurant_id: restaurantId, ...payload }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || 'Failed');
+      msgEl.textContent = 'Settings saved!';
+      msgEl.className = 'text-sm p-3 rounded-lg bg-green-900/30 text-green-400';
+      msgEl.classList.remove('hidden');
+    } catch (err) {
+      msgEl.textContent = err.message;
+      msgEl.className = 'text-sm p-3 rounded-lg bg-red-900/30 text-red-400';
+      msgEl.classList.remove('hidden');
+    }
+  });
+</script>

@@ -1,0 +1,694 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../lib/supabase';
+import { ALL_LOCATIONS } from '../../lib/locations';
+
+const service = getServiceClient();
+
+const [interestsRes, businessesRes] = await Promise.all([
+  service.from('partner_interests').select('*').order('created_at', { ascending: false }),
+  service.from('partner_businesses')
+    .select('*, partner_coupons(*)')
+    .order('location_slug')
+    .order('sort_order')
+    .order('created_at', { ascending: false }),
+]);
+
+const interests  = interestsRes.data ?? [];
+const businesses = businessesRes.data ?? [];
+
+const newCount        = interests.filter((i: any) => i.status === 'new').length;
+const activeCount     = businesses.filter((b: any) => b.status === 'active').length;
+const totalRedemptions = businesses.reduce((s: number, b: any) =>
+  s + (b.partner_coupons ?? []).reduce((cs: number, c: any) => cs + (c.redemption_count ?? 0), 0), 0);
+const estimatedMRR = businesses.reduce((s: number, b: any) => {
+  const redemptions = (b.partner_coupons ?? []).reduce((cs: number, c: any) => cs + (c.redemption_count ?? 0), 0);
+  return s + redemptions * (b.commission_per_redemption ?? 2);
+}, 0);
+
+const locationOptions = ALL_LOCATIONS.map((l: any) => ({ slug: l.slug, name: l.name }));
+
+const statusBadge: Record<string, string> = {
+  new:       'bg-blue-100 text-blue-700',
+  contacted: 'bg-amber-100 text-amber-700',
+  approved:  'bg-emerald-100 text-emerald-700',
+  rejected:  'bg-red-100 text-red-500',
+};
+
+const typeLabelMap: Record<string, string> = {
+  taverna: '🐟 Taverna', restaurant: '🍽 Restaurant', cafe: '☕ Cafe',
+  bar: '🍹 Bar', boat_rental: '⛵ Boat Rental', guided_tour: '🗺 Guided Tour',
+  watersports: '🏄 Watersports', transport: '🚗 Transport', shop: '🛍 Shop', other: '📍 Other',
+};
+
+function fmtDate(d: string | null) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+---
+
+<AdminLayout title="Partner Businesses">
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-xl font-bold text-gray-900">Partner Businesses</h1>
+      <p class="text-sm text-gray-500 mt-0.5">Commission per redemption — businesses pay only when guests use their coupon</p>
+    </div>
+    <button id="add-business-btn"
+      class="min-h-[44px] bg-[#1a1a2e] text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-[#2d2d4e] transition-colors">
+      + Add Business
+    </button>
+  </div>
+
+  <!-- Stats -->
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    <div class="bg-white border border-gray-100 rounded-2xl p-4 text-center">
+      <p class="text-2xl font-bold text-gray-900">{activeCount}</p>
+      <p class="text-xs text-gray-500 mt-0.5">Active businesses</p>
+    </div>
+    <div class="bg-white border border-gray-100 rounded-2xl p-4 text-center">
+      <p class="text-2xl font-bold text-gray-900">{totalRedemptions}</p>
+      <p class="text-xs text-gray-500 mt-0.5">Total coupon uses</p>
+    </div>
+    <div class="bg-white border border-gray-100 rounded-2xl p-4 text-center">
+      <p class="text-2xl font-bold text-emerald-600">€{estimatedMRR.toFixed(0)}</p>
+      <p class="text-xs text-gray-500 mt-0.5">Total owed to you</p>
+    </div>
+    <div class="bg-white border border-gray-100 rounded-2xl p-4 text-center">
+      <p class="text-2xl font-bold text-gray-900">{newCount}</p>
+      <p class="text-xs text-gray-500 mt-0.5">New submissions</p>
+    </div>
+  </div>
+
+  <!-- How it works -->
+  <div class="bg-blue-50 border border-blue-100 rounded-2xl p-4 mb-6 text-sm text-blue-900 space-y-1">
+    <p><strong>How it works:</strong> Listing and coupons are free. Guests tap "Show Code" on the guide page — this logs a <strong>reveal</strong>. The business scans the QR code shown to the guest and taps "Confirm" on their phone — this logs a <strong>confirmed redemption</strong>.</p>
+    <p class="text-blue-700">Only confirmed redemptions are billable. Reveals without a business confirmation are free — you can see them to understand intent vs actual use.</p>
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex gap-1 border-b border-gray-200 mb-6 overflow-x-auto">
+    <button class="tab-btn active min-h-[44px] px-4 py-2.5 text-sm font-medium border-b-2 border-[#1a1a2e] text-[#1a1a2e] whitespace-nowrap" data-tab="businesses">
+      Businesses ({activeCount})
+    </button>
+    <button class="tab-btn min-h-[44px] px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-800 whitespace-nowrap" data-tab="billing">
+      Monthly Billing
+    </button>
+    <button class="tab-btn min-h-[44px] px-4 py-2.5 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-800 whitespace-nowrap" data-tab="interests">
+      Submissions
+      {newCount > 0 && <span class="ml-1.5 bg-blue-600 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">{newCount}</span>}
+    </button>
+  </div>
+
+  <!-- ── Businesses tab ─────────────────────────────────────────────── -->
+  <div id="tab-businesses">
+    {businesses.length === 0 ? (
+      <div class="text-center py-16 bg-gray-50 rounded-2xl">
+        <p class="text-4xl mb-3">🤝</p>
+        <p class="text-gray-500 text-sm">No businesses yet. Add one or approve a submission.</p>
+      </div>
+    ) : (
+      <div class="space-y-4">
+        {businesses.map((b: any) => {
+          const coupons = b.partner_coupons ?? [];
+          const bRedemptions = coupons.reduce((s: number, c: any) => s + (c.redemption_count ?? 0), 0);
+          const bOwed = bRedemptions * (b.commission_per_redemption ?? 2);
+          return (
+          <div class={`bg-white border rounded-2xl overflow-hidden ${b.featured ? 'border-amber-200' : 'border-gray-100'}`} id={`biz-${b.id}`}>
+            <div class="p-4 flex items-start gap-4">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap mb-1">
+                  <span class="font-semibold text-gray-900">{b.name}</span>
+                  <span class="text-xs text-gray-400">{typeLabelMap[b.type] ?? b.type}</span>
+                  {b.featured && <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">★ Featured</span>}
+                  {b.status === 'inactive' && <span class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">inactive</span>}
+                </div>
+                <p class="text-xs text-[#c9a96e] font-medium mb-1">📍 {b.location_name}</p>
+                <p class="text-sm text-gray-600 line-clamp-1">{b.description}</p>
+                <div class="flex gap-4 mt-2 text-xs">
+                  <span class="text-gray-500">€{b.commission_per_redemption ?? 2} / redemption</span>
+                  {bRedemptions > 0 && <span class="font-semibold text-emerald-600">🎟 {bRedemptions} uses → <strong>€{bOwed.toFixed(0)} owed</strong></span>}
+                  {b.billing_email && <span class="text-gray-400">📧 {b.billing_email}</span>}
+                  {b.phone && <span class="text-gray-400">📞 {b.phone}</span>}
+                </div>
+              </div>
+              <div class="flex flex-col gap-1.5 shrink-0">
+                <button class="edit-biz-btn min-h-[44px] text-sm text-gray-500 hover:text-gray-900 border border-gray-200 hover:border-gray-400 rounded-lg px-4 py-2.5 transition-colors"
+                  data-biz={JSON.stringify(b)}>Edit</button>
+                <button class="add-coupon-btn min-h-[44px] text-sm text-blue-600 hover:text-blue-800 border border-blue-100 hover:border-blue-300 rounded-lg px-4 py-2.5 transition-colors"
+                  data-id={b.id} data-name={b.name}>+ Coupon</button>
+                <button class="delete-biz-btn min-h-[44px] text-sm text-red-400 hover:text-red-600 border border-red-100 hover:border-red-300 rounded-lg px-4 py-2.5 transition-colors"
+                  data-id={b.id} data-name={b.name}>Delete</button>
+              </div>
+            </div>
+
+            {coupons.length > 0 && (
+              <div class="border-t border-gray-50 bg-gray-50/50 px-4 py-3">
+                <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Coupons</p>
+                <div class="flex flex-wrap gap-2">
+                  {coupons.map((c: any) => (
+                    <div class={`flex items-center gap-2 border rounded-xl px-3 py-1.5 text-xs ${c.is_active ? 'bg-white border-gray-200' : 'bg-gray-100 border-gray-200 opacity-50'}`}>
+                      <span class="font-mono font-bold text-[#1a1a2e]">{c.code}</span>
+                      <span class="text-gray-500">—</span>
+                      <span class="text-gray-700">{c.description}</span>
+                      <span class={`font-semibold ${c.discount_type === 'percent' ? 'text-emerald-600' : 'text-blue-600'}`}>
+                        {c.discount_type === 'percent' ? `-${c.discount_value}%` : `-€${c.discount_value}`}
+                      </span>
+                      {(c.reveal_count > 0 || c.redemption_count > 0) && (
+                        <span class="flex items-center gap-1">
+                          {c.reveal_count > 0 && <span class="bg-gray-100 text-gray-500 text-xs px-1.5 rounded-full" title="Times code was shown to a guest">{c.reveal_count} shown</span>}
+                          {c.redemption_count > 0 && <span class="bg-emerald-100 text-emerald-700 font-semibold px-1.5 rounded-full" title="Confirmed by business — billable">{c.redemption_count} confirmed</span>}
+                        </span>
+                      )}
+                      {c.valid_until && <span class="text-gray-400">until {fmtDate(c.valid_until)}</span>}
+                      <button class="toggle-coupon-btn text-gray-400 hover:text-gray-700 transition-colors"
+                        data-id={c.id} data-active={c.is_active ? '1' : '0'}>
+                        {c.is_active ? '⏸' : '▶'}
+                      </button>
+                      <button class="delete-coupon-btn text-red-300 hover:text-red-500 transition-colors"
+                        data-id={c.id}>×</button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )})}
+      </div>
+    )}
+  </div>
+
+  <!-- ── Billing tab ────────────────────────────────────────────────── -->
+  <div id="tab-billing" class="hidden">
+    <p class="text-sm text-gray-500 mb-4">Businesses with coupon redemptions — what to invoice them this month.</p>
+    {businesses.filter((b: any) => {
+      const r = (b.partner_coupons ?? []).reduce((s: number, c: any) => s + (c.redemption_count ?? 0), 0);
+      return r > 0;
+    }).length === 0 ? (
+      <div class="text-center py-16 bg-gray-50 rounded-2xl">
+        <p class="text-4xl mb-3">📊</p>
+        <p class="text-gray-500 text-sm">No redemptions yet. Billing summary will appear here once guests start using coupons.</p>
+      </div>
+    ) : (
+      <!-- Mobile billing cards -->
+      <div class="lg:hidden space-y-3">
+        {businesses.map((b: any) => {
+          const r = (b.partner_coupons ?? []).reduce((s: number, c: any) => s + (c.redemption_count ?? 0), 0);
+          if (r === 0) return null;
+          const owed = r * (b.commission_per_redemption ?? 2);
+          return (
+            <div class="bg-white border border-gray-100 rounded-2xl p-4 space-y-2">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <p class="font-medium text-gray-900">{b.name}</p>
+                  <p class="text-xs text-gray-500">{b.location_name}</p>
+                </div>
+                <p class="font-bold text-emerald-600 text-lg shrink-0">€{owed.toFixed(2)}</p>
+              </div>
+              <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-500">
+                <span>Redemptions: <span class="font-mono text-gray-900">{r}</span></span>
+                <span>Rate: €{(b.commission_per_redemption ?? 2).toFixed(2)}</span>
+              </div>
+              {b.billing_email && (
+                <a href={`mailto:${b.billing_email}?subject=KefaloniaBNB — Monthly Referral Invoice&body=Hi, you had ${r} guest redemptions this month via your coupon on kefaloniabnb.com. Total: €${owed.toFixed(2)}`}
+                  class="inline-flex items-center min-h-[44px] px-4 py-2.5 text-sm text-blue-500 border border-blue-200 rounded-xl hover:bg-blue-50 transition-colors">
+                  {b.billing_email}
+                </a>
+              )}
+            </div>
+          );
+        })}
+        <div class="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-center justify-between">
+          <span class="font-semibold text-gray-700">Total to collect</span>
+          <span class="font-bold text-emerald-600 text-lg">€{estimatedMRR.toFixed(2)}</span>
+        </div>
+      </div>
+
+      <!-- Desktop billing table -->
+      <div class="hidden lg:block bg-white border border-gray-100 rounded-2xl overflow-hidden">
+        <table class="w-full text-sm">
+          <thead class="bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Business</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Location</th>
+              <th class="text-left px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Billing email</th>
+              <th class="text-right px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Redemptions</th>
+              <th class="text-right px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Rate</th>
+              <th class="text-right px-4 py-3 text-xs font-semibold text-gray-600 uppercase tracking-wide">Amount owed</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-50">
+            {businesses.map((b: any) => {
+              const r = (b.partner_coupons ?? []).reduce((s: number, c: any) => s + (c.redemption_count ?? 0), 0);
+              if (r === 0) return null;
+              const owed = r * (b.commission_per_redemption ?? 2);
+              return (
+                <tr class="hover:bg-gray-50/50">
+                  <td class="px-4 py-3 font-medium text-gray-900">{b.name}</td>
+                  <td class="px-4 py-3 text-gray-500">{b.location_name}</td>
+                  <td class="px-4 py-3">
+                    {b.billing_email
+                      ? <a href={`mailto:${b.billing_email}?subject=KefaloniaBNB — Monthly Referral Invoice&body=Hi, you had ${r} guest redemptions this month via your coupon on kefaloniabnb.com. Total: €${owed.toFixed(2)}`}
+                          class="text-blue-500 hover:underline text-xs">{b.billing_email}</a>
+                      : <span class="text-gray-400 text-xs">—</span>}
+                  </td>
+                  <td class="px-4 py-3 text-right font-mono text-gray-900">{r}</td>
+                  <td class="px-4 py-3 text-right text-gray-500">€{(b.commission_per_redemption ?? 2).toFixed(2)}</td>
+                  <td class="px-4 py-3 text-right font-bold text-emerald-600">€{owed.toFixed(2)}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+          <tfoot class="border-t-2 border-gray-200 bg-gray-50">
+            <tr>
+              <td colspan="5" class="px-4 py-3 font-semibold text-gray-700 text-right">Total to collect</td>
+              <td class="px-4 py-3 text-right font-bold text-emerald-600 text-lg">€{estimatedMRR.toFixed(2)}</td>
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+    )}
+  </div>
+
+  <!-- ── Interests tab ──────────────────────────────────────────────── -->
+  <div id="tab-interests" class="hidden">
+    {interests.length === 0 ? (
+      <div class="text-center py-16 bg-gray-50 rounded-2xl">
+        <p class="text-4xl mb-3">📬</p>
+        <p class="text-gray-500 text-sm">No partner interest submissions yet.</p>
+      </div>
+    ) : (
+      <div class="space-y-3">
+        {interests.map((i: any) => (
+          <div class="bg-white border border-gray-100 rounded-2xl p-4">
+            <div class="flex items-start justify-between gap-4">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap mb-1">
+                  <span class="font-semibold text-gray-900 text-sm">{i.business_name}</span>
+                  <span class="text-xs text-gray-400">{typeLabelMap[i.business_type] ?? i.business_type}</span>
+                  <span class={`text-xs px-2 py-0.5 rounded-full font-medium ${statusBadge[i.status]}`}>{i.status}</span>
+                </div>
+                <p class="text-xs text-[#c9a96e] font-medium mb-1">📍 {i.location_name}</p>
+                <p class="text-sm text-gray-600">👤 {i.contact_name} · 📧 <a href={`mailto:${i.email}`} class="text-blue-500 hover:underline">{i.email}</a></p>
+                {i.message && <p class="text-sm text-gray-500 mt-1 italic">"{i.message}"</p>}
+                <p class="text-xs text-gray-400 mt-1">{fmtDate(i.created_at)}</p>
+                {i.notes && <p class="text-xs text-amber-700 bg-amber-50 rounded-lg px-2 py-1 mt-2">📝 {i.notes}</p>}
+              </div>
+              <div class="flex flex-col gap-1.5 shrink-0">
+                <button class="approve-interest-btn min-h-[44px] text-sm bg-emerald-600 hover:bg-emerald-700 text-white font-medium rounded-lg px-4 py-2.5 transition-colors"
+                  data-interest={JSON.stringify(i)}>+ Add Business</button>
+                <select class="interest-status-sel min-h-[44px] text-sm border border-gray-200 rounded-lg px-3 py-2.5 text-gray-600 bg-white" data-id={i.id}>
+                  {['new','contacted','approved','rejected'].map(s => (
+                    <option value={s} selected={i.status === s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
+                  ))}
+                </select>
+                <button class="add-note-btn min-h-[44px] text-sm text-gray-500 border border-gray-200 rounded-lg px-4 py-2.5 hover:bg-gray-50 transition-colors"
+                  data-id={i.id} data-notes={i.notes ?? ''}>Note</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+
+  <!-- ── Add/Edit Business Modal ────────────────────────────────────── -->
+  <div id="biz-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+        <h2 id="modal-title" class="font-bold text-gray-900">Add Business</h2>
+        <button id="modal-close" class="text-gray-400 hover:text-gray-600 text-xl">×</button>
+      </div>
+      <form id="biz-form" class="p-6 space-y-4">
+        <input type="hidden" id="biz-id" />
+        <input type="hidden" id="biz-interest-id" />
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Business name *</label>
+            <input id="biz-name" type="text" required class="input-field text-sm w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Type *</label>
+            <select id="biz-type" required class="input-field text-sm w-full bg-white">
+              <option value="">Select…</option>
+              {[['taverna','Taverna'],['restaurant','Restaurant'],['cafe','Cafe / Bar'],['bar','Bar'],['boat_rental','Boat Rental'],['guided_tour','Guided Tours'],['watersports','Watersports'],['transport','Transport / Taxi'],['shop','Shop'],['other','Other']].map(([v,l]) => (
+                <option value={v}>{l}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Location *</label>
+            <select id="biz-location" required class="input-field text-sm w-full bg-white">
+              <option value="">Select location…</option>
+              {locationOptions.map((l: any) => <option value={l.slug} data-name={l.name}>{l.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Price range</label>
+            <select id="biz-price" class="input-field text-sm w-full bg-white">
+              <option value="">Not specified</option>
+              <option value="€">€ — Budget</option>
+              <option value="€€">€€ — Mid-range</option>
+              <option value="€€€">€€€ — Upscale</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Highlight <span class="text-gray-400">(short one-liner)</span></label>
+          <input id="biz-highlight" type="text" placeholder="Best fresh fish in Keramoti" class="input-field text-sm w-full" />
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Description *</label>
+          <textarea id="biz-desc" required rows="2" class="input-field text-sm w-full resize-none"></textarea>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Phone</label>
+            <input id="biz-phone" type="tel" class="input-field text-sm w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Website</label>
+            <input id="biz-website" type="url" class="input-field text-sm w-full" />
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Address</label>
+            <input id="biz-address" type="text" class="input-field text-sm w-full" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Google Maps URL</label>
+            <input id="biz-gmaps" type="url" class="input-field text-sm w-full" />
+          </div>
+        </div>
+
+        <div class="border-t border-gray-100 pt-4">
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3">Commission & Billing</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Commission per redemption (€)</label>
+              <input id="biz-commission" type="number" min="0" step="0.50" placeholder="2.00" class="input-field text-sm w-full" />
+              <p class="text-xs text-gray-400 mt-1">What you charge for each coupon use</p>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">Billing email</label>
+              <input id="biz-billing-email" type="email" placeholder="owner@taverna.com" class="input-field text-sm w-full" />
+              <p class="text-xs text-gray-400 mt-1">For monthly invoice emails</p>
+            </div>
+          </div>
+        </div>
+
+        <label class="flex items-center gap-2 cursor-pointer">
+          <input id="biz-featured" type="checkbox" class="w-4 h-4 rounded" />
+          <span class="text-sm text-gray-700">★ Feature this business (shown first with gold border)</span>
+        </label>
+
+        <div id="biz-msg" class="hidden text-xs font-medium"></div>
+        <div class="flex gap-3 pt-2">
+          <button type="submit" id="biz-submit"
+            class="flex-1 bg-[#1a1a2e] hover:bg-[#2d2d4e] text-white font-semibold py-2.5 rounded-xl text-sm transition-colors">
+            Save Business
+          </button>
+          <button type="button" id="modal-cancel"
+            class="px-6 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- ── Coupon Modal ───────────────────────────────────────────────── -->
+  <div id="coupon-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+      <h3 class="font-bold text-gray-900 mb-1">Add Discount Coupon</h3>
+      <p id="coupon-biz-name" class="text-sm text-gray-500 mb-4"></p>
+      <input type="hidden" id="coupon-biz-id" />
+      <div class="space-y-4">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Code (shown to guests) *</label>
+            <input id="coupon-code" type="text" placeholder="AKROGIALI10" maxlength="20"
+              class="input-field text-sm w-full font-mono" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Valid until</label>
+            <input id="coupon-until" type="date" class="input-field text-sm w-full" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">What guests see *</label>
+          <input id="coupon-desc" type="text" placeholder="10% off your meal" class="input-field text-sm w-full" />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Discount type *</label>
+            <select id="coupon-type" class="input-field text-sm w-full bg-white">
+              <option value="percent">Percent (%)</option>
+              <option value="fixed">Fixed amount (€)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Value *</label>
+            <input id="coupon-value" type="number" min="1" step="1" placeholder="10" class="input-field text-sm w-full" />
+          </div>
+        </div>
+        <div class="bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs text-amber-800">
+          💡 Guests tap "Show Code" on the guide page to reveal this coupon. The business scans the QR code on the guest's screen and confirms it on their phone. Only business-confirmed redemptions are billable.
+        </div>
+        <div id="coupon-msg" class="hidden text-xs font-medium text-red-600"></div>
+        <div class="flex gap-3">
+          <button id="coupon-save" class="flex-1 bg-[#1a1a2e] hover:bg-[#2d2d4e] text-white font-semibold py-2.5 rounded-xl text-sm transition-colors">
+            Create Coupon
+          </button>
+          <button id="coupon-cancel" class="px-5 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── Note Modal ────────────────────────────────────────────────── -->
+  <div id="note-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div class="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+      <h3 class="font-bold text-gray-900 mb-3">Internal Note</h3>
+      <input type="hidden" id="note-interest-id" />
+      <textarea id="note-text" rows="3" class="input-field text-sm w-full resize-none mb-3" placeholder="e.g. Called on 20 March, following up next week…"></textarea>
+      <div class="flex gap-3">
+        <button id="note-save" class="flex-1 bg-[#1a1a2e] text-white font-semibold py-2.5 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">Save</button>
+        <button id="note-cancel" class="px-5 py-2.5 border border-gray-200 text-gray-600 rounded-xl text-sm hover:bg-gray-50 transition-colors">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+</AdminLayout>
+
+<script>
+  function f(id: string) { return document.getElementById(id) as any; }
+
+  // ── Tabs ────────────────────────────────────────────────────────────
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => {
+        b.classList.remove('border-[#1a1a2e]','text-[#1a1a2e]');
+        b.classList.add('border-transparent','text-gray-500');
+      });
+      btn.classList.add('border-[#1a1a2e]','text-[#1a1a2e]');
+      btn.classList.remove('border-transparent','text-gray-500');
+      const tab = (btn as HTMLElement).dataset.tab!;
+      ['businesses','billing','interests'].forEach(t =>
+        f(`tab-${t}`)?.classList.toggle('hidden', t !== tab));
+    });
+  });
+
+  // ── Business modal ──────────────────────────────────────────────────
+  const bizModal  = document.getElementById('biz-modal')!;
+  const bizMsg    = f('biz-msg');
+  const bizSubmit = f('biz-submit') as HTMLButtonElement;
+
+  function openBizModal(title: string, d: any = {}) {
+    f('modal-title').textContent = title;
+    f('biz-id').value             = d.id ?? '';
+    f('biz-interest-id').value    = d.interest_id ?? '';
+    f('biz-name').value           = d.name ?? '';
+    f('biz-type').value           = d.type ?? '';
+    f('biz-location').value       = d.location_slug ?? '';
+    f('biz-price').value          = d.price_range ?? '';
+    f('biz-highlight').value      = d.highlight ?? '';
+    f('biz-desc').value           = d.description ?? '';
+    f('biz-phone').value          = d.phone ?? '';
+    f('biz-website').value        = d.website ?? '';
+    f('biz-address').value        = d.address ?? '';
+    f('biz-gmaps').value          = d.google_maps_url ?? '';
+    f('biz-commission').value     = d.commission_per_redemption ?? '2';
+    f('biz-billing-email').value  = d.billing_email ?? '';
+    f('biz-featured').checked     = d.featured ?? false;
+    bizMsg.classList.add('hidden');
+    bizModal.classList.remove('hidden');
+  }
+
+  const closeBizModal = () => bizModal.classList.add('hidden');
+  f('modal-close').addEventListener('click', closeBizModal);
+  f('modal-cancel').addEventListener('click', closeBizModal);
+  bizModal.addEventListener('click', (e: MouseEvent) => { if (e.target === bizModal) closeBizModal(); });
+  f('add-business-btn').addEventListener('click', () => openBizModal('Add Business'));
+
+  document.querySelectorAll('.edit-biz-btn').forEach(btn =>
+    btn.addEventListener('click', () => openBizModal('Edit Business', JSON.parse((btn as HTMLElement).dataset.biz!))));
+
+  document.querySelectorAll('.approve-interest-btn').forEach(btn =>
+    btn.addEventListener('click', () => {
+      const i = JSON.parse((btn as HTMLElement).dataset.interest!);
+      openBizModal('Add Business from Submission', {
+        interest_id: i.id, name: i.business_name, type: i.business_type,
+        location_slug: i.location_slug, billing_email: i.email,
+      });
+      (document.querySelector('[data-tab="businesses"]') as HTMLElement).click();
+    }));
+
+  f('biz-form').addEventListener('submit', async (e: Event) => {
+    e.preventDefault();
+    bizMsg.classList.add('hidden');
+    bizSubmit.disabled = true; bizSubmit.textContent = 'Saving…';
+
+    const bizId = f('biz-id').value;
+    const locSel = f('biz-location') as HTMLSelectElement;
+    const body: Record<string, unknown> = {
+      name:                    f('biz-name').value.trim(),
+      type:                    f('biz-type').value,
+      location_slug:           locSel.value,
+      location_name:           locSel.selectedOptions[0]?.dataset.name ?? locSel.value,
+      price_range:             f('biz-price').value || null,
+      highlight:               f('biz-highlight').value.trim() || null,
+      description:             f('biz-desc').value.trim(),
+      phone:                   f('biz-phone').value.trim() || null,
+      website:                 f('biz-website').value.trim() || null,
+      address:                 f('biz-address').value.trim() || null,
+      google_maps_url:         f('biz-gmaps').value.trim() || null,
+      commission_per_redemption: parseFloat(f('biz-commission').value) || 2,
+      billing_email:           f('biz-billing-email').value.trim() || null,
+      featured:                f('biz-featured').checked,
+    };
+    if (bizId) body.id = bizId;
+    else if (f('biz-interest-id').value) body.interest_id = f('biz-interest-id').value;
+
+    const res = await fetch('/api/partners/businesses', {
+      method: bizId ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) { closeBizModal(); window.location.reload(); }
+    else {
+      const j = await res.json().catch(() => ({}));
+      bizMsg.textContent = j.error ?? 'Failed to save';
+      bizMsg.className = 'text-xs font-medium text-red-600';
+      bizMsg.classList.remove('hidden');
+      bizSubmit.disabled = false; bizSubmit.textContent = 'Save Business';
+    }
+  });
+
+  document.querySelectorAll('.delete-biz-btn').forEach(btn =>
+    btn.addEventListener('click', async () => {
+      if (!confirm(`Delete "${(btn as HTMLElement).dataset.name}"?`)) return;
+      const res = await fetch('/api/partners/businesses', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: (btn as HTMLElement).dataset.id }),
+      });
+      if (res.ok || res.status === 204) document.getElementById(`biz-${(btn as HTMLElement).dataset.id}`)?.remove();
+    }));
+
+  // ── Coupon modal ────────────────────────────────────────────────────
+  const couponModal = document.getElementById('coupon-modal')!;
+  const couponMsg   = f('coupon-msg');
+
+  document.querySelectorAll('.add-coupon-btn').forEach(btn =>
+    btn.addEventListener('click', () => {
+      f('coupon-biz-id').value = (btn as HTMLElement).dataset.id!;
+      f('coupon-biz-name').textContent = 'for ' + (btn as HTMLElement).dataset.name;
+      ['coupon-code','coupon-desc','coupon-value','coupon-until'].forEach(id => f(id).value = '');
+      couponMsg.classList.add('hidden');
+      couponModal.classList.remove('hidden');
+    }));
+
+  f('coupon-code').addEventListener('input', () => {
+    f('coupon-code').value = f('coupon-code').value.toUpperCase().replace(/[^A-Z0-9]/g,'');
+  });
+
+  f('coupon-cancel').addEventListener('click', () => couponModal.classList.add('hidden'));
+  couponModal.addEventListener('click', (e: MouseEvent) => { if (e.target === couponModal) couponModal.classList.add('hidden'); });
+
+  f('coupon-save').addEventListener('click', async () => {
+    couponMsg.classList.add('hidden');
+    const body = {
+      business_id: f('coupon-biz-id').value,
+      code: f('coupon-code').value.trim(),
+      description: f('coupon-desc').value.trim(),
+      discount_type: f('coupon-type').value,
+      discount_value: f('coupon-value').value,
+      valid_until: f('coupon-until').value || null,
+    };
+    if (!body.code || !body.description || !body.discount_value) {
+      couponMsg.textContent = 'Code, description and value required';
+      couponMsg.classList.remove('hidden'); return;
+    }
+    const res = await fetch('/api/partners/coupons', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    if (res.ok) { couponModal.classList.add('hidden'); window.location.reload(); }
+    else { const j = await res.json().catch(() => ({})); couponMsg.textContent = j.error ?? 'Failed'; couponMsg.classList.remove('hidden'); }
+  });
+
+  document.querySelectorAll('.toggle-coupon-btn').forEach(btn =>
+    btn.addEventListener('click', async () => {
+      const active = (btn as HTMLElement).dataset.active === '1';
+      const res = await fetch('/api/partners/coupons', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: (btn as HTMLElement).dataset.id, is_active: !active }),
+      });
+      if (res.ok) {
+        (window as any).adminToast(!active ? '✅ Coupon enabled' : '🔕 Coupon disabled', !active ? 'success' : 'info');
+        setTimeout(() => window.location.reload(), 1200);
+      } else {
+        (window as any).adminToast('❌ Failed to update coupon', 'error');
+      }
+    }));
+
+  document.querySelectorAll('.delete-coupon-btn').forEach(btn =>
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete this coupon?')) return;
+      await fetch('/api/partners/coupons', {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: (btn as HTMLElement).dataset.id }),
+      });
+      window.location.reload();
+    }));
+
+  // ── Interest status ─────────────────────────────────────────────────
+  document.querySelectorAll('.interest-status-sel').forEach(sel =>
+    sel.addEventListener('change', async () => {
+      await fetch('/api/partners/interests', {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: (sel as HTMLElement).dataset.id, status: (sel as HTMLSelectElement).value }),
+      });
+    }));
+
+  // ── Note modal ──────────────────────────────────────────────────────
+  const noteModal = document.getElementById('note-modal')!;
+  f('note-cancel').addEventListener('click', () => noteModal.classList.add('hidden'));
+  document.querySelectorAll('.add-note-btn').forEach(btn =>
+    btn.addEventListener('click', () => {
+      f('note-interest-id').value = (btn as HTMLElement).dataset.id!;
+      f('note-text').value = (btn as HTMLElement).dataset.notes ?? '';
+      noteModal.classList.remove('hidden');
+    }));
+  f('note-save').addEventListener('click', async () => {
+    const res = await fetch('/api/partners/interests', {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: f('note-interest-id').value, notes: f('note-text').value.trim() }),
+    });
+    if (res.ok) { noteModal.classList.add('hidden'); window.location.reload(); }
+  });
+</script>

@@ -1,0 +1,25 @@
+name: Daily Cron Jobs
+
+on:
+  schedule:
+    # Runs at 10:00 UTC daily (13:00 Greece summer / 12:00 winter)
+    - cron: '0 10 * * *'
+  workflow_dispatch: # allow manual trigger
+
+jobs:
+  cron:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check-in reminders (48 h before arrival)
+        run: |
+          curl -sf -X GET "${{ secrets.SITE_URL }}/api/cron/checkin-reminder" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
+
+      - name: Review request emails (on checkout day)
+        run: |
+          curl -sf -X GET "${{ secrets.SITE_URL }}/api/cron/review-request" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
+
+      - name: Cancel unverified bookings (24h expired)
+        run: |
+          curl -sf -X GET "${{ secrets.SITE_URL }}/api/cron/cleanup-unverified?secret=${{ secrets.CRON_SECRET }}"

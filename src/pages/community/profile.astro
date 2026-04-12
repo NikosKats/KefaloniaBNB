@@ -1,0 +1,325 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+if (!Astro.locals.session) {
+  return Astro.redirect('/community/join');
+}
+
+const userId = Astro.locals.session.user.id;
+const service = getServiceClient();
+
+const { data: profile } = await service
+  .from('profiles')
+  .select('*')
+  .eq('id', userId)
+  .single();
+
+if (!profile) return Astro.redirect('/community/join');
+
+// User's posts
+const { data: myPosts } = await service
+  .from('community_posts')
+  .select('*')
+  .eq('author_id', userId)
+  .order('created_at', { ascending: false })
+  .limit(20);
+
+const memberSince = new Date(profile.created_at).toLocaleDateString();
+---
+
+<BaseLayout
+  title={isEl ? 'Το Προφίλ Μου' : isBg ? 'Моят профил' : isSr ? 'Moj profil' : isTr ? 'Profilim' : isRo ? 'Profilul Meu' : 'My Profile'}
+  description="Community profile"
+>
+  <section class="bg-[#1a1a2e] py-8">
+    <div class="max-w-2xl mx-auto px-4">
+      <a href="/community/board" class="text-gray-400 hover:text-white text-sm">← {isEl ? 'Κοινότητα' : isBg ? 'Общност' : isSr ? 'Zajednica' : isTr ? 'Topluluk' : isRo ? 'Comunitate' : 'Community'}</a>
+    </div>
+  </section>
+
+  <section class="max-w-2xl mx-auto px-4 -mt-8">
+    {/* Profile card */}
+    <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+      {/* Cover */}
+      <div class="h-32 bg-gradient-to-br from-[#1a1a2e] to-[#3d3d5e] relative">
+        {profile.cover_photo && (
+          <img src={profile.cover_photo} alt="" class="w-full h-full object-cover" />
+        )}
+      </div>
+
+      {/* Avatar + info */}
+      <div class="px-5 pb-5 -mt-10 relative">
+        <div class="flex items-end gap-4">
+          <div class="w-20 h-20 rounded-full border-4 border-white bg-[#1a1a2e] flex items-center justify-center text-white text-2xl font-bold overflow-hidden flex-shrink-0">
+            {profile.avatar_url ? (
+              <img src={profile.avatar_url} alt={profile.full_name} class="w-full h-full object-cover" />
+            ) : (
+              profile.full_name?.[0]?.toUpperCase() ?? '?'
+            )}
+          </div>
+          <div class="pb-1">
+            <h1 class="text-xl font-bold text-gray-900">{profile.full_name}</h1>
+            <p class="text-xs text-gray-400">{isEl ? 'Μέλος από' : isBg ? 'Член от' : isSr ? 'Član od' : isTr ? 'Üye olma tarihi' : isRo ? 'Membru din' : 'Member since'} {memberSince}</p>
+          </div>
+        </div>
+
+        {/* Info chips */}
+        <div class="flex flex-wrap gap-2 mt-4">
+          {profile.location && (
+            <span class="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">📍 {profile.location}</span>
+          )}
+          {profile.hometown && (
+            <span class="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">🏠 {isEl ? 'Από' : isBg ? 'От' : isSr ? 'Iz' : isTr ? 'Memleket' : isRo ? 'Din' : 'From'} {profile.hometown}</span>
+          )}
+          {profile.phone && (
+            <span class="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">📞 {profile.phone}</span>
+          )}
+          {profile.date_of_birth && (
+            <span class="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">🎂 {new Date(profile.date_of_birth).toLocaleDateString()}</span>
+          )}
+        </div>
+
+        {profile.bio && (
+          <p class="text-sm text-gray-600 mt-3">{profile.bio}</p>
+        )}
+
+        {/* Social links */}
+        {(profile.facebook_url || profile.instagram_url) && (
+          <div class="flex gap-3 mt-3">
+            {profile.facebook_url && (
+              <a href={profile.facebook_url} target="_blank" rel="noopener" class="text-xs text-gray-500 hover:text-blue-600 flex items-center gap-1">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                Facebook
+              </a>
+            )}
+            {profile.instagram_url && (
+              <a href={profile.instagram_url} target="_blank" rel="noopener" class="text-xs text-gray-500 hover:text-pink-600 flex items-center gap-1">
+                <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+                Instagram
+              </a>
+            )}
+          </div>
+        )}
+
+        <button id="edit-profile-btn" class="mt-4 bg-gray-100 text-gray-700 px-4 py-2 rounded-xl text-sm font-medium hover:bg-gray-200 transition-colors">
+          {isEl ? 'Επεξεργασία Προφίλ' : isBg ? 'Редактирайте профила' : isSr ? 'Uredi profil' : isTr ? 'Profili Düzenle' : isRo ? 'Editare Profil' : 'Edit Profile'}
+        </button>
+      </div>
+    </div>
+
+    {/* Edit form (hidden) */}
+    <div id="edit-form-wrap" class="hidden bg-white rounded-2xl border border-gray-100 p-5 mt-4 shadow-sm">
+      <h2 class="text-lg font-semibold text-gray-900 mb-4">{isEl ? 'Επεξεργασία Προφίλ' : isBg ? 'Редактирайте профила' : isSr ? 'Uredi profil' : isTr ? 'Profili Düzenle' : isRo ? 'Editare Profil' : 'Edit Profile'}</h2>
+      <form id="edit-form" class="space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">{isEl ? 'Ονοματεπώνυμο' : isBg ? 'Пълно име' : isSr ? 'Ime i prezime' : isTr ? 'Ad Soyad' : isRo ? 'Nume complet' : 'Full Name'}</label>
+            <input type="text" name="full_name" value={profile.full_name ?? ''} class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1a1a2e]" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">{isEl ? 'Τηλέφωνο' : isBg ? 'Телефон' : isSr ? 'Telefon' : isTr ? 'Telefon' : isRo ? 'Telefon' : 'Phone'}</label>
+            <input type="tel" name="phone" value={profile.phone ?? ''} class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1a1a2e]" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">{isEl ? 'Τοποθεσία' : isBg ? 'Местоположение' : isSr ? 'Lokacija' : isTr ? 'Konum' : isRo ? 'Locație' : 'Location'}</label>
+            <input type="text" name="location" value={profile.location ?? ''} placeholder={isEl ? 'Πού μένεις' : isBg ? 'Къде живеете' : isSr ? 'Gde živite' : isTr ? 'Nerede yaşıyorsunuz' : isRo ? 'Unde locuiești' : 'Where you live'} class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1a1a2e]" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">{isEl ? 'Καταγωγή' : isBg ? 'Роден град' : isSr ? 'Rodno mesto' : isTr ? 'Memleket' : isRo ? 'Orașul natal' : 'Hometown'}</label>
+            <input type="text" name="hometown" value={profile.hometown ?? ''} placeholder={isEl ? 'Από πού είσαι' : isBg ? 'Откъде сте' : isSr ? 'Odakle ste' : isTr ? 'Nerelisiniz' : isRo ? 'De unde ești' : 'Where you are from'} class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1a1a2e]" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">{isEl ? 'Ημ. Γέννησης' : isBg ? 'Дата на раждане' : isSr ? 'Datum rođenja' : isTr ? 'Doğum Tarihi' : isRo ? 'Data nașterii' : 'Date of Birth'}</label>
+            <input type="date" name="date_of_birth" value={profile.date_of_birth ?? ''} class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1a1a2e]" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Facebook URL</label>
+            <input type="url" name="facebook_url" value={profile.facebook_url ?? ''} class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1a1a2e]" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Instagram URL</label>
+            <input type="url" name="instagram_url" value={profile.instagram_url ?? ''} class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1a1a2e]" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-500 mb-1">Bio</label>
+          <textarea name="bio" rows="3" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1a1a2e] resize-y">{profile.bio ?? ''}</textarea>
+        </div>
+
+        {/* Photo uploads */}
+        <div class="grid grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">{isEl ? 'Φωτο Προφίλ' : isBg ? 'Профилна снимка' : isSr ? 'Profilna fotografija' : isTr ? 'Profil Fotoğrafı' : isRo ? 'Fotografie Profil' : 'Profile Photo'}</label>
+            <label class="block cursor-pointer">
+              <div class="w-20 h-20 rounded-full bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden hover:border-[#1a1a2e] transition-colors" id="avatar-preview">
+                {profile.avatar_url ? (
+                  <img src={profile.avatar_url} class="w-full h-full object-cover" id="avatar-img" />
+                ) : (
+                  <span class="text-gray-400 text-xs">{isEl ? 'Ανέβασε' : isBg ? 'Качете' : isSr ? 'Otpremi' : isTr ? 'Yükle' : isRo ? 'Încarcă' : 'Upload'}</span>
+                )}
+              </div>
+              <input type="file" accept="image/jpeg,image/png,image/webp" class="hidden" id="avatar-input" />
+            </label>
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">{isEl ? 'Εξώφυλλο' : isBg ? 'Корица' : isSr ? 'Naslovna fotografija' : isTr ? 'Kapak Fotoğrafı' : isRo ? 'Fotografie copertă' : 'Cover Photo'}</label>
+            <label class="block cursor-pointer">
+              <div class="h-20 rounded-lg bg-gray-100 border-2 border-dashed border-gray-300 flex items-center justify-center overflow-hidden hover:border-[#1a1a2e] transition-colors" id="cover-preview">
+                {profile.cover_photo ? (
+                  <img src={profile.cover_photo} class="w-full h-full object-cover" id="cover-img" />
+                ) : (
+                  <span class="text-gray-400 text-xs">{isEl ? 'Ανέβασε' : isBg ? 'Качете' : isSr ? 'Otpremi' : isTr ? 'Yükle' : isRo ? 'Încarcă' : 'Upload'}</span>
+                )}
+              </div>
+              <input type="file" accept="image/jpeg,image/png,image/webp" class="hidden" id="cover-input" />
+            </label>
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <button type="submit" class="bg-[#1a1a2e] text-white px-6 py-2 rounded-xl text-sm font-semibold hover:bg-[#2d2d4e]">
+            {isEl ? 'Αποθήκευση' : isBg ? 'Запазете' : isSr ? 'Sačuvaj' : isTr ? 'Kaydet' : isRo ? 'Salvează' : 'Save'}
+          </button>
+          <button type="button" id="cancel-edit-btn" class="bg-gray-100 text-gray-600 px-6 py-2 rounded-xl text-sm hover:bg-gray-200">
+            {isEl ? 'Ακύρωση' : isBg ? 'Отказ' : isSr ? 'Otkaži' : isTr ? 'İptal' : isRo ? 'Anulare' : 'Cancel'}
+          </button>
+        </div>
+        <p id="edit-msg" class="text-xs hidden"></p>
+      </form>
+    </div>
+
+    {/* My Posts */}
+    <div class="mt-6">
+      <h2 class="text-lg font-semibold text-gray-900 mb-4">{isEl ? 'Οι Δημοσιεύσεις Μου' : isBg ? 'Моите публикации' : isSr ? 'Moje objave' : isTr ? 'Gönderilerim' : isRo ? 'Postările Mele' : 'My Posts'} ({(myPosts ?? []).length})</h2>
+      {(!myPosts || myPosts.length === 0) ? (
+        <div class="text-center py-8 text-gray-400">
+          <p class="text-sm">{isEl ? 'Δεν έχεις δημοσιεύσεις ακόμα' : isBg ? 'Все още нямате публикации' : isSr ? 'Još niste ništa objavili' : isTr ? 'Henüz bir şey paylaşmadınız' : isRo ? 'Nu ai postat nimic încă' : "You haven't posted anything yet"}</p>
+          <a href="/community/board" class="text-sm text-[#1a1a2e] font-semibold hover:underline mt-1 inline-block">{isEl ? 'Πήγαινε στην κοινότητα' : isBg ? 'Отидете в общността' : isSr ? 'Idi na zajednicu' : isTr ? 'Topluluk panosuna git' : isRo ? 'Mergi la panoul comunității' : 'Go to community board'}</a>
+        </div>
+      ) : (
+        <div class="space-y-3">
+          {(myPosts ?? []).map((post: any) => (
+            <a href={`/community/board/${post.id}`} class="block bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-shadow">
+              <div class="flex items-center justify-between">
+                <span class="text-xs text-gray-400">{new Date(post.created_at).toLocaleDateString()} · {post.category}</span>
+                <div class="flex items-center gap-3 text-xs text-gray-400">
+                  <span>♥ {post.like_count}</span>
+                  <span>💬 {post.comment_count}</span>
+                </div>
+              </div>
+              {post.title && <h3 class="font-semibold text-gray-900 mt-1">{post.title}</h3>}
+              <p class="text-sm text-gray-600 mt-1 line-clamp-2">{post.body}</p>
+              {post.photo_urls?.length > 0 && (
+                <div class="flex gap-1 mt-2">
+                  {post.photo_urls.slice(0, 3).map((url: string) => (
+                    <img src={url} alt="" class="w-12 h-12 rounded object-cover" loading="lazy" />
+                  ))}
+                </div>
+              )}
+              {post.is_hidden && <span class="text-xs text-red-500 mt-1 inline-block">Hidden by admin</span>}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  </section>
+</BaseLayout>
+
+<script>
+  document.getElementById('edit-profile-btn')?.addEventListener('click', () => {
+    document.getElementById('edit-form-wrap')?.classList.toggle('hidden');
+  });
+  document.getElementById('cancel-edit-btn')?.addEventListener('click', () => {
+    document.getElementById('edit-form-wrap')?.classList.add('hidden');
+  });
+
+  // Photo uploads
+  let avatarUrl = '';
+  let coverUrl = '';
+
+  async function uploadPhoto(file: File): Promise<string | null> {
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const res = await fetch('/api/community/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+      return res.ok ? data.url : null;
+    } catch { return null; }
+  }
+
+  document.getElementById('avatar-input')?.addEventListener('change', async (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    const preview = document.getElementById('avatar-preview')!;
+    preview.innerHTML = '<span class="text-xs text-gray-400">...</span>';
+    const url = await uploadPhoto(file);
+    if (url) {
+      avatarUrl = url;
+      preview.innerHTML = `<img src="${url}" class="w-full h-full object-cover" />`;
+    } else {
+      preview.innerHTML = '<span class="text-xs text-red-500">Error</span>';
+    }
+  });
+
+  document.getElementById('cover-input')?.addEventListener('change', async (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    const preview = document.getElementById('cover-preview')!;
+    preview.innerHTML = '<span class="text-xs text-gray-400">...</span>';
+    const url = await uploadPhoto(file);
+    if (url) {
+      coverUrl = url;
+      preview.innerHTML = `<img src="${url}" class="w-full h-full object-cover" />`;
+    } else {
+      preview.innerHTML = '<span class="text-xs text-red-500">Error</span>';
+    }
+  });
+
+  document.getElementById('edit-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target as HTMLFormElement;
+    const fd = new FormData(form);
+    const msg = document.getElementById('edit-msg')!;
+
+    const body: Record<string, any> = {
+      full_name: fd.get('full_name') || null,
+      phone: fd.get('phone') || null,
+      location: fd.get('location') || null,
+      hometown: fd.get('hometown') || null,
+      date_of_birth: fd.get('date_of_birth') || null,
+      bio: fd.get('bio') || null,
+      facebook_url: fd.get('facebook_url') || null,
+      instagram_url: fd.get('instagram_url') || null,
+    };
+    if (avatarUrl) body.avatar_url = avatarUrl;
+    if (coverUrl) body.cover_photo = coverUrl;
+
+    try {
+      const res = await fetch('/api/community/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      if (res.ok) {
+        msg.textContent = 'Saved!';
+        msg.className = 'text-xs text-green-600';
+        setTimeout(() => location.reload(), 500);
+      } else {
+        const data = await res.json();
+        msg.textContent = data.error || 'Failed';
+        msg.className = 'text-xs text-red-600';
+      }
+    } catch {
+      msg.textContent = 'Network error';
+      msg.className = 'text-xs text-red-600';
+    }
+  });
+</script>

@@ -1,0 +1,308 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Nightly Pipeline — comprehensive regression + JMeter baseline
+#
+# Runs every night at 02:00 UTC on the main/develop branch.
+# Also triggered manually via workflow_dispatch.
+#
+# Stages:
+#   1. Unit + API tests (full suite)
+#   2. Full E2E regression (3 browsers: chromium, mobile-chrome, mobile-safari)
+#   3. JMeter baseline smoke (5 VUs × 3 min against staging)
+#   4. JMeter availability load (50 VUs × 10 min against staging)
+#   5. Slack/email notification on failure
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: Nightly — Full Regression + JMeter Baseline
+
+on:
+  schedule:
+    # 02:00 UTC daily
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      skip_jmeter:
+        description: 'Skip JMeter tests (true/false)'
+        required: false
+        default: 'false'
+      target_env:
+        description: 'JMeter target environment (local/staging)'
+        required: false
+        default: 'staging'
+
+env:
+  NODE_VERSION: '22'
+  CI: 'true'
+  JMETER_VERSION: '5.6.3'
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 1 — Full unit + API test suite with coverage
+  # ────────────────────────────────────────────────────────────────────────────
+  unit-full:
+    name: Full Unit + API Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY_TEST }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET_TEST }}
+      PUBLIC_SITE_URL: 'https://staging.kefaloniabnb.com'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Unit + API tests
+        run: npm run test:coverage
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-nightly-${{ github.run_number }}
+          path: coverage/
+          retention-days: 30
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 2 — Full E2E regression across all 3 browser projects
+  # Runs against staging (or dev server if staging is unavailable).
+  # Admin tests require secrets to be set.
+  # ────────────────────────────────────────────────────────────────────────────
+  e2e-regression:
+    name: Full E2E Regression (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: unit-full
+
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [chromium, mobile-chrome, mobile-safari]
+
+    env:
+      TEST_BASE_URL: ${{ secrets.TEST_BASE_URL || 'http://localhost:4321' }}
+      PUBLIC_SITE_URL: ${{ secrets.TEST_BASE_URL || 'http://localhost:4321' }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
+      TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+      TEST_ADMIN_ROLE: ${{ secrets.TEST_ADMIN_ROLE }}
+      TEST_LISTING_SLUG: ${{ secrets.TEST_LISTING_SLUG }}
+      TEST_LISTING_ID: ${{ secrets.TEST_LISTING_ID }}
+      TEST_DEPOSIT_LISTING_ID: ${{ secrets.TEST_DEPOSIT_LISTING_ID }}
+      TEST_BOOKING_ID: ${{ secrets.TEST_BOOKING_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright browsers
+        run: |
+          case "${{ matrix.project }}" in
+            chromium)     npx playwright install chromium --with-deps ;;
+            mobile-chrome) npx playwright install chromium --with-deps ;;
+            mobile-safari) npx playwright install webkit --with-deps ;;
+          esac
+
+      - name: Start dev server (if no external staging URL)
+        if: env.TEST_BASE_URL == 'http://localhost:4321'
+        run: |
+          npm run dev &
+          npx wait-on http://localhost:4321 --timeout 60000
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          PUBLIC_SITE_URL: 'http://localhost:4321'
+
+      - name: Run full E2E suite
+        run: npx playwright test --project=${{ matrix.project }} --retries=2
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-nightly-${{ matrix.project }}-${{ github.run_number }}
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Upload traces on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces-${{ matrix.project }}-${{ github.run_number }}
+          path: test-results/
+          retention-days: 14
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 3 — JMeter baseline smoke (5 VUs × 3 min)
+  # Validates that key endpoints still meet SLOs after last night's deploy.
+  # ────────────────────────────────────────────────────────────────────────────
+  jmeter-baseline:
+    name: JMeter Baseline Smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: unit-full
+    if: ${{ github.event.inputs.skip_jmeter != 'true' }}
+
+    env:
+      JMETER_TARGET_ENV: ${{ github.event.inputs.target_env || 'staging' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install JMeter ${{ env.JMETER_VERSION }}
+        run: |
+          wget -q "https://downloads.apache.org/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz"
+          tar xzf "apache-jmeter-${JMETER_VERSION}.tgz"
+          echo "$(pwd)/apache-jmeter-${JMETER_VERSION}/bin" >> $GITHUB_PATH
+
+      - name: Install JMeter plugins (JSON Path Extractor, etc.)
+        run: |
+          JMETER_HOME="$(pwd)/apache-jmeter-${JMETER_VERSION}"
+          # Download plugins manager
+          wget -q -O "${JMETER_HOME}/lib/ext/jmeter-plugins-manager.jar" \
+            "https://search.maven.org/remotecontent?filepath=kg/apc/jmeter-plugins-manager/1.9/jmeter-plugins-manager-1.9.jar"
+          # Install json-path-extractor plugin
+          java -cp "${JMETER_HOME}/lib/ext/jmeter-plugins-manager.jar" \
+            org.jmeterplugins.repository.PluginManagerCMDInstaller || true
+
+      - name: Create results directory
+        run: mkdir -p tests/performance/jmeter/results/nightly
+
+      - name: Run JMeter baseline smoke
+        working-directory: tests/performance/jmeter
+        env:
+          JMETER_STAGING_HOST: ${{ secrets.STAGING_HOST || 'kefaloniabnb.com' }}
+          JMETER_LISTING_ID: ${{ secrets.TEST_LISTING_ID || '00000000-0000-0000-0000-000000000001' }}
+          JMETER_LISTING_SLUG: ${{ secrets.TEST_LISTING_SLUG || 'villa-thalassa' }}
+        run: |
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          jmeter -n \
+            -t plans/01-baseline-smoke.jmx \
+            -p env/${{ env.JMETER_TARGET_ENV }}.properties \
+            -Jhost="${JMETER_STAGING_HOST}" \
+            -Jlisting_id="${JMETER_LISTING_ID}" \
+            -Jlisting_slug="${JMETER_LISTING_SLUG}" \
+            -l "results/nightly/smoke-${TIMESTAMP}.jtl" \
+            -e -o "results/nightly/smoke-${TIMESTAMP}-report" \
+            -j "results/nightly/smoke-${TIMESTAMP}.log"
+
+      - name: Upload JMeter results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jmeter-baseline-${{ github.run_number }}
+          path: tests/performance/jmeter/results/nightly/
+          retention-days: 30
+
+      - name: Check for JMeter assertion failures
+        working-directory: tests/performance/jmeter/results/nightly
+        run: |
+          # Count error rows in the latest .jtl file
+          LATEST_JTL=$(ls -t smoke-*.jtl 2>/dev/null | head -1)
+          if [ -z "$LATEST_JTL" ]; then
+            echo "No JTL file found"
+            exit 1
+          fi
+          ERROR_COUNT=$(tail -n +2 "$LATEST_JTL" | awk -F',' '$8=="false"' | wc -l | tr -d ' ')
+          TOTAL_COUNT=$(tail -n +2 "$LATEST_JTL" | wc -l | tr -d ' ')
+          ERROR_RATE=$(echo "scale=2; $ERROR_COUNT * 100 / $TOTAL_COUNT" | bc 2>/dev/null || echo "0")
+          echo "Total samples: $TOTAL_COUNT  Errors: $ERROR_COUNT  Error rate: ${ERROR_RATE}%"
+          # Fail if error rate > 1%
+          if (( $(echo "$ERROR_RATE > 1" | bc -l) )); then
+            echo "FAIL: Error rate ${ERROR_RATE}% exceeds 1% threshold"
+            exit 1
+          fi
+          echo "PASS: Error rate within SLO"
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 4 — JMeter availability load (50 VUs × 10 min)
+  # Validates sustained load SLO on the most-called API endpoint.
+  # Only runs on Mondays (deeper test without running every night).
+  # ────────────────────────────────────────────────────────────────────────────
+  jmeter-availability-load:
+    name: JMeter Availability Load Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    needs: jmeter-baseline
+    # Run full load test only on Mondays or manual trigger
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'schedule' && github.event.schedule == '0 2 * * 1')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install JMeter ${{ env.JMETER_VERSION }}
+        run: |
+          wget -q "https://downloads.apache.org/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz"
+          tar xzf "apache-jmeter-${JMETER_VERSION}.tgz"
+          echo "$(pwd)/apache-jmeter-${JMETER_VERSION}/bin" >> $GITHUB_PATH
+
+      - name: Create results directory
+        run: mkdir -p tests/performance/jmeter/results/nightly
+
+      - name: Run JMeter availability load test
+        working-directory: tests/performance/jmeter
+        env:
+          JMETER_STAGING_HOST: ${{ secrets.STAGING_HOST || 'kefaloniabnb.com' }}
+        run: |
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          jmeter -n \
+            -t plans/02-availability-load.jmx \
+            -p env/staging.properties \
+            -Jhost="${JMETER_STAGING_HOST}" \
+            -Jthreads=50 \
+            -Jramp_time=120 \
+            -Jduration=300 \
+            -l "results/nightly/availability-load-${TIMESTAMP}.jtl" \
+            -e -o "results/nightly/availability-load-${TIMESTAMP}-report" \
+            -j "results/nightly/availability-load-${TIMESTAMP}.log"
+
+      - name: Upload JMeter load results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jmeter-availability-load-${{ github.run_number }}
+          path: tests/performance/jmeter/results/nightly/
+          retention-days: 30
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # NOTIFY — post Slack message on failure (optional, configure SLACK_WEBHOOK)
+  # ────────────────────────────────────────────────────────────────────────────
+  notify-failure:
+    name: Notify on Failure
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs:
+      - unit-full
+      - e2e-regression
+      - jmeter-baseline
+    if: failure()
+
+    steps:
+      - name: Send Slack notification
+        env:
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+        run: |
+          [ -z "$SLACK_WEBHOOK" ] && echo "SLACK_WEBHOOK not set, skipping." && exit 0
+          curl -s -X POST "$SLACK_WEBHOOK" \
+            -H 'Content-type: application/json' \
+            --data '{
+              "text": "🔴 *Nightly pipeline failed* on `'"${{ github.ref_name }}"'`\nRun: '"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"'"
+            }'

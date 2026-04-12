@@ -1,0 +1,161 @@
+---
+import { t, type Lang } from '../../i18n/translations.ts';
+
+interface Props {
+  unavailableRanges: Array<{ start: string; end: string }>;
+  minNights: number;
+  checkIn?: string;
+  checkOut?: string;
+}
+const { unavailableRanges, minNights, checkIn, checkOut } = Astro.props;
+const lang = (Astro.locals.lang ?? 'en') as Lang;
+
+const calDays   = t(lang, 'cal.days').split(',');
+const calLocale = t(lang, 'cal.locale');
+const calLabels = {
+  available:   t(lang, 'cal.available'),
+  unavailable: t(lang, 'cal.unavailable'),
+  selected:    t(lang, 'cal.selected'),
+};
+---
+
+<div
+  id="availability-calendar"
+  data-unavailable={JSON.stringify(unavailableRanges)}
+  data-min-nights={minNights}
+  data-check-in={checkIn ?? ''}
+  data-check-out={checkOut ?? ''}
+  data-days={JSON.stringify(calDays)}
+  data-locale={calLocale}
+  class="select-none"
+>
+  <!-- Horizontal scroll wrapper -->
+  <div class="overflow-x-auto -mx-1 px-1 pb-2">
+    <div class="flex flex-row gap-8 min-w-max" id="cal-months"></div>
+  </div>
+  <div class="mt-4 flex flex-wrap gap-4 text-xs text-gray-500">
+    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-gray-100 border border-gray-200 inline-block"></span> {calLabels.available}</span>
+    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-gray-200 inline-block"></span> {calLabels.unavailable}</span>
+    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-full bg-[#1a1a2e] inline-block"></span> {calLabels.selected}</span>
+  </div>
+</div>
+
+<script>
+const el = document.getElementById('availability-calendar');
+if (el) {
+  const unavailableRanges: Array<{start: string; end: string}> = JSON.parse(el.dataset.unavailable ?? '[]');
+  const minNights = parseInt(el.dataset.minNights ?? '1');
+  const dayNames: string[] = JSON.parse(el.dataset.days ?? '["Su","Mo","Tu","We","Th","Fr","Sa"]');
+  const calLocale: string = el.dataset.locale ?? 'en-US';
+  let selectedCheckIn: string | null = el.dataset.checkIn || null;
+  let selectedCheckOut: string | null = el.dataset.checkOut || null;
+
+  function localDateStr(d: Date): string {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  const unavailableDays = new Set<string>();
+  for (const range of unavailableRanges) {
+    const d = new Date(range.start + 'T00:00:00');
+    while (localDateStr(d) < range.end) {
+      unavailableDays.add(localDateStr(d));
+      d.setDate(d.getDate() + 1);
+    }
+  }
+
+  function renderMonth(year: number, month: number) {
+    const firstDay = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const monthName = new Date(year, month).toLocaleDateString(calLocale, { month: 'long', year: 'numeric' });
+    const today = localDateStr(new Date());
+
+    let html = `<div class="w-[280px] shrink-0">`;
+    html += `<h4 class="font-semibold text-gray-900 text-sm mb-4 text-center">${monthName}</h4>`;
+    html += `<div class="grid grid-cols-7 gap-0.5 mb-2">`;
+    for (const d of dayNames) {
+      html += `<div class="text-center text-xs text-gray-400 font-medium py-1">${d}</div>`;
+    }
+    html += `</div><div class="grid grid-cols-7 gap-0.5">`;
+
+    for (let i = 0; i < firstDay; i++) html += `<div></div>`;
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${year}-${String(month + 1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      const isPast = dateStr < today;
+      const isUnavailable = unavailableDays.has(dateStr);
+      const isCheckIn = dateStr === selectedCheckIn;
+      const isCheckOut = dateStr === selectedCheckOut;
+      const inRange = selectedCheckIn && selectedCheckOut && dateStr > selectedCheckIn && dateStr < selectedCheckOut;
+
+      let cls = 'relative text-center text-sm py-1.5 rounded-lg transition-colors ';
+      if (isPast || isUnavailable) {
+        cls += 'text-gray-300 cursor-not-allowed line-through';
+      } else if (isCheckIn || isCheckOut) {
+        cls += 'bg-[#1a1a2e] text-white font-semibold cursor-pointer';
+      } else if (inRange) {
+        cls += 'bg-[#1a1a2e]/10 text-[#1a1a2e] cursor-pointer';
+      } else {
+        cls += 'text-gray-900 cursor-pointer hover:bg-gray-100';
+      }
+
+      html += `<button class="${cls}" data-date="${dateStr}" ${(isPast || isUnavailable) ? 'disabled' : ''} type="button">${day}</button>`;
+    }
+    html += `</div></div>`;
+    return html;
+  }
+
+  function render() {
+    const container = document.getElementById('cal-months');
+    if (!container) return;
+    const now = new Date();
+    let html = '';
+    for (let i = 0; i < 12; i++) {
+      const m = (now.getMonth() + i) % 12;
+      const y = now.getFullYear() + Math.floor((now.getMonth() + i) / 12);
+      html += renderMonth(y, m);
+    }
+    container.innerHTML = html;
+
+    container.querySelectorAll('button[data-date]').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const date = (btn as HTMLElement).dataset.date ?? '';
+        handleDateClick(date);
+      });
+    });
+  }
+
+  function handleDateClick(date: string) {
+    if (!selectedCheckIn || (selectedCheckIn && selectedCheckOut)) {
+      selectedCheckIn = date;
+      selectedCheckOut = null;
+    } else {
+      if (date <= selectedCheckIn) {
+        selectedCheckIn = date;
+        selectedCheckOut = null;
+      } else {
+        let hasBlock = false;
+        const cur = new Date(selectedCheckIn + 'T00:00:00');
+        cur.setDate(cur.getDate() + 1);
+        while (localDateStr(cur) < date) {
+          if (unavailableDays.has(localDateStr(cur))) { hasBlock = true; break; }
+          cur.setDate(cur.getDate() + 1);
+        }
+        if (hasBlock) {
+          selectedCheckIn = date;
+          selectedCheckOut = null;
+        } else {
+          selectedCheckOut = date;
+        }
+      }
+    }
+    render();
+
+    el?.dispatchEvent(new CustomEvent('dates-selected', {
+      bubbles: true,
+      detail: { checkIn: selectedCheckIn, checkOut: selectedCheckOut },
+    }));
+  }
+
+  render();
+}
+</script>

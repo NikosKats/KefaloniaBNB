@@ -1,0 +1,49 @@
+---
+import CleanerLayout from '../../layouts/CleanerLayout.astro';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isBg = lang === 'bg';
+const isEl = lang === 'el';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const tTitle = isEl ? 'Σύνδεση Stripe' : isBg ? 'Свързване на Stripe' : isSr ? 'Poveži Stripe' : isTr ? 'Stripe Bağla' : isRo ? 'Conectare Stripe' : 'Connect Stripe';
+const tHeading = isEl ? 'Σύνδεση Stripe για Πληρωμές' : isBg ? 'Свържете Stripe за плащания' : isSr ? 'Poveži Stripe za isplate' : isTr ? 'Ödemeler için Stripe Bağlayın' : isRo ? 'Conectare Stripe pentru Plăți' : 'Connect Stripe for Payouts';
+const tDescription = isEl ? 'Θα ανακατευθυνθείτε στο Stripe για να ρυθμίσετε τον λογαριασμό πληρωμών σας. Αυτό διαρκεί περίπου 5 λεπτά.' : isBg ? 'Ще бъдете пренасочени към Stripe, за да настроите акаунта си за плащания. Това отнема около 5 минути.' : isSr ? 'Bićete preusmereni na Stripe da podesite račun za isplate. Ovo traje oko 5 minuta.' : isTr ? 'Ödeme hesabınızı ayarlamak için Stripe\'a yönlendirileceksiniz. Bu yaklaşık 5 dakika sürer.' : isRo ? 'Veți fi redirecționat către Stripe pentru a configura contul de plăți. Durează aproximativ 5 minute.' : 'You\'ll be redirected to Stripe to set up your payout account. This takes about 5 minutes.';
+const tConnectBtn = isEl ? 'Σύνδεση με Stripe →' : isBg ? 'Свържете със Stripe →' : isSr ? 'Poveži sa Stripe →' : isTr ? 'Stripe ile Bağlan →' : isRo ? 'Conectare cu Stripe →' : 'Connect with Stripe →';
+const tRedirecting = isEl ? 'Ανακατεύθυνση…' : isBg ? 'Пренасочване…' : isSr ? 'Preusmeravanje…' : isTr ? 'Yönlendiriliyor…' : isRo ? 'Redirecționare…' : 'Redirecting…';
+const tFailedConnect = isEl ? 'Αποτυχία σύνδεσης Stripe. Δοκιμάστε ξανά.' : isBg ? 'Неуспешно свързване на Stripe. Моля, опитайте отново.' : isSr ? 'Povezivanje sa Stripe neuspešno. Pokušajte ponovo.' : isTr ? 'Stripe bağlantısı başarısız. Lütfen tekrar deneyin.' : isRo ? 'Conectare Stripe eșuată. Vă rugăm încercați din nou.' : 'Failed to connect Stripe. Please try again.';
+---
+
+<CleanerLayout title={tTitle}>
+  <div class="max-w-lg mx-auto text-center py-16">
+    <p class="text-4xl mb-4">💳</p>
+    <h1 class="text-xl font-bold text-gray-900 mb-2">{tHeading}</h1>
+    <p class="text-sm text-gray-500 mb-6">{tDescription}</p>
+    <button id="connect-btn" class="bg-[#635BFF] text-white font-semibold px-6 py-3 rounded-xl hover:opacity-90 transition-opacity">
+      {tConnectBtn}
+    </button>
+  </div>
+</CleanerLayout>
+
+<script define:vars={{ tConnectBtn, tRedirecting, tFailedConnect }}>
+  document.getElementById('connect-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('connect-btn');
+    btn.disabled = true;
+    btn.textContent = tRedirecting;
+    const res = await fetch('/api/cleaner/connect', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    if (res.ok) {
+      const { url } = await res.json();
+      window.location.href = url;
+    } else {
+      alert(tFailedConnect);
+      btn.disabled = false;
+      btn.textContent = tConnectBtn;
+    }
+  });
+</script>

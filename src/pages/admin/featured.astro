@@ -1,0 +1,297 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+if (!Astro.locals.session) return Astro.redirect('/auth/login');
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const L: Record<string, Record<string, string>> = {
+  page_title:     { en: 'Featured Listings', el: 'Προβεβλημένες Καταχωρίσεις' },
+  btn_new:        { en: '+ Feature a Listing', el: '+ Προσθήκη Προβολής' },
+  add_title:      { en: 'Add Featured Listing', el: 'Προσθήκη Προβεβλημένης Καταχώρισης' },
+  lbl_listing:    { en: 'Listing *', el: 'Καταχώριση *' },
+  lbl_days:       { en: 'Duration *', el: 'Διάρκεια *' },
+  lbl_starts:     { en: 'Starts on', el: 'Ξεκινά' },
+  opt_7:          { en: '7 days', el: '7 ημέρες' },
+  opt_14:         { en: '14 days', el: '14 ημέρες' },
+  opt_30:         { en: '30 days', el: '30 ημέρες' },
+  btn_add:        { en: 'Add', el: 'Προσθήκη' },
+  btn_cancel:     { en: 'Cancel', el: 'Άκυρο' },
+  btn_deactivate: { en: 'Pause', el: 'Παύση' },
+  btn_activate:   { en: 'Resume', el: 'Συνέχεια' },
+  btn_extend:     { en: 'Extend', el: 'Παράταση' },
+  btn_remove:     { en: 'Remove', el: 'Αφαίρεση' },
+  remove_confirm: { en: 'Remove this featured slot?', el: 'Αφαίρεση αυτής της προβολής;' },
+  th_listing:     { en: 'Listing', el: 'Καταχώριση' },
+  th_starts:      { en: 'Starts', el: 'Έναρξη' },
+  th_expires:     { en: 'Expires', el: 'Λήξη' },
+  th_status:      { en: 'Status', el: 'Κατάσταση' },
+  th_actions:     { en: 'Actions', el: 'Ενέργειες' },
+  status_active:  { en: 'Active', el: 'Ενεργό' },
+  status_paused:  { en: 'Paused', el: 'Σε Παύση' },
+  status_expired: { en: 'Expired', el: 'Έληξε' },
+  no_featured:    { en: 'No featured listings yet.', el: 'Δεν υπάρχουν προβεβλημένες καταχωρίσεις.' },
+  msg_added:      { en: 'Featured slot added.', el: 'Η προβεβλημένη θέση προστέθηκε.' },
+  msg_updated:    { en: 'Status updated.', el: 'Η κατάσταση ενημερώθηκε.' },
+  msg_extended:   { en: 'Expiry extended.', el: 'Η λήξη παρατάθηκε.' },
+  msg_removed:    { en: 'Featured slot removed.', el: 'Η προβεβλημένη θέση αφαιρέθηκε.' },
+  msg_error:      { en: 'An error occurred. Please try again.', el: 'Παρουσιάστηκε σφάλμα. Δοκιμάστε ξανά.' },
+  extend_days:    { en: 'Add days:', el: 'Προσθήκη ημερών:' },
+};
+function al(k: string) { return L[k]?.[lang] ?? L[k]?.en ?? k; }
+
+const service = getServiceClient();
+const msg = Astro.url.searchParams.get('msg');
+const now = new Date().toISOString();
+
+const [featuredRes, listingsRes] = await Promise.all([
+  service
+    .from('featured_listings')
+    .select('*, listings(id, title, slug)')
+    .order('created_at', { ascending: false }),
+  service
+    .from('listings')
+    .select('id, title, slug, owner_id')
+    .eq('is_active', true)
+    .order('title'),
+]);
+
+const featuredRows = featuredRes.data ?? [];
+const listings = listingsRes.data ?? [];
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+function rowStatus(row: any): 'active' | 'paused' | 'expired' {
+  if (!row.is_active) return 'paused';
+  if (row.expires_at < now) return 'expired';
+  return 'active';
+}
+---
+
+<AdminLayout title="Featured Listings">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-xl font-bold text-gray-900">{al('page_title')}</h1>
+    <button
+      id="new-btn"
+      class="min-h-[44px] bg-[#1a1a2e] text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-[#2d2d4e] transition-colors"
+    >
+      {al('btn_new')}
+    </button>
+  </div>
+
+  {msg === 'added'    && <div class="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm p-3 rounded-xl">{al('msg_added')}</div>}
+  {msg === 'updated'  && <div class="mb-4 bg-blue-50 border border-blue-200 text-blue-700 text-sm p-3 rounded-xl">{al('msg_updated')}</div>}
+  {msg === 'extended' && <div class="mb-4 bg-blue-50 border border-blue-200 text-blue-700 text-sm p-3 rounded-xl">{al('msg_extended')}</div>}
+  {msg === 'removed'  && <div class="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-xl">{al('msg_removed')}</div>}
+  {msg === 'error'    && <div class="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-xl">{al('msg_error')}</div>}
+
+  <!-- Add form (hidden by default) -->
+  <div id="new-form" class="hidden mb-6 bg-white border border-gray-200 rounded-2xl p-6">
+    <h2 class="font-semibold text-gray-900 mb-4">{al('add_title')}</h2>
+    <form method="POST" action="/api/admin/featured/add" class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">{al('lbl_listing')}</label>
+        <select name="listing_id" required class="input-field">
+          <option value="">— select —</option>
+          {listings.map((l: any) => (
+            <option value={l.id}>{l.title}</option>
+          ))}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">{al('lbl_days')}</label>
+        <select name="days" required class="input-field">
+          <option value="7">{al('opt_7')}</option>
+          <option value="14">{al('opt_14')}</option>
+          <option value="30">{al('opt_30')}</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">{al('lbl_starts')}</label>
+        <input type="date" name="starts_at" class="input-field" />
+      </div>
+      <div class="sm:col-span-3 flex gap-3 pt-1">
+        <button type="submit" class="bg-[#1a1a2e] text-white text-sm font-semibold px-5 py-2 rounded-xl hover:bg-[#2d2d4e] transition-colors">
+          {al('btn_add')}
+        </button>
+        <button type="button" id="cancel-btn" class="text-sm text-gray-500 hover:text-gray-700 transition-colors">
+          {al('btn_cancel')}
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Mobile card view -->
+  <div class="lg:hidden space-y-3">
+    {featuredRows.length === 0 ? (
+      <div class="bg-white rounded-2xl border border-gray-200 p-6">
+        <p class="text-gray-500 text-sm text-center">{al('no_featured')}</p>
+      </div>
+    ) : (
+      featuredRows.map((row: any) => {
+        const status = rowStatus(row);
+        const listing = row.listings;
+        return (
+          <div class="bg-white rounded-2xl border border-gray-200 p-4 space-y-3">
+            <div class="flex items-start justify-between gap-2">
+              <p class="font-medium text-gray-900">{listing?.title ?? row.listing_id}</p>
+              {status === 'active' && (
+                <span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-xs font-medium px-2 py-0.5 rounded-full shrink-0">
+                  ⭐ {al('status_active')}
+                </span>
+              )}
+              {status === 'paused' && (
+                <span class="inline-flex items-center gap-1 bg-yellow-50 text-yellow-700 text-xs font-medium px-2 py-0.5 rounded-full shrink-0">
+                  ⏸ {al('status_paused')}
+                </span>
+              )}
+              {status === 'expired' && (
+                <span class="inline-flex items-center gap-1 bg-gray-100 text-gray-500 text-xs font-medium px-2 py-0.5 rounded-full shrink-0">
+                  ✕ {al('status_expired')}
+                </span>
+              )}
+            </div>
+            <div class="flex gap-4 text-xs text-gray-500">
+              <span>{al('th_starts')}: {fmtDate(row.starts_at)}</span>
+              <span>{al('th_expires')}: {fmtDate(row.expires_at)}</span>
+            </div>
+            <div class="flex flex-wrap gap-2 pt-1">
+              <form method="POST" action="/api/admin/featured/toggle">
+                <input type="hidden" name="id" value={row.id} />
+                <input type="hidden" name="is_active" value={row.is_active ? 'false' : 'true'} />
+                <button type="submit" class="min-h-[44px] px-4 py-2.5 text-sm text-blue-600 border border-blue-200 rounded-xl hover:bg-blue-50 transition-colors">
+                  {row.is_active ? al('btn_deactivate') : al('btn_activate')}
+                </button>
+              </form>
+              <form method="POST" action="/api/admin/featured/extend" class="flex items-center gap-2">
+                <input type="hidden" name="id" value={row.id} />
+                <select name="days" class="min-h-[44px] text-sm border border-gray-200 rounded-xl px-3 py-2">
+                  <option value="7">7</option>
+                  <option value="14">14</option>
+                  <option value="30">30</option>
+                </select>
+                <button type="submit" class="min-h-[44px] px-4 py-2.5 text-sm text-emerald-600 border border-emerald-200 rounded-xl hover:bg-emerald-50 transition-colors">{al('btn_extend')}</button>
+              </form>
+              <form method="POST" action="/api/admin/featured/remove" onsubmit={`return confirm('${al('remove_confirm')}')`}>
+                <input type="hidden" name="id" value={row.id} />
+                <button type="submit" class="min-h-[44px] px-4 py-2.5 text-sm text-red-500 border border-red-200 rounded-xl hover:bg-red-50 transition-colors">{al('btn_remove')}</button>
+              </form>
+            </div>
+          </div>
+        );
+      })
+    )}
+  </div>
+
+  <!-- Desktop table -->
+  <div class="hidden lg:block bg-white rounded-2xl border border-gray-200 overflow-hidden">
+    {featuredRows.length === 0 ? (
+      <p class="text-gray-500 text-sm text-center py-12">{al('no_featured')}</p>
+    ) : (
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="border-b border-gray-100 text-left">
+            <th class="px-4 py-3 font-semibold text-gray-700">{al('th_listing')}</th>
+            <th class="px-4 py-3 font-semibold text-gray-700">{al('th_starts')}</th>
+            <th class="px-4 py-3 font-semibold text-gray-700">{al('th_expires')}</th>
+            <th class="px-4 py-3 font-semibold text-gray-700">{al('th_status')}</th>
+            <th class="px-4 py-3 font-semibold text-gray-700 text-right">{al('th_actions')}</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          {featuredRows.map((row: any) => {
+            const status = rowStatus(row);
+            const listing = row.listings;
+            return (
+              <tr class="hover:bg-gray-50 transition-colors">
+                <td class="px-4 py-3 font-medium text-gray-900">
+                  {listing?.title ?? row.listing_id}
+                </td>
+                <td class="px-4 py-3 text-gray-500">{fmtDate(row.starts_at)}</td>
+                <td class="px-4 py-3 text-gray-500">{fmtDate(row.expires_at)}</td>
+                <td class="px-4 py-3">
+                  {status === 'active' && (
+                    <span class="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                      ⭐ {al('status_active')}
+                    </span>
+                  )}
+                  {status === 'paused' && (
+                    <span class="inline-flex items-center gap-1 bg-yellow-50 text-yellow-700 text-xs font-medium px-2 py-0.5 rounded-full">
+                      ⏸ {al('status_paused')}
+                    </span>
+                  )}
+                  {status === 'expired' && (
+                    <span class="inline-flex items-center gap-1 bg-gray-100 text-gray-500 text-xs font-medium px-2 py-0.5 rounded-full">
+                      ✕ {al('status_expired')}
+                    </span>
+                  )}
+                </td>
+                <td class="px-4 py-3">
+                  <div class="flex items-center justify-end gap-2 flex-wrap">
+                    <!-- Toggle active / paused -->
+                    <form method="POST" action="/api/admin/featured/toggle">
+                      <input type="hidden" name="id" value={row.id} />
+                      <input type="hidden" name="is_active" value={row.is_active ? 'false' : 'true'} />
+                      <button
+                        type="submit"
+                        class="text-xs text-blue-600 hover:underline"
+                      >
+                        {row.is_active ? al('btn_deactivate') : al('btn_activate')}
+                      </button>
+                    </form>
+                    <!-- Extend -->
+                    <form method="POST" action="/api/admin/featured/extend" class="flex items-center gap-1">
+                      <input type="hidden" name="id" value={row.id} />
+                      <span class="text-xs text-gray-500">{al('extend_days')}</span>
+                      <select name="days" class="text-xs border border-gray-200 rounded px-1 py-0.5">
+                        <option value="7">7</option>
+                        <option value="14">14</option>
+                        <option value="30">30</option>
+                      </select>
+                      <button type="submit" class="text-xs text-emerald-600 hover:underline">{al('btn_extend')}</button>
+                    </form>
+                    <!-- Remove -->
+                    <form
+                      method="POST"
+                      action="/api/admin/featured/remove"
+                      onsubmit={`return confirm('${al('remove_confirm')}')`}
+                    >
+                      <input type="hidden" name="id" value={row.id} />
+                      <button type="submit" class="text-xs text-red-500 hover:underline">{al('btn_remove')}</button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    )}
+  </div>
+</AdminLayout>
+
+<script>
+  const newBtn    = document.getElementById('new-btn');
+  const cancelBtn = document.getElementById('cancel-btn');
+  const newForm   = document.getElementById('new-form');
+  newBtn?.addEventListener('click',    () => newForm?.classList.remove('hidden'));
+  cancelBtn?.addEventListener('click', () => newForm?.classList.add('hidden'));
+
+  // Intercept toggle forms to show toast
+  document.querySelectorAll('form[action="/api/admin/featured/toggle"]').forEach((form) => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form as HTMLFormElement);
+      const isActivating = fd.get('is_active') === 'true';
+      const res = await fetch('/api/admin/featured/toggle', { method: 'POST', body: fd });
+      if (res.ok || res.redirected) {
+        (window as any).adminToast(isActivating ? '✅ Featured listing activated' : '⏸ Featured listing deactivated', isActivating ? 'success' : 'info');
+        setTimeout(() => window.location.reload(), 1200);
+      } else {
+        (window as any).adminToast('❌ Failed to update featured listing', 'error');
+      }
+    });
+  });
+</script>

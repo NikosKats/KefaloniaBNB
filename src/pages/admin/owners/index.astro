@@ -1,0 +1,494 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+// Super admin only — middleware already blocks property_owner from /admin/owners
+const profile = Astro.locals.profile!;
+if (profile.role !== 'super_admin') return Astro.redirect('/admin');
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const service = getServiceClient();
+
+const [ownersRes, listingsRes, settingsRes] = await Promise.all([
+  service
+    .from('profiles')
+    .select('id,email,full_name,company_name,created_at')
+    .eq('role', 'property_owner')
+    .order('created_at', { ascending: false }),
+  service
+    .from('listings')
+    .select('id,title,owner_id,is_active,base_price,commission_rate')
+    .not('owner_id', 'is', null),
+  service
+    .from('platform_settings')
+    .select('key,value')
+    .eq('key', 'commission_rate')
+    .single(),
+]);
+
+const platformCommissionRate: number = settingsRes.data ? Number(settingsRes.data.value) : 5;
+
+const owners: any[] = ownersRes.data ?? [];
+const listings: any[] = listingsRes.data ?? [];
+
+// Fetch auth users to check invite acceptance (last_sign_in_at)
+const ownerIds = owners.map((o: any) => o.id);
+const authStatusMap: Record<string, { last_sign_in_at: string | null; confirmed_at: string | null }> = {};
+for (const oid of ownerIds) {
+  try {
+    const { data } = await service.auth.admin.getUserById(oid);
+    if (data?.user) {
+      authStatusMap[oid] = {
+        last_sign_in_at: data.user.last_sign_in_at ?? null,
+        confirmed_at: data.user.confirmed_at ?? null,
+      };
+    }
+  } catch {}
+}
+
+// Group listings by owner
+const listingsByOwner: Record<string, any[]> = {};
+for (const l of listings) {
+  if (!listingsByOwner[l.owner_id]) listingsByOwner[l.owner_id] = [];
+  listingsByOwner[l.owner_id].push(l);
+}
+
+// Unassigned listings (no owner)
+const { data: unassignedListings } = await service
+  .from('listings')
+  .select('id,title,is_active,base_price')
+  .is('owner_id', null);
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+---
+
+<AdminLayout title="Owners">
+
+  <div class="flex items-center justify-between mb-6">
+    <p class="text-sm text-gray-500">{owners.length} property {owners.length !== 1 ? 'owners' : 'owner'}</p>
+    <button id="invite-btn"
+      class="bg-[#1a1a2e] text-white font-semibold px-4 py-2 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">
+      + Invite owner
+    </button>
+  </div>
+
+  <!-- Invite modal -->
+  <div id="invite-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      <h3 class="font-semibold text-gray-900 mb-4">Invite property owner</h3>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Full name *</label>
+          <input id="inv-name" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" placeholder="Maria Papadopoulou" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+          <input id="inv-email" type="email" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" placeholder="maria@example.com" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Company / Trading name</label>
+          <input id="inv-company" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" placeholder="Papadopoulou Rentals" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Commission rate (%)</label>
+          <input id="inv-commission" type="number" min="0" max="50" step="0.5" value="5"
+            class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+        </div>
+        <p class="text-xs text-gray-400">The owner will receive an email to set their password and connect Stripe.</p>
+      </div>
+      <div id="invite-error" class="hidden mt-3 text-sm text-red-600"></div>
+      <div class="flex gap-3 mt-5">
+        <button id="invite-cancel" class="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+        <button id="invite-submit" class="flex-1 bg-[#1a1a2e] text-white font-semibold px-4 py-2 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">Send invite</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Remove confirmation modal -->
+  <div id="remove-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+          <svg class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+        </div>
+        <div>
+          <h3 class="font-semibold text-gray-900">Remove owner</h3>
+          <p id="remove-modal-desc" class="text-sm text-gray-500 mt-0.5"></p>
+        </div>
+      </div>
+      <div class="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-5 text-sm text-red-800">
+        This will permanently <strong>delete all their listings</strong> and remove their account. This cannot be undone.
+      </div>
+      <div class="flex gap-3">
+        <button id="remove-cancel" class="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">
+          Cancel
+        </button>
+        <button id="remove-confirm" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-xl text-sm transition-colors">
+          Yes, remove owner
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit modal -->
+  <div id="edit-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      <h3 class="font-semibold text-gray-900 mb-4">Edit owner</h3>
+      <input type="hidden" id="edit-id" />
+      <div class="space-y-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Full name</label>
+          <input id="edit-name" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Company / Trading name</label>
+          <input id="edit-company" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Commission rate (%) — applies to all their listings</label>
+          <input id="edit-commission" type="number" min="0" max="50" step="0.5"
+            class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+        </div>
+      </div>
+      <div id="edit-error" class="hidden mt-3 text-sm text-red-600"></div>
+      <div class="flex gap-3 mt-5">
+        <button id="edit-cancel" class="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+        <button id="edit-submit" class="flex-1 bg-[#1a1a2e] text-white font-semibold px-4 py-2 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">Save changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Owners list -->
+  <div class="space-y-4">
+    {owners.map((owner) => {
+      const ownerListings = listingsByOwner[owner.id] ?? [];
+      const authInfo = authStatusMap[owner.id];
+      const hasAccepted = !!authInfo?.last_sign_in_at;
+      return (
+        <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <div class="p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <p class="font-semibold text-gray-900">{owner.full_name ?? owner.email}</p>
+                {owner.company_name && <span class="text-xs text-gray-400">({owner.company_name})</span>}
+                {hasAccepted
+                  ? <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700">Accepted</span>
+                  : <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">Pending invite</span>
+                }
+              </div>
+              <p class="text-sm text-gray-400">{owner.email}</p>
+              <p class="text-xs text-gray-300 mt-0.5">Joined {fmtDate(owner.created_at)}</p>
+            </div>
+            <div class="flex items-center gap-3 shrink-0 flex-wrap">
+              {!hasAccepted && (
+                <button
+                  class="resend-invite-btn text-xs text-amber-600 font-medium hover:text-amber-700 transition-colors px-3 py-1.5 border border-amber-200 rounded-lg bg-amber-50 hover:bg-amber-100"
+                  data-id={owner.id}
+                  data-email={owner.email}
+                  data-name={owner.full_name ?? owner.email}>
+                  Resend invite
+                </button>
+              )}
+              <a
+                href={`/admin/owners/${owner.id}`}
+                class="text-xs text-[#1a1a2e] font-medium hover:text-[#c9a96e] transition-colors px-3 py-1.5 border border-gray-200 rounded-lg">
+                Manage
+              </a>
+              <button
+                class="edit-owner-btn text-xs text-gray-400 font-medium hover:text-gray-600 transition-colors px-3 py-1.5 border border-gray-200 rounded-lg"
+                data-id={owner.id}
+                data-name={owner.full_name ?? ''}
+                data-company={owner.company_name ?? ''}
+                data-commission={ownerListings[0]?.commission_rate ?? platformCommissionRate}>
+                Edit
+              </button>
+              <button
+                class="delete-owner-btn text-xs text-red-400 hover:text-red-600 transition-colors px-3 py-1.5"
+                data-id={owner.id} data-name={owner.full_name ?? owner.email}>
+                Remove
+              </button>
+            </div>
+          </div>
+
+          {ownerListings.length > 0 && (
+            <div class="border-t border-gray-50 px-5 py-3">
+              <p class="text-xs font-medium text-gray-500 mb-2">Listings ({ownerListings.length})</p>
+              <div class="flex flex-wrap gap-2">
+                {ownerListings.map((l) => (
+                  <a href={`/admin/listings/${l.id}`}
+                    class="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-50 hover:bg-gray-100 rounded-lg text-xs text-gray-700 transition-colors">
+                    <span class={`w-1.5 h-1.5 rounded-full ${l.is_active ? 'bg-emerald-400' : 'bg-gray-300'}`}></span>
+                    {l.title}
+                    <span class="text-gray-400">({l.commission_rate}%)</span>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+          {ownerListings.length === 0 && (
+            <div class="border-t border-gray-50 px-5 py-3 text-xs text-gray-300 italic">No listings assigned yet</div>
+          )}
+        </div>
+      );
+    })}
+
+    {owners.length === 0 && (
+      <div class="text-center py-20 text-gray-400">
+        <p class="text-4xl mb-3">🏘️</p>
+        <p class="font-medium">No property owners yet</p>
+        <p class="text-sm mt-1">Invite your first owner using the button above.</p>
+      </div>
+    )}
+  </div>
+
+  <!-- Unassigned listings -->
+  {(unassignedListings ?? []).length > 0 && (
+    <div class="mt-8 bg-amber-50 border border-amber-200 rounded-2xl p-5">
+      <div class="flex items-center justify-between mb-3 gap-4 flex-wrap">
+        <h3 class="font-semibold text-amber-800">⚠️ Unassigned listings ({unassignedListings!.length})</h3>
+        <button id="purge-unassigned-btn"
+          class="text-xs text-red-600 font-medium border border-red-200 bg-white hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors shrink-0">
+          Delete all unassigned
+        </button>
+      </div>
+      <p class="text-sm text-amber-700 mb-3">These listings have no owner. Reassign them from the listing editor or delete them.</p>
+      <div class="flex flex-wrap gap-2">
+        {(unassignedListings ?? []).map((l: any) => (
+          <a href={`/admin/listings/${l.id}`}
+            class="inline-flex items-center gap-1.5 px-3 py-1 bg-white rounded-lg text-xs text-gray-700 border border-amber-200 hover:bg-amber-50 transition-colors">
+            <span class={`w-1.5 h-1.5 rounded-full ${l.is_active ? 'bg-emerald-400' : 'bg-gray-300'}`}></span>
+            {l.title}
+          </a>
+        ))}
+      </div>
+    </div>
+  )}
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-6 right-6 z-[100] flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl text-sm font-medium text-white translate-y-16 opacity-0 transition-all duration-300 pointer-events-none max-w-xs">
+    <span id="toast-icon" class="text-lg shrink-0"></span>
+    <span id="toast-msg"></span>
+  </div>
+
+</AdminLayout>
+
+<script>
+  // ── Toast ────────────────────────────────────────────────────────────────────
+  const toast     = document.getElementById('toast')!;
+  const toastMsg  = document.getElementById('toast-msg')!;
+  const toastIcon = document.getElementById('toast-icon')!;
+  let toastTimer: ReturnType<typeof setTimeout>;
+
+  function showToast(msg: string, type: 'success' | 'error' = 'success') {
+    clearTimeout(toastTimer);
+    toastMsg.textContent = msg;
+    toastIcon.textContent = type === 'success' ? '✓' : '✕';
+    toast.className = toast.className
+      .replace(/bg-\S+/g, '')
+      .replace(/translate-y-\S+/g, '')
+      .replace(/opacity-\S+/g, '');
+    toast.classList.add(
+      type === 'success' ? 'bg-emerald-600' : 'bg-red-600',
+      'translate-y-0', 'opacity-100',
+    );
+    toastTimer = setTimeout(() => {
+      toast.classList.remove('translate-y-0', 'opacity-100');
+      toast.classList.add('translate-y-16', 'opacity-0');
+    }, 4000);
+  }
+
+  // ── Invite modal ─────────────────────────────────────────────────────────────
+  const modal     = document.getElementById('invite-modal')!;
+  const invBtn    = document.getElementById('invite-btn')!;
+  const cancelBtn = document.getElementById('invite-cancel')!;
+  const submitBtn = document.getElementById('invite-submit')!;
+  const errBox    = document.getElementById('invite-error')!;
+
+  invBtn.addEventListener('click', () => modal.classList.remove('hidden'));
+  cancelBtn.addEventListener('click', () => modal.classList.add('hidden'));
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.add('hidden'); });
+
+  submitBtn.addEventListener('click', async () => {
+    const email        = (document.getElementById('inv-email') as HTMLInputElement).value.trim();
+    const full_name    = (document.getElementById('inv-name') as HTMLInputElement).value.trim();
+    const company_name = (document.getElementById('inv-company') as HTMLInputElement).value.trim();
+    const commission_rate = parseFloat((document.getElementById('inv-commission') as HTMLInputElement).value);
+
+    if (!email || !full_name) {
+      errBox.textContent = 'Name and email are required.';
+      errBox.classList.remove('hidden');
+      return;
+    }
+
+    submitBtn.textContent = 'Sending…';
+    submitBtn.setAttribute('disabled', 'true');
+    errBox.classList.add('hidden');
+
+    const res = await fetch('/api/admin/owners/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, full_name, company_name: company_name || undefined, commission_rate }),
+    });
+    const json = await res.json();
+
+    if (res.ok) {
+      modal.classList.add('hidden');
+      showToast(`Invite sent to ${email}`, 'success');
+      setTimeout(() => window.location.reload(), 1200);
+    } else {
+      errBox.textContent = json.error ?? 'Invite failed';
+      errBox.classList.remove('hidden');
+      showToast(json.error ?? 'Invite failed', 'error');
+      submitBtn.textContent = 'Send invite';
+      submitBtn.removeAttribute('disabled');
+    }
+  });
+
+  // Edit owner
+  const editModal    = document.getElementById('edit-modal')!;
+  const editIdInput  = document.getElementById('edit-id') as HTMLInputElement;
+  const editName     = document.getElementById('edit-name') as HTMLInputElement;
+  const editCompany  = document.getElementById('edit-company') as HTMLInputElement;
+  const editCommission = document.getElementById('edit-commission') as HTMLInputElement;
+  const editErr      = document.getElementById('edit-error')!;
+  const editSubmit   = document.getElementById('edit-submit') as HTMLButtonElement;
+
+  document.getElementById('edit-cancel')!.addEventListener('click', () => editModal.classList.add('hidden'));
+  editModal.addEventListener('click', (e) => { if (e.target === editModal) editModal.classList.add('hidden'); });
+
+  document.querySelectorAll('.edit-owner-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const el = btn as HTMLElement;
+      editIdInput.value      = el.dataset.id!;
+      editName.value         = el.dataset.name ?? '';
+      editCompany.value      = el.dataset.company ?? '';
+      editCommission.value   = el.dataset.commission ?? '5';
+      editErr.classList.add('hidden');
+      editModal.classList.remove('hidden');
+    });
+  });
+
+  editSubmit.addEventListener('click', async () => {
+    editSubmit.disabled = true;
+    editSubmit.textContent = 'Saving…';
+    editErr.classList.add('hidden');
+
+    const res = await fetch('/api/admin/owners/invite', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: editIdInput.value,
+        full_name: editName.value.trim(),
+        company_name: editCompany.value.trim() || null,
+        commission_rate: parseFloat(editCommission.value),
+      }),
+    });
+
+    if (res.ok) {
+      editModal.classList.add('hidden');
+      showToast('Owner updated', 'success');
+      setTimeout(() => window.location.reload(), 1200);
+    } else {
+      const json = await res.json();
+      editErr.textContent = json.error ?? 'Update failed';
+      editErr.classList.remove('hidden');
+      showToast(json.error ?? 'Update failed', 'error');
+      editSubmit.disabled = false;
+      editSubmit.textContent = 'Save changes';
+    }
+  });
+
+  // Remove owner — confirmation modal
+  const removeModal   = document.getElementById('remove-modal')!;
+  const removeDesc    = document.getElementById('remove-modal-desc')!;
+  const removeCancel  = document.getElementById('remove-cancel')!;
+  const removeConfirm = document.getElementById('remove-confirm') as HTMLButtonElement;
+  let pendingRemoveId: string | null = null;
+
+  document.querySelectorAll('.delete-owner-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const el = btn as HTMLElement;
+      pendingRemoveId = el.dataset.id!;
+      removeDesc.textContent = `You are about to remove ${el.dataset.name ?? 'this owner'}.`;
+      removeModal.classList.remove('hidden');
+    });
+  });
+
+  removeCancel.addEventListener('click', () => {
+    removeModal.classList.add('hidden');
+    pendingRemoveId = null;
+  });
+  removeModal.addEventListener('click', (e) => {
+    if (e.target === removeModal) { removeModal.classList.add('hidden'); pendingRemoveId = null; }
+  });
+
+  // Delete all unassigned listings
+  document.getElementById('purge-unassigned-btn')?.addEventListener('click', async () => {
+    if (!confirm('Permanently delete all unassigned listings? This cannot be undone.')) return;
+    const btn = document.getElementById('purge-unassigned-btn') as HTMLButtonElement;
+    btn.textContent = 'Deleting…';
+    btn.disabled = true;
+    const res = await fetch('/api/admin/listings/purge-unassigned', { method: 'DELETE' });
+    if (res.ok) {
+      window.location.reload();
+    } else {
+      const json = await res.json();
+      alert(json.error ?? 'Failed to delete unassigned listings.');
+      btn.textContent = 'Delete all unassigned';
+      btn.disabled = false;
+    }
+  });
+
+  // Resend invite
+  document.querySelectorAll('.resend-invite-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const el = btn as HTMLButtonElement;
+      const id = el.dataset.id!;
+      const email = el.dataset.email!;
+      const name = el.dataset.name!;
+      el.disabled = true;
+      el.textContent = 'Sending…';
+      const res = await fetch('/api/admin/owners/resend-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) {
+        showToast(`Invite resent to ${email}`, 'success');
+        el.textContent = 'Sent ✓';
+      } else {
+        const json = await res.json();
+        showToast(json.error ?? 'Failed to resend invite', 'error');
+        el.textContent = 'Resend invite';
+        el.disabled = false;
+      }
+    });
+  });
+
+  removeConfirm.addEventListener('click', async () => {
+    if (!pendingRemoveId) return;
+    removeConfirm.disabled = true;
+    removeConfirm.textContent = 'Removing…';
+
+    const res = await fetch('/api/admin/owners/invite', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: pendingRemoveId }),
+    });
+
+    if (res.ok) {
+      removeModal.classList.add('hidden');
+      showToast('Owner removed', 'success');
+      setTimeout(() => window.location.reload(), 1200);
+    } else {
+      removeModal.classList.add('hidden');
+      pendingRemoveId = null;
+      removeConfirm.disabled = false;
+      removeConfirm.textContent = 'Yes, remove owner';
+      showToast('Failed to remove owner. Please try again.', 'error');
+    }
+  });
+</script>

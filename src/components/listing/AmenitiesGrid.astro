@@ -1,0 +1,42 @@
+---
+import type { Amenity } from '../../types/index.ts';
+import { t, type Lang } from '../../i18n/translations.ts';
+
+interface Props {
+  amenities: Amenity[];
+}
+const { amenities } = Astro.props;
+const lang = (Astro.locals.lang ?? 'en') as Lang;
+
+const categories = [
+  { key: 'outdoor',       label: t(lang,'amenity.outdoor') },
+  { key: 'kitchen',       label: t(lang,'amenity.kitchen') },
+  { key: 'general',       label: t(lang,'amenity.general') },
+  { key: 'entertainment', label: t(lang,'amenity.entertainment') },
+  { key: 'safety',        label: t(lang,'amenity.safety') },
+  { key: 'bathroom',      label: t(lang,'amenity.bathroom') },
+  { key: 'bedroom',       label: t(lang,'amenity.bedroom') },
+  { key: 'accessibility', label: t(lang,'amenity.accessibility') },
+];
+
+const grouped = categories.map((cat) => ({
+  ...cat,
+  items: amenities.filter((a) => a.category === cat.key),
+})).filter((g) => g.items.length > 0);
+---
+
+<div class="space-y-8">
+  {grouped.map((group) => (
+    <div>
+      <h4 class="font-medium text-gray-700 text-sm uppercase tracking-wider mb-3">{group.label}</h4>
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        {group.items.map((amenity) => (
+          <div class="flex items-center gap-2.5 text-gray-700">
+            <span class="text-xl w-6 text-center">{amenity.icon}</span>
+            <span class="text-sm">{amenity.label}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  ))}
+</div>

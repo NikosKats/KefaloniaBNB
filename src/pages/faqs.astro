@@ -1,0 +1,368 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { t, type Lang } from '../i18n/translations.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as Lang;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+const supabase = Astro.locals.supabase;
+const { data: page } = await supabase.from('cms_pages').select('*, faq_items(*)').eq('slug', 'faqs').single();
+const cmsItems = (page?.faq_items ?? []).sort((a: any, b: any) => a.sort_order - b.sort_order);
+
+const fallbackFaqs = [
+  {
+    id: 'booking',
+    category: 'Searching & Booking',
+    icon: '🔍',
+    items: [
+      {
+        q: 'How do I search for a property?',
+        a: 'Use the search bar on our homepage to enter your destination, travel dates and number of guests. Filter results by price, amenities, property type and more to find your perfect stay.',
+      },
+      {
+        q: 'Can I book instantly or do I need approval?',
+        a: 'It depends on the property. Listings marked with an "Instant" badge are confirmed immediately after payment. Others are sent to the host for approval — you\'ll typically hear back within a few hours.',
+      },
+      {
+        q: 'Can I modify my dates after booking?',
+        a: 'Date changes are subject to availability and the host\'s approval. Contact us or the host as soon as possible. If the new dates cost more or less, the difference will be charged or refunded accordingly.',
+      },
+      {
+        q: 'Do I need to create an account to book?',
+        a: 'No account is needed. Simply fill in your details at checkout and all booking confirmations, receipts and check-in instructions are sent directly to your email.',
+      },
+      {
+        q: 'How far in advance can I book?',
+        a: 'Most properties accept bookings up to 12 months in advance. The calendar on each listing shows exactly which dates are available in real time.',
+      },
+    ],
+  },
+  {
+    id: 'payment',
+    category: 'Payment',
+    icon: '💳',
+    items: [
+      {
+        q: 'What payment methods are accepted?',
+        a: 'We accept all major credit and debit cards (Visa, Mastercard) processed securely through Stripe, as well as bank transfers via IBAN, Revolut or Wise. Card payments are confirmed instantly; bank transfers are confirmed within 24 hours.',
+      },
+      {
+        q: 'Can I pay a deposit and settle the rest later?',
+        a: 'Yes — many properties offer a flexible deposit option. You pay a small percentage now to secure your booking, and the remaining balance is collected on arrival. Look for the "Pay deposit" option at checkout.',
+      },
+      {
+        q: 'Is it safe to pay online?',
+        a: 'Absolutely. Card payments are handled by Stripe, a PCI-DSS Level 1 certified processor trusted by millions of businesses globally. We never store your card details on our servers.',
+      },
+      {
+        q: 'When will I receive my receipt?',
+        a: 'A payment confirmation with a full cost breakdown is sent to your email immediately after your booking is paid. You can also use this as proof of payment for bank transfer bookings.',
+      },
+      {
+        q: 'Are there any hidden fees?',
+        a: 'No surprises. The price breakdown shown before you confirm includes the nightly rate, cleaning fee, any applicable extra-guest fees and taxes. The total you see is the total you pay.',
+      },
+    ],
+  },
+  {
+    id: 'stay',
+    category: 'Your Stay',
+    icon: '🏡',
+    items: [
+      {
+        q: 'How do I check in?',
+        a: 'You\'ll receive a detailed check-in email 48 hours before arrival containing directions, access instructions (key safe codes, key handover details etc.) and any property-specific notes.',
+      },
+      {
+        q: 'What time is check-in and check-out?',
+        a: 'Standard check-in is from 15:00 and check-out is by 11:00. Early check-in or late check-out can often be arranged directly with the host in advance, subject to availability.',
+      },
+      {
+        q: 'What\'s included in every property?',
+        a: 'All properties come with Wi-Fi, bed linen, towels and the amenities listed on each property page. Beyond those basics, what\'s included varies — review the amenities section on the listing before booking.',
+      },
+      {
+        q: 'What if I have a problem during my stay?',
+        a: 'Contact us or the host immediately by phone, email or WhatsApp. We aim to resolve any issues same-day. If a problem makes the property uninhabitable and can\'t be fixed, we will work to find alternative accommodation.',
+      },
+      {
+        q: 'Are pets allowed?',
+        a: 'Pet policies are set by each host. Check the listing page or the amenities section to see if pets are welcome. If you\'re unsure, reach out before booking — some hosts are happy to accommodate pets on request.',
+      },
+    ],
+  },
+  {
+    id: 'cancellations',
+    category: 'Cancellations & Refunds',
+    icon: '↩️',
+    items: [
+      {
+        q: 'What cancellation policy applies to my booking?',
+        a: 'Each property has its own policy — Flexible, Moderate or Strict — clearly shown on the listing page and in your booking confirmation. Always review the policy before booking as refund terms differ.',
+      },
+      {
+        q: 'How do I cancel a booking?',
+        a: 'Reply to your booking confirmation email or contact us via the site. Include your booking reference number and we\'ll process the cancellation and confirm your eligibility for a refund.',
+      },
+      {
+        q: 'How long does a refund take?',
+        a: 'Refunds for card payments are processed within 5–10 business days back to the original card. Bank transfer refunds are returned to the account you paid from within 3–5 business days.',
+      },
+      {
+        q: 'What happens if the host cancels my booking?',
+        a: 'If a host cancels, you receive a full refund automatically — no questions asked. We\'ll also help you find an alternative property for your dates.',
+      },
+    ],
+  },
+  {
+    id: 'hosting',
+    category: 'For Hosts',
+    icon: '🏠',
+    items: [
+      {
+        q: 'How do I list my property?',
+        a: 'Create a host account, go to your dashboard and click "Add listing". You\'ll be guided through uploading photos, setting your prices, availability and house rules. Listings go live once reviewed.',
+      },
+      {
+        q: 'How and when do I get paid?',
+        a: 'Payouts are sent automatically to your connected bank account or Stripe account after each guest checks in. You can view all upcoming and past payouts in your host dashboard.',
+      },
+      {
+        q: 'Can I set my own prices and availability?',
+        a: 'Yes — you have full control. Set your base nightly rate, seasonal pricing, minimum and maximum stay lengths, and block off dates whenever you need. Changes take effect immediately.',
+      },
+      {
+        q: 'What fees does the platform charge hosts?',
+        a: 'We charge a small commission on each completed booking. The exact percentage is shown in your host settings and is deducted before payout — you always see the net amount you\'ll receive.',
+      },
+    ],
+  },
+];
+
+const useCms = false; // always show generic platform FAQs
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? '';
+const allFaqsFlat = useCms
+  ? cmsItems
+  : fallbackFaqs.flatMap((g) => g.items.map((i) => ({ question: i.q, answer: i.a })));
+
+const faqSchema = allFaqsFlat.length > 0 ? {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: allFaqsFlat.map((faq: any) => ({
+    '@type': 'Question',
+    name: faq.question ?? faq.q,
+    acceptedAnswer: { '@type': 'Answer', text: faq.answer ?? faq.a },
+  })),
+} : null;
+
+const schemas = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'FAQs', item: `${siteUrl}/faqs` },
+    ],
+  },
+  ...(faqSchema ? [faqSchema] : []),
+];
+---
+
+<BaseLayout
+  title={page?.meta_title ?? 'Frequently Asked Questions'}
+  description={page?.meta_description ?? 'Everything you need to know about searching, booking, payments, check-in, cancellations and hosting on our platform.'}
+  schema={schemas}
+>
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+
+    <!-- Header -->
+    <div class="text-center mb-12">
+      <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-wider mb-2">{isEl ? 'Κέντρο Βοήθειας' : isBg ? 'Център за помощ' : isSr ? 'Центар за помоћ' : isTr ? 'Yardım Merkezi' : isRo ? 'Centru de Ajutor' : 'Help Centre'}</p>
+      <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">{page?.title ?? 'Frequently Asked Questions'}</h1>
+      <p class="text-gray-500 max-w-xl mx-auto">
+        {isEl ? 'Βρείτε γρήγορες απαντήσεις παρακάτω. Δεν βρίσκετε αυτό που ψάχνετε;' : isBg ? 'Намерете бързи отговори по-долу. Не можете да намерите търсеното?' : isSr ? 'Пронађите брзе одговоре испод. Не можете да нађете оно што тражите?' : isTr ? 'Aşağıda hızlı yanıtlar bulun. Aradığınızı bulamıyor musunuz?' : isRo ? 'Găsiți răspunsuri rapide mai jos. Nu găsiți ce căutați?' : 'Find quick answers below. Can\'t find what you\'re looking for?'}{' '}
+        <a href="/contact" class="text-[#1a1a2e] font-medium underline hover:text-[#c9a96e] transition-colors">{isEl ? 'Επικοινωνήστε μαζί μας' : isBg ? 'Свържете се с нас' : isSr ? 'Контактирајте нас' : isTr ? 'Bizimle iletişime geçin' : isRo ? 'Contactați-ne' : 'Contact us'}</a>
+        {' '}{isEl ? '— απαντάμε εντός λίγων ωρών.' : isBg ? '— отговаряме в рамките на няколко часа.' : isSr ? '— одговарамо у року од неколико сати.' : isTr ? '— birkaç saat içinde yanıt veririz.' : isRo ? '— răspundem în câteva ore.' : '— we reply within a few hours.'}
+      </p>
+    </div>
+
+    {useCms ? (
+      <!-- CMS-managed FAQs -->
+      <div class="space-y-3">
+        {cmsItems.map((faq: any) => (
+          <details class="group bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <summary class="flex items-center justify-between p-5 cursor-pointer font-medium text-gray-900 hover:bg-gray-50 transition-colors list-none">
+              {faq.question}
+              <svg class="w-5 h-5 text-gray-400 shrink-0 group-open:rotate-180 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+              </svg>
+            </summary>
+            <div class="px-5 pb-5 text-gray-600 text-sm leading-relaxed border-t border-gray-100 pt-4">
+              {faq.answer}
+            </div>
+          </details>
+        ))}
+      </div>
+    ) : (
+      <!-- Generic grouped FAQs with category tabs -->
+      <div>
+        <!-- Category tabs -->
+        <div class="flex gap-2 flex-wrap mb-8" id="faq-tabs">
+          <button
+            class="faq-tab px-4 py-2 rounded-full text-sm font-medium transition-colors bg-[#1a1a2e] text-white"
+            data-target="all"
+          >
+            {isEl ? 'Όλα' : isBg ? 'Всички' : isSr ? 'Све' : isTr ? 'Tümü' : isRo ? 'Toate' : 'All'}
+          </button>
+          {fallbackFaqs.map((group) => (
+            <button
+              class="faq-tab px-4 py-2 rounded-full text-sm font-medium transition-colors bg-gray-100 text-gray-600 hover:bg-gray-200"
+              data-target={group.id}
+            >
+              <span class="mr-1.5">{group.icon}</span>{
+                group.id === 'booking' ? (isEl ? 'Αναζήτηση & Κράτηση' : isBg ? 'Търсене & Резервация' : isSr ? 'Претрага & Резервација' : isTr ? 'Arama & Rezervasyon' : isRo ? 'Căutare & Rezervare' : group.category) :
+                group.id === 'payment' ? (isEl ? 'Πληρωμή' : isBg ? 'Плащане' : isSr ? 'Плаћање' : isTr ? 'Ödeme' : isRo ? 'Plată' : group.category) :
+                group.id === 'stay' ? (isEl ? 'Η Διαμονή σας' : isBg ? 'Вашият престой' : isSr ? 'Ваш боравак' : isTr ? 'Konaklamanız' : isRo ? 'Sejurul Dvs.' : group.category) :
+                group.id === 'cancellations' ? (isEl ? 'Ακυρώσεις & Επιστροφές' : isBg ? 'Анулации & Възстановявания' : isSr ? 'Отказивање & Повраћај' : isTr ? 'İptal & İade' : isRo ? 'Anulări & Rambursări' : group.category) :
+                group.id === 'hosting' ? (isEl ? 'Για Ιδιοκτήτες' : isBg ? 'За домакини' : isSr ? 'За домаћине' : isTr ? 'Ev Sahipleri İçin' : isRo ? 'Pentru Proprietari' : group.category) :
+                group.category
+              }
+            </button>
+          ))}
+        </div>
+
+        <!-- FAQ groups -->
+        <div class="space-y-10" id="faq-groups">
+          {fallbackFaqs.map((group) => (
+            <section class="faq-group" data-group={group.id}>
+              <div class="flex items-center gap-2 mb-4">
+                <span class="text-xl">{group.icon}</span>
+                <h2 class="text-sm font-semibold uppercase tracking-widest text-gray-400">{
+                  group.id === 'booking' ? (isEl ? 'Αναζήτηση & Κράτηση' : isBg ? 'Търсене & Резервация' : isSr ? 'Претрага & Резервација' : isTr ? 'Arama & Rezervasyon' : isRo ? 'Căutare & Rezervare' : group.category) :
+                  group.id === 'payment' ? (isEl ? 'Πληρωμή' : isBg ? 'Плащане' : isSr ? 'Плаћање' : isTr ? 'Ödeme' : isRo ? 'Plată' : group.category) :
+                  group.id === 'stay' ? (isEl ? 'Η Διαμονή σας' : isBg ? 'Вашият престой' : isSr ? 'Ваш боравак' : isTr ? 'Konaklamanız' : isRo ? 'Sejurul Dvs.' : group.category) :
+                  group.id === 'cancellations' ? (isEl ? 'Ακυρώσεις & Επιστροφές' : isBg ? 'Анулации & Възстановявания' : isSr ? 'Отказивање & Повраћај' : isTr ? 'İptal & İade' : isRo ? 'Anulări & Rambursări' : group.category) :
+                  group.id === 'hosting' ? (isEl ? 'Για Ιδιοκτήτες' : isBg ? 'За домакини' : isSr ? 'За домаћине' : isTr ? 'Ev Sahipleri İçin' : isRo ? 'Pentru Proprietari' : group.category) :
+                  group.category
+                }</h2>
+              </div>
+              <div class="space-y-3">
+                {group.items.map((faq) => (
+                  <details class="group bg-white border border-gray-200 rounded-xl overflow-hidden">
+                    <summary class="flex items-center justify-between p-5 cursor-pointer font-medium text-gray-900 hover:bg-gray-50 transition-colors list-none">
+                      {
+                        faq.q === 'How do I search for a property?' ? (isEl ? 'Πώς αναζητώ ένα ακίνητο;' : isBg ? 'Как да търся имот?' : isSr ? 'Како да претражим некретнину?' : isTr ? 'Bir mülkü nasıl ararım?' : isRo ? 'Cum caut o proprietate?' : faq.q) :
+                        faq.q === 'Can I book instantly or do I need approval?' ? (isEl ? 'Μπορώ να κάνω άμεση κράτηση ή χρειάζομαι έγκριση;' : isBg ? 'Мога ли да резервирам веднага или ми е нужно одобрение?' : isSr ? 'Могу ли да резервишем одмах или ми је потребно одобрење?' : isTr ? 'Anında rezervasyon yapabilir miyim yoksa onay gerekli mi?' : isRo ? 'Pot rezerva instant sau am nevoie de aprobare?' : faq.q) :
+                        faq.q === 'Can I modify my dates after booking?' ? (isEl ? 'Μπορώ να αλλάξω τις ημερομηνίες μου μετά την κράτηση;' : isBg ? 'Мога ли да променя датите след резервацията?' : isSr ? 'Могу ли да изменим датуме након резервације?' : isTr ? 'Rezervasyon sonrası tarihlerimi değiştirebilir miyim?' : isRo ? 'Pot modifica datele după rezervare?' : faq.q) :
+                        faq.q === 'Do I need to create an account to book?' ? (isEl ? 'Χρειάζομαι λογαριασμό για να κάνω κράτηση;' : isBg ? 'Трябва ли да създам акаунт, за да резервирам?' : isSr ? 'Да ли ми је потребан налог за резервацију?' : isTr ? 'Rezervasyon yapmak için hesap oluşturmam gerekiyor mu?' : isRo ? 'Trebuie să-mi creez cont pentru a rezerva?' : faq.q) :
+                        faq.q === 'How far in advance can I book?' ? (isEl ? 'Πόσο νωρίτερα μπορώ να κάνω κράτηση;' : isBg ? 'Колко предварително мога да резервирам?' : isSr ? 'Колико унапред могу да резервишем?' : isTr ? 'Ne kadar önceden rezervasyon yapabilirim?' : isRo ? 'Cu cât timp înainte pot rezerva?' : faq.q) :
+                        faq.q === 'What payment methods are accepted?' ? (isEl ? 'Ποιες μέθοδοι πληρωμής γίνονται δεκτές;' : isBg ? 'Какви методи на плащане се приемат?' : isSr ? 'Које методе плаћања се прихватају?' : isTr ? 'Hangi ödeme yöntemleri kabul edilmektedir?' : isRo ? 'Ce metode de plată sunt acceptate?' : faq.q) :
+                        faq.q === 'Can I pay a deposit and settle the rest later?' ? (isEl ? 'Μπορώ να πληρώσω προκαταβολή και το υπόλοιπο αργότερα;' : isBg ? 'Мога ли да платя депозит и остатъка по-късно?' : isSr ? 'Могу ли да платим депозит и остатак касније?' : isTr ? 'Depozito ödeyip kalanını sonra ödeyebilir miyim?' : isRo ? 'Pot plăti un avans și restul mai târziu?' : faq.q) :
+                        faq.q === 'Is it safe to pay online?' ? (isEl ? 'Είναι ασφαλής η ηλεκτρονική πληρωμή;' : isBg ? 'Безопасно ли е да плащам онлайн?' : isSr ? 'Да ли је безбедно плаћати онлајн?' : isTr ? 'Online ödeme güvenli mi?' : isRo ? 'Este sigur să plătesc online?' : faq.q) :
+                        faq.q === 'When will I receive my receipt?' ? (isEl ? 'Πότε θα λάβω την απόδειξή μου;' : isBg ? 'Кога ще получа разписката си?' : isSr ? 'Када ћу добити потврду о плаћању?' : isTr ? 'Makbuzumu ne zaman alacağım?' : isRo ? 'Când voi primi chitanța?' : faq.q) :
+                        faq.q === 'Are there any hidden fees?' ? (isEl ? 'Υπάρχουν κρυφές χρεώσεις;' : isBg ? 'Има ли скрити такси?' : isSr ? 'Постоје ли скривене накнаде?' : isTr ? 'Gizli ücretler var mı?' : isRo ? 'Există comisioane ascunse?' : faq.q) :
+                        faq.q === 'How do I check in?' ? (isEl ? 'Πώς κάνω check-in;' : isBg ? 'Как да направя настаняване?' : isSr ? 'Како се пријављујем?' : isTr ? 'Nasıl giriş yaparım?' : isRo ? 'Cum fac check-in?' : faq.q) :
+                        faq.q === 'What time is check-in and check-out?' ? (isEl ? 'Ποια ώρα είναι το check-in και check-out;' : isBg ? 'В колко часа е настаняването и напускането?' : isSr ? 'Када је долазак и одлазак?' : isTr ? 'Giriş ve çıkış saatleri nelerdir?' : isRo ? 'La ce oră este check-in și check-out?' : faq.q) :
+                        faq.q === "What's included in every property?" ? (isEl ? 'Τι περιλαμβάνεται σε κάθε ακίνητο;' : isBg ? 'Какво е включено във всеки имот?' : isSr ? 'Шта је укључено у свакој некретнини?' : isTr ? 'Her mülkte neler dahildir?' : isRo ? 'Ce este inclus în fiecare proprietate?' : faq.q) :
+                        faq.q === 'What if I have a problem during my stay?' ? (isEl ? 'Τι γίνεται αν αντιμετωπίσω πρόβλημα κατά τη διαμονή μου;' : isBg ? 'Какво да правя, ако имам проблем по време на престоя?' : isSr ? 'Шта ако имам проблем током боравка?' : isTr ? 'Konaklamam sırasında bir sorun yaşarsam ne olur?' : isRo ? 'Ce se întâmplă dacă am o problemă în timpul sejurului?' : faq.q) :
+                        faq.q === 'Are pets allowed?' ? (isEl ? 'Επιτρέπονται τα κατοικίδια;' : isBg ? 'Разрешени ли са домашни любимци?' : isSr ? 'Да ли су кућни љубимци дозвољени?' : isTr ? 'Evcil hayvanlar kabul ediliyor mu?' : isRo ? 'Sunt permise animalele de companie?' : faq.q) :
+                        faq.q === 'What cancellation policy applies to my booking?' ? (isEl ? 'Ποια πολιτική ακύρωσης ισχύει για την κράτησή μου;' : isBg ? 'Каква политика за анулация важи за моята резервация?' : isSr ? 'Која политика отказивања важи за моју резервацију?' : isTr ? 'Rezervasyonuma hangi iptal politikası uygulanır?' : isRo ? 'Ce politică de anulare se aplică rezervării mele?' : faq.q) :
+                        faq.q === 'How do I cancel a booking?' ? (isEl ? 'Πώς ακυρώνω μια κράτηση;' : isBg ? 'Как да анулирам резервация?' : isSr ? 'Како да откажем резервацију?' : isTr ? 'Bir rezervasyonu nasıl iptal ederim?' : isRo ? 'Cum anulez o rezervare?' : faq.q) :
+                        faq.q === 'How long does a refund take?' ? (isEl ? 'Πόσος χρόνος χρειάζεται για επιστροφή χρημάτων;' : isBg ? 'Колко време отнема възстановяването на средства?' : isSr ? 'Колико дуго траје повраћај новца?' : isTr ? 'İade ne kadar sürer?' : isRo ? 'Cât durează o rambursare?' : faq.q) :
+                        faq.q === 'What happens if the host cancels my booking?' ? (isEl ? 'Τι γίνεται αν ο ιδιοκτήτης ακυρώσει την κράτησή μου;' : isBg ? 'Какво се случва, ако домакинът анулира резервацията ми?' : isSr ? 'Шта се дешава ако домаћин откаже моју резервацију?' : isTr ? 'Ev sahibi rezervasyonumu iptal ederse ne olur?' : isRo ? 'Ce se întâmplă dacă proprietarul îmi anulează rezervarea?' : faq.q) :
+                        faq.q === 'How do I list my property?' ? (isEl ? 'Πώς καταχωρίζω το ακίνητό μου;' : isBg ? 'Как да публикувам имота си?' : isSr ? 'Како да огласим своју некретнину?' : isTr ? 'Mülkümü nasıl listelerim?' : isRo ? 'Cum îmi listez proprietatea?' : faq.q) :
+                        faq.q === 'How and when do I get paid?' ? (isEl ? 'Πώς και πότε πληρώνομαι;' : isBg ? 'Как и кога получавам плащане?' : isSr ? 'Како и када добијам исплату?' : isTr ? 'Nasıl ve ne zaman ödeme alırım?' : isRo ? 'Cum și când primesc plata?' : faq.q) :
+                        faq.q === 'Can I set my own prices and availability?' ? (isEl ? 'Μπορώ να ορίσω τις δικές μου τιμές και διαθεσιμότητα;' : isBg ? 'Мога ли да задам собствени цени и наличност?' : isSr ? 'Могу ли да одредим сопствене цене и доступност?' : isTr ? 'Kendi fiyatlarımı ve müsaitlik durumumu belirleyebilir miyim?' : isRo ? 'Pot stabili propriile prețuri și disponibilitate?' : faq.q) :
+                        faq.q === 'What fees does the platform charge hosts?' ? (isEl ? 'Τι τέλη χρεώνει η πλατφόρμα στους ιδιοκτήτες;' : isBg ? 'Какви такси начислява платформата на домакините?' : isSr ? 'Које накнаде платформа наплаћује домаћинима?' : isTr ? 'Platform ev sahiplerinden ne kadar ücret alır?' : isRo ? 'Ce comisioane percepe platforma proprietarilor?' : faq.q) :
+                        faq.q
+                      }
+                      <svg class="w-5 h-5 text-gray-400 shrink-0 group-open:rotate-180 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                      </svg>
+                    </summary>
+                    <div class="px-5 pb-5 text-gray-600 text-sm leading-relaxed border-t border-gray-100 pt-4">
+                      {
+                        faq.q === 'How do I search for a property?' ? (isEl ? 'Χρησιμοποιήστε τη γραμμή αναζήτησης στην αρχική σελίδα για να εισάγετε τον προορισμό σας, τις ημερομηνίες ταξιδιού και τον αριθμό επισκεπτών. Φιλτράρετε τα αποτελέσματα για να βρείτε την ιδανική διαμονή σας.' : isBg ? 'Използвайте лентата за търсење на начална страница, за да въведете дестинацията, датите на пътуване и броя гости. Филтрирайте резултатите по цена, удобства, вид имот и още, за да намерите идеалния си престой.' : isSr ? 'Користите траку за претрагу на почетној страни да унесете своје одредиште, датуме путовања и број гостију. Филтрирајте резултате по цени, садржајима и типу некретнине да бисте пронашли идеалан боравак.' : isTr ? 'Ana sayfadaki arama çubuğunu kullanarak varış yerinizi, seyahat tarihlerinizi ve misafir sayısını girin. Fiyat, olanaklar ve mülk türüne göre sonuçları filtreleyin.' : isRo ? 'Folosiți bara de căutare de pe pagina principală pentru a introduce destinația, datele de călătorie și numărul de oaspeți. Filtrați rezultatele după preț, facilități, tip de proprietate și altele.' : faq.a) :
+                        faq.q === 'Can I book instantly or do I need approval?' ? (isEl ? 'Εξαρτάται από το ακίνητο. Οι καταχωρίσεις με ετικέτα «Άμεσα» επιβεβαιώνονται αμέσως μετά την πληρωμή. Άλλες αποστέλλονται στον ιδιοκτήτη για έγκριση — συνήθως λαμβάνετε απάντηση εντός λίγων ωρών.' : isBg ? 'Зависи от имота. Обявите с етикет „Незабавно" се потвърждават веднага след плащането. Другите се изпращат на домакина за одобрение — обикновено получавате отговор в рамките на няколко часа.' : isSr ? 'Зависи од некретнине. Огласи са ознаком „Тренутно" потврђују се одмах после плаћања. Остали се шаљу домаћину на одобрење — обично добијате одговор у року од неколико сати.' : isTr ? 'Mülke bağlıdır. "Anında" etiketli ilanlar ödeme sonrasında hemen onaylanır. Diğerleri onay için ev sahibine iletilir — genellikle birkaç saat içinde yanıt alırsınız.' : isRo ? 'Depinde de proprietate. Anunțurile marcate cu „Instant" sunt confirmate imediat după plată. Celelalte sunt trimise proprietarului pentru aprobare — de obicei primiți răspuns în câteva ore.' : faq.a) :
+                        faq.q === 'Can I modify my dates after booking?' ? (isEl ? 'Οι αλλαγές ημερομηνιών υπόκεινται σε διαθεσιμότητα και έγκριση του ιδιοκτήτη. Επικοινωνήστε μαζί μας το συντομότερο δυνατό. Εάν οι νέες ημερομηνίες κοστίζουν περισσότερο ή λιγότερο, η διαφορά θα χρεωθεί ή θα επιστραφεί αναλόγως.' : isBg ? 'Промяната на дати зависи от наличността и одобрението на домакина. Свържете се с нас или с домакина възможно най-скоро. Ако новите дати струват повече или по-малко, разликата ще бъде начислена или възстановена.' : isSr ? 'Промена датума зависи од доступности и одобрења домаћина. Контактирајте нас или домаћина што пре. Ако нови датуми коштају више или мање, разлика ће бити наплаћена или враћена.' : isTr ? 'Tarih değişikliği müsaitlik ve ev sahibinin onayına bağlıdır. Mümkün olan en kısa sürede bizimle veya ev sahibiyle iletişime geçin. Yeni tarihler daha pahalı veya ucuzsa fark tahsil edilir ya da iade edilir.' : isRo ? 'Modificarea datelor depinde de disponibilitate și aprobarea proprietarului. Contactați-ne cât mai curând posibil. Dacă datele noi costă mai mult sau mai puțin, diferența va fi percepută sau rambursată.' : faq.a) :
+                        faq.q === 'Do I need to create an account to book?' ? (isEl ? 'Δεν χρειάζεται λογαριασμός. Απλώς συμπληρώστε τα στοιχεία σας κατά την πληρωμή και όλες οι επιβεβαιώσεις, αποδείξεις και οδηγίες check-in αποστέλλονται απευθείας στο email σας.' : isBg ? 'Не е необходим акаунт. Просто попълнете данните си при плащане и всички потвърждения, разписки и инструкции за настаняване ще бъдат изпратени директно на имейла ви.' : isSr ? 'Налог није потребан. Само попуните своје податке при плаћању и сва потврђења, рачуни и упутства за пријаву биће послата директно на вашу е-пошту.' : isTr ? 'Hesap gerekmez. Ödeme sırasında bilgilerinizi doldurun; tüm rezervasyon onayları, makbuzlar ve giriş talimatları doğrudan e-postanıza gönderilir.' : isRo ? 'Nu este nevoie de cont. Completați datele la checkout și toate confirmările, chitanțele și instrucțiunile de check-in sunt trimise direct pe email.' : faq.a) :
+                        faq.q === 'How far in advance can I book?' ? (isEl ? 'Τα περισσότερα ακίνητα δέχονται κρατήσεις έως 12 μήνες νωρίτερα. Το ημερολόγιο σε κάθε καταχώριση δείχνει ακριβώς ποιες ημερομηνίες είναι διαθέσιμες σε πραγματικό χρόνο.' : isBg ? 'Повечето имоти приемат резервации до 12 месеца предварително. Календарът на всяка обява показва точно кои дати са свободни в реално време.' : isSr ? 'Већина некретнина прихвата резервације до 12 месеци унапред. Календар на сваком огласу показује тачно који датуми су доступни у реалном времену.' : isTr ? 'Çoğu mülk 12 aya kadar önceden rezervasyon kabul eder. Her ilandaki takvim hangi tarihlerin müsait olduğunu gerçek zamanlı olarak gösterir.' : isRo ? 'Majoritatea proprietăților acceptă rezervări cu până la 12 luni înainte. Calendarul de pe fiecare anunț arată exact care date sunt disponibile în timp real.' : faq.a) :
+                        faq.q === 'What payment methods are accepted?' ? (isEl ? 'Δεχόμαστε όλες τις μεγάλες πιστωτικές και χρεωστικές κάρτες (Visa, Mastercard) μέσω Stripe, καθώς και τραπεζικές μεταφορές μέσω IBAN, Revolut ή Wise. Οι πληρωμές με κάρτα επιβεβαιώνονται άμεσα· οι τραπεζικές μεταφορές επιβεβαιώνονται εντός 24 ωρών.' : isBg ? 'Приемаме всички основни кредитни и дебитни карти (Visa, Mastercard), обработени сигурно чрез Stripe, както и банкови преводи чрез IBAN, Revolut или Wise. Картовите плащания се потвърждават незабавно; банковите преводи — в рамките на 24 часа.' : isSr ? 'Прихватамо све главне кредитне и дебитне картице (Visa, Mastercard) обрађене безбедно преко Stripe-а, као и банкарске трансфере путем IBAN-а, Revolut-а или Wise-а. Плаћања картицом потврђују се одмах; банкарски трансфери — у року од 24 сата.' : isTr ? 'Stripe üzerinden güvenli şekilde işlenen tüm büyük kredi ve banka kartlarını (Visa, Mastercard), ayrıca IBAN, Revolut veya Wise ile banka transferlerini kabul ediyoruz. Kart ödemeleri anında onaylanır; banka transferleri 24 saat içinde onaylanır.' : isRo ? 'Acceptăm toate cardurile principale de credit și debit (Visa, Mastercard) procesate securizat prin Stripe, precum și transferuri bancare prin IBAN, Revolut sau Wise. Plățile cu cardul sunt confirmate instant; transferurile bancare sunt confirmate în 24 de ore.' : faq.a) :
+                        faq.q === 'Can I pay a deposit and settle the rest later?' ? (isEl ? 'Ναι — πολλά ακίνητα προσφέρουν ευέλικτη επιλογή προκαταβολής. Πληρώνετε ένα μικρό ποσοστό τώρα για να εξασφαλίσετε την κράτησή σας, και το υπόλοιπο εισπράττεται κατά την άφιξη.' : isBg ? 'Да — много имоти предлагат гъвкава опция за депозит. Плащате малък процент сега, за да осигурите резервацията си, а остатъкът се събира при пристигане. Потърсете опцията „Плащане на депозит" при плащане.' : isSr ? 'Да — многе некретнине нуде флексибилну опцију депозита. Платите мали проценат сада да осигурате резервацију, а преостали износ се наплаћује при доласку. Потражите опцију „Плати депозит" при одјави.' : isTr ? 'Evet — birçok mülk esnek depozito seçeneği sunar. Rezervasyonunuzu güvence altına almak için şimdi küçük bir yüzde ödeyin, kalan bakiye varışta tahsil edilir. Ödeme sırasında "Depozito öde" seçeneğini arayın.' : isRo ? 'Da — multe proprietăți oferă opțiunea flexibilă de avans. Plătiți un procent mic acum pentru a vă asigura rezervarea, iar soldul rămas se colectează la sosire. Căutați opțiunea „Plătiți avans" la checkout.' : faq.a) :
+                        faq.q === 'Is it safe to pay online?' ? (isEl ? 'Απολύτως. Οι πληρωμές με κάρτα γίνονται μέσω Stripe, πιστοποιημένο επεξεργαστή PCI-DSS Level 1 που εμπιστεύονται εκατομμύρια επιχειρήσεις παγκοσμίως. Ποτέ δεν αποθηκεύουμε τα στοιχεία κάρτας σας.' : isBg ? 'Абсолютно. Картовите плащания се обработват от Stripe — сертифициран процесор от ниво PCI-DSS Level 1, на когото се доверяват милиони бизнеси по света. Ние никога не съхраняваме данните на картата ви на нашите сървъри.' : isSr ? 'Апсолутно. Плаћања картицом обрађује Stripe — сертификовани процесор PCI-DSS нивоа 1 коме верују милиони предузећа широм света. Никада не чувамо податке о вашој картици на нашим серверима.' : isTr ? 'Kesinlikle. Kart ödemeleri, dünya genelinde milyonlarca işletmenin güvendiği PCI-DSS Seviye 1 sertifikalı işlemci Stripe tarafından işlenir. Kart bilgilerinizi hiçbir zaman sunucularımızda saklamayız.' : isRo ? 'Absolut. Plățile cu cardul sunt gestionate de Stripe, un procesor certificat PCI-DSS Nivel 1 în care au încredere milioane de afaceri din întreaga lume. Nu stocăm niciodată datele cardului pe serverele noastre.' : faq.a) :
+                        faq.q === 'When will I receive my receipt?' ? (isEl ? 'Επιβεβαίωση πληρωμής με πλήρη ανάλυση κόστους αποστέλλεται στο email σας αμέσως μετά την πληρωμή. Μπορείτε επίσης να το χρησιμοποιήσετε ως απόδειξη πληρωμής για κρατήσεις με τραπεζική μεταφορά.' : isBg ? 'Потвърждение за плащане с пълна разбивка на разходите се изпраща на имейла ви веднага след резервацията. Можете да го използвате и като доказателство за плащане при резервации с банков превод.' : isSr ? 'Потврда о плаћању са потпуним прегледом трошкова шаље се на вашу е-пошту одмах по завршетку резервације. Можете је користити и као доказ о плаћању за резервације банкарским трансфером.' : isTr ? 'Tam maliyet dökümü içeren ödeme onayı, rezervasyonunuz ödendikten hemen sonra e-postanıza gönderilir. Bunu banka transferi rezervasyonları için ödeme kanıtı olarak da kullanabilirsiniz.' : isRo ? 'O confirmare de plată cu defalcarea completă a costurilor este trimisă pe email imediat după ce rezervarea este plătită. O puteți folosi și ca dovadă de plată pentru rezervările cu transfer bancar.' : faq.a) :
+                        faq.q === 'Are there any hidden fees?' ? (isEl ? 'Καμία έκπληξη. Η ανάλυση τιμής που εμφανίζεται πριν επιβεβαιώσετε περιλαμβάνει τη νυχτερινή τιμή, τέλος καθαριότητας, τυχόν χρεώσεις για επιπλέον επισκέπτες και φόρους. Το σύνολο που βλέπετε είναι το σύνολο που πληρώνετε.' : isBg ? 'Без изненади. Разбивката на цената, показана преди потвърждение, включва нощната ставка, такса почистване, евентуални такси за допълнителни гости и данъци. Сумата, която виждате, е сумата, която плащате.' : isSr ? 'Без изненађења. Преглед цене приказан пре потврде укључује ноћну цену, накнаду за чишћење, евентуалне накнаде за додатне госте и порезе. Укупан износ који видите је укупан износ који плаћате.' : isTr ? 'Sürpriz yok. Onaylamadan önce gösterilen fiyat dökümü gecelik ücreti, temizlik ücretini, varsa ekstra misafir ücretlerini ve vergileri içerir. Gördüğünüz toplam, ödediğiniz toplamdir.' : isRo ? 'Fără surprize. Defalcarea prețului afișată înainte de confirmare include tariful pe noapte, taxa de curățenie, eventualele taxe pentru oaspeți suplimentari și impozitele. Totalul pe care îl vedeți este totalul pe care îl plătiți.' : faq.a) :
+                        faq.q === 'How do I check in?' ? (isEl ? 'Θα λάβετε λεπτομερές email check-in 48 ώρες πριν την άφιξη, με οδηγίες, οδηγίες πρόσβασης (κωδικοί χρηματοκιβωτίου κλειδιών κ.λπ.) και ειδικές σημειώσεις για το ακίνητο.' : isBg ? 'Ще получите подробен имейл за настаняване 48 часа преди пристигане с указания за маршрута, инструкции за достъп (кодове за сейф с ключове, данни за предаване на ключ и др.) и специфични бележки за имота.' : isSr ? 'Добићете детаљан е-маил за пријаву 48 сати пре доласка са упутствима за долазак, инструкцијама за приступ (кодови за сеф за кључеве, детаљи предаје кључа итд.) и напоменама специфичним за некретнину.' : isTr ? 'Varıştan 48 saat önce yol tarifi, erişim talimatları (anahtar kasa kodları, anahtar teslim detayları vb.) ve mülde özgü notlar içeren ayrıntılı bir giriş e-postası alacaksınız.' : isRo ? 'Veți primi un email detaliat de check-in cu 48 de ore înainte de sosire, conținând indicații, instrucțiuni de acces (coduri seif chei, detalii predare cheie etc.) și note specifice proprietății.' : faq.a) :
+                        faq.q === 'What time is check-in and check-out?' ? (isEl ? 'Το τυπικό check-in είναι από τις 15:00 και το check-out έως τις 11:00. Πρώιμο check-in ή καθυστερημένο check-out μπορεί συχνά να κανονιστεί απευθείας με τον ιδιοκτήτη, ανάλογα με τη διαθεσιμότητα.' : isBg ? 'Стандартното настаняване е от 15:00, а напускането — до 11:00. Ранно настаняване или късно напускане може да бъде уредено директно с домакина, при наличност.' : isSr ? 'Стандардни долазак је од 15:00, а одлазак до 11:00. Рани долазак или касни одлазак може се често договорити директно са домаћином унапред, у складу са доступношћу.' : isTr ? 'Standart giriş saati 15:00\'den itibaren, çıkış saati ise 11:00\'e kadardır. Erken giriş veya geç çıkış çoğunlukla müsaitliğe göre ev sahibiyle önceden ayarlanabilir.' : isRo ? 'Check-in-ul standard este de la 15:00, iar check-out-ul până la 11:00. Check-in devreme sau check-out târziu pot fi adesea aranjate direct cu proprietarul, în funcție de disponibilitate.' : faq.a) :
+                        faq.q === "What's included in every property?" ? (isEl ? 'Όλα τα ακίνητα διαθέτουν Wi-Fi, κλινοσκεπάσματα, πετσέτες και τις παροχές που αναφέρονται σε κάθε σελίδα ακινήτου. Πέρα από αυτά τα βασικά, τα περιλαμβανόμενα ποικίλλουν — ελέγξτε την ενότητα παροχών πριν κάνετε κράτηση.' : isBg ? 'Всички имоти разполагат с Wi-Fi, спално бельо, кърпи и удобствата, изброени на страницата на всеки имот. Освен тези основни неща, включеното варира — прегледайте раздела с удобства в обявата преди резервация.' : isSr ? 'Све некретнине имају Wi-Fi, постељину, пешкире и садржаје наведене на страници сваке некретнине. Поред тих основних ствари, оно што је укључено варира — прегледајте одељак са садржајима у огласу пре резервације.' : isTr ? 'Tüm mülklerde Wi-Fi, yatak çarşafları, havlular ve her mülk sayfasında listelenen olanaklar bulunur. Bu temel özellikler dışında nelerin dahil olduğu değişiklik gösterir — rezervasyon yapmadan önce ilandaki olanaklar bölümünü inceleyin.' : isRo ? 'Toate proprietățile includ Wi-Fi, lenjerie de pat, prosoape și facilitățile listate pe pagina fiecărei proprietăți. Dincolo de aceste elemente de bază, ce este inclus variază — verificați secțiunea de facilități înainte de rezervare.' : faq.a) :
+                        faq.q === 'What if I have a problem during my stay?' ? (isEl ? 'Επικοινωνήστε με εμάς ή τον ιδιοκτήτη αμέσως τηλεφωνικά, μέσω email ή WhatsApp. Στόχος μας είναι η επίλυση οποιωνδήποτε ζητημάτων την ίδια μέρα.' : isBg ? 'Свържете се с нас или с домакина незабавно по телефон, имейл или WhatsApp. Стремим се да решаваме всякакви проблеми в същия ден. Ако проблемът прави имота необитаем и не може да бъде отстранен, ще положим усилия да намерим алтернативно настаняване.' : isSr ? 'Контактирајте нас или домаћина одмах телефоном, е-поштом или WhatsApp-ом. Циљ нам је да решимо све проблеме истог дана. Ако проблем учини некретнину неусловном за становање и не може се отклонити, потрудићемо се да пронађемо алтернативни смештај.' : isTr ? 'Bize veya ev sahibine hemen telefon, e-posta veya WhatsApp ile ulaşın. Tüm sorunları aynı gün çözmeyi hedefliyoruz. Bir sorun mülkü kullanılamaz hale getirirse ve çözülemezse alternatif konaklama bulmak için çalışacağız.' : isRo ? 'Contactați-ne pe noi sau proprietarul imediat prin telefon, email sau WhatsApp. Ne propunem să rezolvăm orice probleme în aceeași zi. Dacă o problemă face proprietatea nelocuibilă și nu poate fi rezolvată, vom lucra să găsim cazare alternativă.' : faq.a) :
+                        faq.q === 'Are pets allowed?' ? (isEl ? 'Οι πολιτικές για κατοικίδια ορίζονται από κάθε ιδιοκτήτη. Ελέγξτε τη σελίδα καταχώρισης για να δείτε αν επιτρέπονται κατοικίδια. Αν δεν είστε σίγουροι, επικοινωνήστε πριν κάνετε κράτηση.' : isBg ? 'Политиката за домашни любимци се определя от всеки домакин. Проверете страницата на обявата или раздела с удобства, за да видите дали са добре дошли домашни любимци. Ако не сте сигурни, свържете се преди резервация.' : isSr ? 'Политику о кућним љубимцима одређује сваки домаћин. Проверите страницу огласа или одељак са садржајима да видите да ли су кућни љубимци добродошли. Ако нисте сигурни, обратите се пре резервације.' : isTr ? 'Evcil hayvan politikaları her ev sahibi tarafından belirlenir. Evcil hayvanlara izin verilip verilmediğini görmek için ilan sayfasını veya olanaklar bölümünü kontrol edin. Emin değilseniz, rezervasyon yapmadan önce sorun.' : isRo ? 'Politicile privind animalele de companie sunt stabilite de fiecare proprietar. Verificați pagina anunțului sau secțiunea de facilități pentru a vedea dacă sunt acceptate. Dacă nu sunteți sigur, contactați înainte de rezervare.' : faq.a) :
+                        faq.q === 'What cancellation policy applies to my booking?' ? (isEl ? 'Κάθε ακίνητο έχει τη δική του πολιτική — Ευέλικτη, Μέτρια ή Αυστηρή — που εμφανίζεται ξεκάθαρα στη σελίδα καταχώρισης και στην επιβεβαίωση κράτησης. Ελέγχετε πάντα την πολιτική πριν κάνετε κράτηση.' : isBg ? 'Всеки имот има собствена политика — Гъвкава, Умерена или Строга — ясно показана на страницата на обявата и в потвърждението за резервация. Винаги преглеждайте политиката преди резервация, тъй като условията за възстановяване се различават.' : isSr ? 'Свака некретнина има сопствену политику — Флексибилну, Умерену или Строгу — јасно приказану на страни огласа и у потврди резервације. Увек прегледајте политику пре резервације јер се услови повраћаја разликују.' : isTr ? 'Her mülkün kendi politikası vardır — Esnek, Orta veya Katı — ilan sayfasında ve rezervasyon onayında açıkça gösterilir. İade koşulları farklılık gösterdiğinden rezervasyon yapmadan önce her zaman politikayı inceleyin.' : isRo ? 'Fiecare proprietate are propria politică — Flexibilă, Moderată sau Strictă — afișată clar pe pagina anunțului și în confirmarea rezervării. Verificați întotdeauna politica înainte de rezervare, deoarece termenii de rambursare diferă.' : faq.a) :
+                        faq.q === 'How do I cancel a booking?' ? (isEl ? 'Απαντήστε στο email επιβεβαίωσης κράτησης ή επικοινωνήστε μαζί μας μέσω της ιστοσελίδας. Συμπεριλάβετε τον αριθμό αναφοράς κράτησής σας.' : isBg ? 'Отговорете на имейла за потвърждение на резервацията или се свържете с нас чрез сайта. Включете референтния номер на резервацията си и ние ще обработим анулацията и ще потвърдим правото ви на възстановяване.' : isSr ? 'Одговорите на е-маил потврде резервације или нас контактирајте преко сајта. Наведите референтни број резервације и ми ћемо обрадити отказивање и потврдити вашу подобност за повраћај.' : isTr ? 'Rezervasyon onay e-postanıza yanıt verin veya site üzerinden bizimle iletişime geçin. Rezervasyon referans numaranızı ekleyin; iptali işleyeceğiz ve iade hakkınızı onaylayacağız.' : isRo ? 'Răspundeți la emailul de confirmare a rezervării sau contactați-ne prin site. Includeți numărul de referință al rezervării și vom procesa anularea și vom confirma eligibilitatea pentru rambursare.' : faq.a) :
+                        faq.q === 'How long does a refund take?' ? (isEl ? 'Οι επιστροφές χρημάτων για πληρωμές με κάρτα επεξεργάζονται εντός 5–10 εργάσιμων ημερών. Οι επιστροφές τραπεζικών μεταφορών επιστρέφονται στον λογαριασμό από τον οποίο πληρώσατε εντός 3–5 εργάσιμων ημερών.' : isBg ? 'Възстановяванията за картови плащания се обработват в рамките на 5–10 работни дни по оригиналната карта. Възстановяванията при банков превод се връщат по сметката, от която сте платили, в рамките на 3–5 работни дни.' : isSr ? 'Повраћај за плаћања картицом обрађује се у року од 5–10 радних дана на оригиналну картицу. Повраћај банкарским трансфером враћа се на рачун са ког сте платили у року од 3–5 радних дана.' : isTr ? 'Kart ödemelerinin iadesi, orijinal karta 5–10 iş günü içinde işlenir. Banka transferi iadeleri, ödeme yaptığınız hesaba 3–5 iş günü içinde iade edilir.' : isRo ? 'Rambursările pentru plățile cu cardul sunt procesate în 5–10 zile lucrătoare pe cardul original. Rambursările transferurilor bancare sunt returnate în contul din care ați plătit în 3–5 zile lucrătoare.' : faq.a) :
+                        faq.q === 'What happens if the host cancels my booking?' ? (isEl ? 'Εάν ακυρώσει ο ιδιοκτήτης, λαμβάνετε πλήρη επιστροφή χρημάτων αυτόματα. Θα σας βοηθήσουμε επίσης να βρείτε εναλλακτικό ακίνητο για τις ημερομηνίες σας.' : isBg ? 'Ако домакинът анулира, получавате пълно възстановяване автоматично — без въпроси. Ще ви помогнем и да намерите алтернативен имот за вашите дати.' : isSr ? 'Ако домаћин откаже, добијате потпуни повраћај аутоматски — без питања. Такође ћемо вам помоћи да пронађете алтернативну некретнину за ваше датуме.' : isTr ? 'Ev sahibi iptal ederse tam iade otomatik olarak yapılır — soru sorulmaz. Ayrıca tarihleriniz için alternatif bir mülk bulmanıza yardımcı olacağız.' : isRo ? 'Dacă proprietarul anulează, primiți rambursare completă automat — fără întrebări. Vă vom ajuta și să găsiți o proprietate alternativă pentru datele dvs.' : faq.a) :
+                        faq.q === 'How do I list my property?' ? (isEl ? 'Δημιουργήστε λογαριασμό ιδιοκτήτη, μεταβείτε στον πίνακα ελέγχου και κάντε κλικ στο «Προσθήκη καταχώρισης». Θα σας καθοδηγήσουμε στη διαδικασία.' : isBg ? 'Създайте акаунт на домакин, отидете в таблото си и кликнете „Добави обява". Ще бъдете преведени стъпка по стъпка през качването на снимки, задаването на цени, наличност и правила на дома. Обявите се публикуват след преглед.' : isSr ? 'Направите налог домаћина, идите на своју контролну таблу и кликните „Додај оглас". Бићете вођени кроз постављање фотографија, постављање цена, доступности и правила куће. Огласи се објављују после прегледа.' : isTr ? 'Bir ev sahibi hesabı oluşturun, kontrol panelinize gidin ve "İlan ekle"ye tıklayın. Fotoğraf yükleme, fiyatları, müsaitliği ve ev kurallarını ayarlama konusunda rehberlik edileceksiniz. İlanlar incelendikten sonra yayına girer.' : isRo ? 'Creați un cont de proprietar, accesați panoul de control și faceți clic pe „Adaugă anunț". Veți fi ghidat prin încărcarea fotografiilor, stabilirea prețurilor, disponibilității și regulilor casei. Anunțurile devin active după verificare.' : faq.a) :
+                        faq.q === 'How and when do I get paid?' ? (isEl ? 'Οι αποδόσεις αποστέλλονται αυτόματα στον συνδεδεμένο τραπεζικό λογαριασμό σας μετά από κάθε check-in επισκέπτη. Μπορείτε να δείτε όλες τις επερχόμενες και παρελθοντικές αποδόσεις στον πίνακα ελέγχου σας.' : isBg ? 'Плащанията се изпращат автоматично по свързаната ви банкова сметка или Stripe акаунт след като всеки гост се настани. Можете да преглеждате всички предстоящи и минали плащания в таблото на домакина.' : isSr ? 'Исплате се аутоматски шаљу на ваш повезани банковни рачун или Stripe налог после сваке пријаве госта. Можете прегледати све предстојеће и прошле исплате на контролној табли домаћина.' : isTr ? 'Her misafir giriş yaptıktan sonra ödemeler otomatik olarak bağlı banka hesabınıza veya Stripe hesabınıza gönderilir. Tüm yaklaşan ve geçmiş ödemeleri ev sahibi kontrol panelinden görüntüleyebilirsiniz.' : isRo ? 'Plățile sunt trimise automat în contul bancar sau contul Stripe conectat după fiecare check-in al oaspetelui. Puteți vizualiza toate plățile viitoare și anterioare în panoul de control.' : faq.a) :
+                        faq.q === 'Can I set my own prices and availability?' ? (isEl ? 'Ναι — έχετε πλήρη έλεγχο. Ορίστε τη βασική νυχτερινή τιμή, εποχιακές τιμές, ελάχιστη και μέγιστη διάρκεια παραμονής και μπλοκάρετε ημερομηνίες όποτε χρειαστεί.' : isBg ? 'Да — имате пълен контрол. Задайте основна нощна ставка, сезонни цени, минимален и максимален престой и блокирайте дати когато е необходимо. Промените влизат в сила незабавно.' : isSr ? 'Да — имате пуну контролу. Поставите основну ноћну цену, сезонске цене, минималне и максималне дужине боравка и блокирајте датуме кад је потребно. Измене ступају на снагу одмах.' : isTr ? 'Evet — tam kontrolünüz var. Temel gecelik ücretinizi, sezonluk fiyatlandırmayı, minimum ve maksimum konaklama sürelerini belirleyin ve gerektiğinde tarihleri bloklayın. Değişiklikler anında geçerli olur.' : isRo ? 'Da — aveți control deplin. Stabiliți tariful de bază pe noapte, prețurile sezoniere, duratele minime și maxime de ședere și blocați date oricând este nevoie. Modificările intră în vigoare imediat.' : faq.a) :
+                        faq.q === 'What fees does the platform charge hosts?' ? (isEl ? 'Χρεώνουμε μια μικρή προμήθεια σε κάθε ολοκληρωμένη κράτηση. Το ακριβές ποσοστό εμφανίζεται στις ρυθμίσεις σας και αφαιρείται πριν από την απόδοση.' : isBg ? 'Начисляваме малка комисионна върху всяка завършена резервация. Точният процент е показан в настройките на домакина и се приспада преди изплащането — винаги виждате нетната сума, която ще получите.' : isSr ? 'Наплаћујемо малу провизију за сваку завршену резервацију. Тачан проценат је приказан у подешавањима домаћина и одузима се пре исплате — увек видите нето износ који ћете добити.' : isTr ? 'Her tamamlanan rezervasyondan küçük bir komisyon alıyoruz. Kesin yüzde, ev sahibi ayarlarınızda gösterilir ve ödeme yapılmadan önce düşülür — alacağınız net tutarı her zaman görürsünüz.' : isRo ? 'Percepem un comision mic pentru fiecare rezervare completă. Procentul exact este afișat în setările de proprietar și este dedus înainte de plată — vedeți întotdeauna suma netă pe care o veți primi.' : faq.a) :
+                        faq.a
+                      }
+                    </div>
+                  </details>
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      </div>
+    )}
+
+    <!-- Still have questions -->
+    <div class="mt-14 bg-gradient-to-br from-[#1a1a2e] to-[#2d2d4e] rounded-2xl p-8 text-center text-white">
+      <div class="text-3xl mb-3">💬</div>
+      <h2 class="font-bold text-lg mb-2">{isEl ? 'Έχετε ακόμα ερώτηση;' : isBg ? 'Все още имате въпрос?' : isSr ? 'Још увек имате питање?' : isTr ? 'Hâlâ sorunuz var mı?' : isRo ? 'Încă aveți o întrebare?' : 'Still have a question?'}</h2>
+      <p class="text-white/70 text-sm mb-6 max-w-sm mx-auto">{isEl ? 'Η ομάδα μας είναι εδώ για να βοηθήσει — επικοινωνήστε μαζί μας και θα σας απαντήσουμε το συντομότερο δυνατό.' : isBg ? 'Нашият екип е тук, за да помогне — свържете се с нас и ще ви отговорим възможно най-скоро.' : isSr ? 'Наш тим је ту да помогне — обратите нам се и одговорићемо вам што је пре могуће.' : isTr ? 'Ekibimiz yardımcı olmak için burada — bize ulaşın, en kısa sürede yanıt vereceğiz.' : isRo ? 'Echipa noastră este aici să vă ajute — contactați-ne și vă vom răspunde cât mai curând posibil.' : "Our team is here to help — reach out and we'll get back to you as quickly as possible."}</p>
+      <div class="flex flex-col sm:flex-row gap-3 justify-center">
+        <a href="/contact" class="inline-block bg-white text-[#1a1a2e] hover:bg-gray-100 font-semibold px-6 py-3 rounded-xl text-sm transition-colors">
+          {isEl ? 'Στείλτε μας μήνυμα' : isBg ? 'Изпратете ни съобщение' : isSr ? 'Пошаљите нам поруку' : isTr ? 'Mesaj gönderin' : isRo ? 'Trimiteți-ne un mesaj' : 'Send us a message'}
+        </a>
+        <a href="/rentals" class="inline-block border border-white/30 text-white hover:bg-white/10 font-semibold px-6 py-3 rounded-xl text-sm transition-colors">
+          {isEl ? 'Δείτε τα ακίνητα' : isBg ? 'Разгледайте имотите' : isSr ? 'Прегледајте некретнине' : isTr ? 'Mülklere göz atın' : isRo ? 'Răsfoiți proprietățile' : 'Browse properties'}
+        </a>
+      </div>
+    </div>
+
+  </div>
+</BaseLayout>
+
+<script>
+  // Category tab filtering
+  var tabs   = document.querySelectorAll('.faq-tab');
+  var groups = document.querySelectorAll('.faq-group');
+
+  tabs.forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      var target = tab.getAttribute('data-target');
+
+      // Update tab styles
+      tabs.forEach(function(t) {
+        t.classList.remove('bg-[#1a1a2e]', 'text-white');
+        t.classList.add('bg-gray-100', 'text-gray-600');
+      });
+      tab.classList.add('bg-[#1a1a2e]', 'text-white');
+      tab.classList.remove('bg-gray-100', 'text-gray-600');
+
+      // Show/hide groups
+      groups.forEach(function(g) {
+        if (target === 'all' || g.getAttribute('data-group') === target) {
+          g.style.display = '';
+        } else {
+          g.style.display = 'none';
+        }
+      });
+    });
+  });
+</script>

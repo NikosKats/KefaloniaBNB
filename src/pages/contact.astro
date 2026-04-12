@@ -1,0 +1,139 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { t, type Lang } from '../i18n/translations.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as Lang;
+const listingId  = Astro.url.searchParams.get('listing')   ?? '';
+const prefillName    = Astro.url.searchParams.get('name')      ?? '';
+const prefillEmail   = Astro.url.searchParams.get('email')     ?? '';
+const prefillCheckIn = Astro.url.searchParams.get('check_in')  ?? '';
+const prefillCheckOut= Astro.url.searchParams.get('check_out') ?? '';
+const prefillMessage = Astro.url.searchParams.get('message')   ?? '';
+const contactEmail = 'info@kefaloniabnb.com';
+const siteName = import.meta.env.PUBLIC_SITE_NAME ?? 'Vacation Rentals';
+
+const tSend    = t(lang, 'contact.send');
+const tSending = t(lang, 'contact.sending');
+const tSuccess = t(lang, 'contact.success');
+const tError   = t(lang, 'contact.error_msg');
+
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://kefaloniabnb.com';
+const contactSchema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'ContactPage',
+    name: `Contact – ${siteName}`,
+    url: `${siteUrl}/contact`,
+    description: `Get in touch with ${siteName}. We're happy to answer questions about availability, properties, or your upcoming stay.`,
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'Contact', item: `${siteUrl}/contact` },
+    ],
+  },
+];
+---
+
+<BaseLayout
+  title={t(lang,'contact.title')}
+  description={`Get in touch with ${siteName}. We're happy to answer questions about availability, properties, or your upcoming stay.`}
+  schema={contactSchema}
+>
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+    <div class="text-center mb-12">
+      <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-wider mb-2">{t(lang,'contact.badge')}</p>
+      <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">{t(lang,'contact.title')}</h1>
+      <p class="text-gray-500">{t(lang,'contact.subtitle')}</p>
+    </div>
+
+    <div class="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
+      {[
+        { icon: '✉️', label: t(lang,'contact.email_lbl'),    value: contactEmail,    href: `mailto:${contactEmail}` },
+        { icon: '💬', label: t(lang,'contact.whatsapp_lbl'), value: 'WhatsApp / Messenger', href: null },
+        { icon: '🕐', label: lang === 'el' ? 'Χρόνος απάντησης' : lang === 'bg' ? 'Време за отговор' : lang === 'sr' ? 'Време одговора' : lang === 'tr' ? 'Yanıt süresi' : 'Response time', value: lang === 'el' ? 'Συνήθως μέσα σε λίγες ώρες' : lang === 'bg' ? 'Обикновено в рамките на няколко часа' : lang === 'sr' ? 'Обично у року од неколико сати' : lang === 'tr' ? 'Genellikle birkaç saat içinde' : 'Usually within a few hours', href: null },
+      ].map((c) => (
+        <div class="text-center">
+          <div class="text-3xl mb-2">{c.icon}</div>
+          <p class="text-sm font-semibold text-gray-700 mb-1">{c.label}</p>
+          {c.href ? (
+            <a href={c.href} class="text-sm text-[#1a1a2e] hover:text-[#c9a96e] transition-colors">{c.value}</a>
+          ) : (
+            <p class="text-sm text-gray-500">{c.value}</p>
+          )}
+        </div>
+      ))}
+    </div>
+
+    <div class="bg-white border border-gray-200 rounded-2xl p-8">
+      <h2 class="font-semibold text-gray-900 mb-6">{t(lang,'contact.form_title')}</h2>
+      <form id="contact-form" class="space-y-5">
+        {listingId && <input type="hidden" name="listing_id" value={listingId} />}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{t(lang,'contact.name')} *</label>
+            <input type="text" name="name" required class="input-field" placeholder={t(lang,'contact.ph_name')} value={prefillName} />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{t(lang,'contact.email_field')} *</label>
+            <input type="email" name="email" required class="input-field" placeholder={t(lang,'contact.ph_email')} value={prefillEmail} />
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{t(lang,'contact.checkin_opt')}</label>
+            <input type="date" name="check_in" class="input-field" value={prefillCheckIn} />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{t(lang,'contact.checkout_opt')}</label>
+            <input type="date" name="check_out" class="input-field" value={prefillCheckOut} />
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{t(lang,'contact.message')} *</label>
+          <textarea name="message" required rows="5" class="input-field resize-none" placeholder={t(lang,'contact.ph_message')}>{prefillMessage}</textarea>
+        </div>
+        <div id="form-msg" class="hidden text-sm font-medium"></div>
+        <button type="submit" id="submit-btn" class="btn-primary w-full cursor-pointer">{tSend}</button>
+      </form>
+    </div>
+  </div>
+</BaseLayout>
+
+<script define:vars={{ tSend, tSending, tSuccess, tError }}>
+  const form = document.getElementById('contact-form');
+  const msg  = document.getElementById('form-msg');
+  const btn  = document.getElementById('submit-btn');
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    btn.disabled = true;
+    btn.textContent = tSending;
+
+    const raw = Object.fromEntries(new FormData(form));
+    const data = { ...raw };
+    if (raw.guests) data.guests = parseInt(raw.guests);
+
+    try {
+      const res = await fetch('/api/inquiries/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || tError);
+      }
+      form.reset();
+      if (msg) { msg.textContent = tSuccess; msg.className = 'text-sm font-medium text-emerald-600'; }
+    } catch (err) {
+      if (msg) { msg.textContent = err.message || tError; msg.className = 'text-sm font-medium text-red-600'; }
+    } finally {
+      btn.disabled = false;
+      btn.textContent = tSend;
+      msg?.classList.remove('hidden');
+    }
+  });
+</script>

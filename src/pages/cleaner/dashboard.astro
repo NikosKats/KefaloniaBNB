@@ -1,0 +1,276 @@
+---
+import CleanerLayout from '../../layouts/CleanerLayout.astro';
+import { getServiceClient } from '../../lib/supabase';
+
+const userId = Astro.locals.session.user.id;
+const role = Astro.locals.profile?.role ?? '';
+const isAdminViewing = role === 'admin' || role === 'super_admin';
+const service = getServiceClient();
+
+let { data: profile } = await service
+  .from('cleaner_profiles')
+  .select('*')
+  .eq('user_id', userId)
+  .single();
+
+// Auto-create cleaner_profile for invited cleaners who don't have one yet
+if (!profile && !isAdminViewing && role === 'cleaner') {
+  const { data: created } = await service
+    .from('cleaner_profiles')
+    .insert({ user_id: userId })
+    .select()
+    .single();
+  profile = created;
+}
+
+let jobs: any[] = [];
+let openRequests: any[] = [];
+let allCleaners: any[] = [];
+
+if (isAdminViewing) {
+  // Admin sees all cleaners and platform-wide open requests
+  const { data: rawC } = await service
+    .from('cleaner_profiles')
+    .select('*')
+    .order('created_at', { ascending: false });
+  const cUserIds = (rawC ?? []).map((c: any) => c.user_id).filter(Boolean);
+  const { data: cProfiles } = cUserIds.length > 0
+    ? await service.from('profiles').select('id, full_name, email').in('id', cUserIds)
+    : { data: [] };
+  const cProfileMap = Object.fromEntries((cProfiles ?? []).map((p: any) => [p.id, p]));
+  allCleaners = (rawC ?? []).map((c: any) => ({ ...c, profiles: cProfileMap[c.user_id] ?? null }));
+
+  const { data: r } = await service
+    .from('cleaning_requests')
+    .select('*, listings(title,city)')
+    .eq('status', 'open')
+    .order('requested_date');
+  openRequests = r ?? [];
+} else if (profile) {
+  const { data: j } = await service
+    .from('cleaning_jobs')
+    .select('*, listings(title,city)')
+    .eq('cleaner_id', profile.id)
+    .order('scheduled_date', { ascending: false })
+    .limit(20);
+  jobs = j ?? [];
+
+  const { data: r } = await service
+    .from('cleaning_requests')
+    .select('*, listings(title,city,bedrooms,property_type)')
+    .eq('status', 'open')
+    .order('requested_date')
+    .limit(20);
+  openRequests = r ?? [];
+}
+
+const statusColors: Record<string, string> = {
+  scheduled: 'bg-blue-100 text-blue-800',
+  started: 'bg-yellow-100 text-yellow-800',
+  completed: 'bg-purple-100 text-purple-800',
+  approved: 'bg-emerald-100 text-emerald-800',
+  disputed: 'bg-red-100 text-red-800',
+  cancelled: 'bg-gray-100 text-gray-600',
+};
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isBg = lang === 'bg';
+const isEl = lang === 'el';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const tDashboard = isEl ? 'Πίνακας Ελέγχου' : isBg ? 'Табло' : isSr ? 'Kontrolna tabla' : isTr ? 'Kontrol Paneli' : isRo ? 'Panou de Control' : 'Cleaner Dashboard';
+const tTotalCleaners = isEl ? 'Σύνολο Καθαριστών' : isBg ? 'Общо чистачи' : isSr ? 'Ukupno čistača' : isTr ? 'Toplam Temizlikçi' : isRo ? 'Total Persoane Curățenie' : 'Total Cleaners';
+const tActiveCleaners = isEl ? 'Ενεργοί Καθαριστές' : isBg ? 'Активни чистачи' : isSr ? 'Aktivni čistači' : isTr ? 'Aktif Temizlikçiler' : isRo ? 'Persoane Curățenie Active' : 'Active Cleaners';
+const tOpenRequests = isEl ? 'Ανοιχτά Αιτήματα' : isBg ? 'Отворени заявки' : isSr ? 'Otvoreni zahtevi' : isTr ? 'Açık Talepler' : isRo ? 'Cereri Deschise' : 'Open Requests';
+const tAllCleaners = isEl ? 'Όλοι οι Καθαριστές' : isBg ? 'Всички чистачи' : isSr ? 'Svi čistači' : isTr ? 'Tüm Temizlikçiler' : isRo ? 'Toate Persoanele Curățenie' : 'All Cleaners';
+const tManageCleaners = isEl ? 'Διαχείριση καθαριστών →' : isBg ? 'Управление на чистачи →' : isSr ? 'Upravljanje čistačima →' : isTr ? 'Temizlikçileri yönet →' : isRo ? 'Gestionare persoane curățenie →' : 'Manage cleaners →';
+const tCleaner = isEl ? 'Καθαριστής' : isBg ? 'Чистач' : isSr ? 'Čistač' : isTr ? 'Temizlikçi' : isRo ? 'Persoană Curățenie' : 'Cleaner';
+const tRating = isEl ? 'Βαθμολογία' : isBg ? 'Рейтинг' : isSr ? 'Ocena' : isTr ? 'Değerlendirme' : isRo ? 'Evaluare' : 'Rating';
+const tStatus = isEl ? 'Κατάσταση' : isBg ? 'Статус' : isSr ? 'Status' : isTr ? 'Durum' : isRo ? 'Status' : 'Status';
+const tStripe = 'Stripe';
+const tActive = isEl ? 'Ενεργός' : isBg ? 'Активен' : isSr ? 'Aktivan' : isTr ? 'Aktif' : isRo ? 'Activ' : 'Active';
+const tInactive = isEl ? 'Ανενεργός' : isBg ? 'Неактивен' : isSr ? 'Neaktivan' : isTr ? 'Pasif' : isRo ? 'Inactiv' : 'Inactive';
+const tConnected = isEl ? 'Συνδεδεμένο' : isBg ? 'Свързан' : isSr ? 'Povezano' : isTr ? 'Bağlı' : isRo ? 'Conectat' : 'Connected';
+const tPending = isEl ? 'Εκκρεμεί' : isBg ? 'Изчакваща' : isSr ? 'Na čekanju' : isTr ? 'Bekliyor' : isRo ? 'În așteptare' : 'Pending';
+const tView = isEl ? 'Προβολή →' : isBg ? 'Преглед →' : isSr ? 'Pogledaj →' : isTr ? 'Görüntüle →' : isRo ? 'Vizualizare →' : 'View →';
+const tNoCleaners = isEl ? 'Δεν υπάρχουν εγγεγραμμένοι καθαριστές ακόμα.' : isBg ? 'Все още няма регистрирани чистачи.' : isSr ? 'Još nema registrovanih čistača.' : isTr ? 'Henüz kayıtlı temizlikçi yok.' : isRo ? 'Nicio persoană curățenie înregistrată încă.' : 'No cleaners registered yet.';
+const tJoinAsCleaner = isEl ? 'Εγγραφείτε ως Καθαριστής' : isBg ? 'Станете чистач' : isSr ? 'Postanite čistač' : isTr ? 'Temizlikçi Olarak Katılın' : isRo ? 'Înregistrare ca Persoană Curățenie' : 'Join as a Cleaner';
+const tSetUpProfile = isEl ? 'Δημιουργήστε το προφίλ καθαριστή σας για να λαμβάνετε αιτήματα εργασίας.' : isBg ? 'Настройте профила си на чистач, за да получавате заявки за работа.' : isSr ? 'Postavite profil čistača da biste primali zahteve za posao.' : isTr ? 'İş talepleri almak için temizlikçi profilinizi oluşturun.' : isRo ? 'Configurați profilul dvs. de curățenie pentru a primi cereri de lucrări.' : 'Set up your cleaner profile to start receiving cleaning job requests.';
+const tCreateProfile = isEl ? 'Δημιουργία Προφίλ' : isBg ? 'Създаване на профил' : isSr ? 'Kreiraj profil' : isTr ? 'Profil Oluştur' : isRo ? 'Creare Profil' : 'Create Profile';
+const tSetUpPayouts = isEl ? 'Ρύθμιση πληρωμών' : isBg ? 'Настройка на плащания' : isSr ? 'Podešavanje isplata' : isTr ? 'Ödeme ayarları' : isRo ? 'Configurare plăți' : 'Set up payouts';
+const tConnectStripeMsg = isEl ? 'Συνδέστε τον λογαριασμό σας Stripe για να λαμβάνετε πληρωμές.' : isBg ? 'Свържете акаунта си в Stripe, за да получавате плащания за завършени работи.' : isSr ? 'Povežite Stripe nalog da primate isplate za završene poslove.' : isTr ? 'Tamamlanan işler için ödeme almak üzere Stripe hesabınızı bağlayın.' : isRo ? 'Conectați contul Stripe pentru a primi plăți pentru lucrările finalizate.' : 'Connect your Stripe account to receive payments for completed jobs.';
+const tConnectStripe = isEl ? 'Σύνδεση Stripe →' : isBg ? 'Свържете Stripe →' : isSr ? 'Poveži Stripe →' : isTr ? 'Stripe Bağla →' : isRo ? 'Conectare Stripe →' : 'Connect Stripe →';
+const tUpcoming = isEl ? 'Προσεχείς' : isBg ? 'Предстоящи' : isSr ? 'Predstojeći' : isTr ? 'Yaklaşan' : isRo ? 'Viitoare' : 'Upcoming';
+const tCompleted = isEl ? 'Ολοκληρωμένες' : isBg ? 'Завършени' : isSr ? 'Završeno' : isTr ? 'Tamamlanan' : isRo ? 'Finalizate' : 'Completed';
+const tAvailableRequests = isEl ? 'Διαθέσιμα Αιτήματα' : isBg ? 'Налични заявки' : isSr ? 'Dostupni zahtevi' : isTr ? 'Mevcut Talepler' : isRo ? 'Cereri Disponibile' : 'Available Requests';
+const tViewAll = isEl ? 'Προβολή όλων →' : isBg ? 'Виж всички →' : isSr ? 'Pogledaj sve →' : isTr ? 'Tümünü gör →' : isRo ? 'Vezi toate →' : 'View all →';
+const tBid = isEl ? 'Προσφορά →' : isBg ? 'Оферта →' : isSr ? 'Ponuda →' : isTr ? 'Teklif →' : isRo ? 'Ofertă →' : 'Bid →';
+const tMyJobs = isEl ? 'Οι Εργασίες μου' : isBg ? 'Моите работи' : isSr ? 'Moji poslovi' : isTr ? 'İşlerim' : isRo ? 'Lucrările Mele' : 'My Jobs';
+---
+
+<CleanerLayout title={tDashboard}>
+  {isAdminViewing && (
+    <div class="space-y-8">
+      <!-- Admin stats -->
+      <div class="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div class="bg-white rounded-2xl border border-gray-100 p-4">
+          <p class="text-2xl font-bold text-gray-900">{allCleaners.length}</p>
+          <p class="text-xs text-gray-500 mt-1">{tTotalCleaners}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 p-4">
+          <p class="text-2xl font-bold text-gray-900">{allCleaners.filter((c: any) => c.is_active).length}</p>
+          <p class="text-xs text-gray-500 mt-1">{tActiveCleaners}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 p-4">
+          <p class="text-2xl font-bold text-gray-900">{openRequests.length}</p>
+          <p class="text-xs text-gray-500 mt-1">{tOpenRequests}</p>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">{tAllCleaners}</h2>
+        <a href="/admin/cleaning/cleaners" class="text-xs text-[#c9a96e] hover:opacity-80">{tManageCleaners}</a>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-100">
+              <th class="text-left p-4 text-xs font-medium text-gray-500">{tCleaner}</th>
+              <th class="text-left p-4 text-xs font-medium text-gray-500">{tRating}</th>
+              <th class="text-left p-4 text-xs font-medium text-gray-500">{tStatus}</th>
+              <th class="text-left p-4 text-xs font-medium text-gray-500">{tStripe}</th>
+              <th class="p-4"></th>
+            </tr>
+          </thead>
+          <tbody>
+            {allCleaners.map((c: any) => (
+              <tr class="border-b border-gray-50 hover:bg-gray-50">
+                <td class="p-4">
+                  <p class="font-medium text-gray-900">{(c.profiles as any)?.full_name ?? '—'}</p>
+                  <p class="text-xs text-gray-400">{(c.profiles as any)?.email}</p>
+                </td>
+                <td class="p-4 text-gray-600">{c.rating ? `★ ${Number(c.rating).toFixed(1)}` : '—'}</td>
+                <td class="p-4">
+                  <span class={`px-2 py-0.5 rounded-full text-xs font-medium ${c.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                    {c.is_active ? tActive : tInactive}
+                  </span>
+                </td>
+                <td class="p-4">
+                  <span class={`px-2 py-0.5 rounded-full text-xs font-medium ${c.stripe_onboarded ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`}>
+                    {c.stripe_onboarded ? tConnected : tPending}
+                  </span>
+                </td>
+                <td class="p-4">
+                  <a href={`/admin/cleaning/cleaners/${c.id}`} class="text-xs text-[#c9a96e] font-medium hover:opacity-80">{tView}</a>
+                </td>
+              </tr>
+            ))}
+            {allCleaners.length === 0 && (
+              <tr><td colspan="5" class="p-8 text-center text-gray-400 text-sm">{tNoCleaners}</td></tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )}
+
+  {!isAdminViewing && !profile && (
+    <div class="max-w-lg mx-auto text-center py-16">
+      <p class="text-4xl mb-4">🧹</p>
+      <h1 class="text-xl font-bold text-gray-900 mb-2">{tJoinAsCleaner}</h1>
+      <p class="text-sm text-gray-500 mb-6">{tSetUpProfile}</p>
+      <a href="/cleaner/profile" class="bg-[#1a1a2e] text-white font-semibold px-6 py-3 rounded-xl hover:bg-[#2d2d4e] transition-colors text-sm">
+        {tCreateProfile}
+      </a>
+    </div>
+  )}
+
+  {!isAdminViewing && profile && (
+    <div class="space-y-8">
+      <!-- Stripe Connect Banner -->
+      {!profile.stripe_onboarded && (
+        <div class="bg-amber-50 border border-amber-200 rounded-2xl p-5 flex items-center justify-between">
+          <div>
+            <p class="text-sm font-semibold text-amber-800">{tSetUpPayouts}</p>
+            <p class="text-xs text-amber-700 mt-0.5">{tConnectStripeMsg}</p>
+          </div>
+          <a href="/cleaner/connect" class="bg-amber-600 text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-amber-700 transition-colors">
+            {tConnectStripe}
+          </a>
+        </div>
+      )}
+
+      <!-- Stats -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div class="bg-white rounded-2xl border border-gray-100 p-4">
+          <p class="text-2xl font-bold text-gray-900">{jobs.filter(j => j.status === 'scheduled').length}</p>
+          <p class="text-xs text-gray-500 mt-1">{tUpcoming}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 p-4">
+          <p class="text-2xl font-bold text-gray-900">{jobs.filter(j => j.status === 'approved').length}</p>
+          <p class="text-xs text-gray-500 mt-1">{tCompleted}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 p-4">
+          <p class="text-2xl font-bold text-[#c9a96e]">{profile.rating ? `★ ${profile.rating}` : '—'}</p>
+          <p class="text-xs text-gray-500 mt-1">{tRating}</p>
+        </div>
+        <div class="bg-white rounded-2xl border border-gray-100 p-4">
+          <p class="text-2xl font-bold text-gray-900">{openRequests.length}</p>
+          <p class="text-xs text-gray-500 mt-1">{tOpenRequests}</p>
+        </div>
+      </div>
+
+      <!-- Open Requests to Bid -->
+      {openRequests.length > 0 && (
+        <div>
+          <div class="flex justify-between items-center mb-3">
+            <h2 class="text-sm font-semibold text-gray-700">{tAvailableRequests}</h2>
+            <a href="/cleaner/requests" class="text-xs text-[#c9a96e] hover:opacity-80">{tViewAll}</a>
+          </div>
+          <div class="space-y-3">
+            {openRequests.slice(0, 5).map((r: any) => (
+              <div class="bg-white border border-gray-100 rounded-2xl p-4 hover:border-[#c9a96e] transition-all relative cursor-pointer">
+                <a href={`/cleaner/requests/${r.id}`} class="absolute inset-0 rounded-2xl z-0"></a>
+                <div class="flex justify-between items-start relative z-10">
+                  <div>
+                    <p class="font-medium text-gray-900 text-sm">{r.listings?.title}</p>
+                    <p class="text-xs text-gray-500">{r.listings?.city} · {r.listings?.bedrooms} BR · {r.requested_date}</p>
+                    <p class="text-xs text-gray-400">{r.earliest_time} – {r.latest_time}</p>
+                  </div>
+                  <span class="text-xs text-[#c9a96e] font-medium">{tBid}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <!-- My Jobs -->
+      {jobs.length > 0 && (
+        <div>
+          <h2 class="text-sm font-semibold text-gray-700 mb-3">{tMyJobs}</h2>
+          <div class="space-y-3">
+            {jobs.map((job: any) => (
+              <div class="bg-white border border-gray-100 rounded-2xl p-4 hover:border-[#c9a96e] transition-all relative cursor-pointer">
+                <a href={`/cleaner/jobs/${job.id}`} class="absolute inset-0 rounded-2xl z-0"></a>
+                <div class="flex justify-between items-start relative z-10">
+                  <div>
+                    <p class="font-medium text-gray-900 text-sm">{job.listings?.title}</p>
+                    <p class="text-xs text-gray-500">{job.listings?.city} · {job.scheduled_date} at {job.scheduled_time}</p>
+                  </div>
+                  <div class="text-right">
+                    <span class={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[job.status]}`}>{job.status}</span>
+                    <p class="text-xs font-bold text-gray-900 mt-1">€{job.cleaner_payout}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )}
+</CleanerLayout>

@@ -1,0 +1,185 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const service = getServiceClient();
+const { data: restaurants } = await service
+  .from('restaurants')
+  .select('*')
+  .eq('is_active', true)
+  .order('is_partner', { ascending: false })
+  .order('sort_order')
+  .order('name');
+
+const priceLabels: Record<string, string> = { budget: '€', moderate: '€€', upscale: '€€€' };
+const featureLabels: Record<string, { en: string; el: string; bg: string; sr: string; tr: string; ro: string }> = {
+  sea_view:        { en: 'Sea View',         el: 'Θέα Θάλασσα',       bg: 'Изглед към морето',  sr: 'Pogled na more',      tr: 'Deniz Manzarası',    ro: 'Vedere la mare' },
+  outdoor_seating: { en: 'Outdoor Seating',  el: 'Εξωτερικός Χώρος',  bg: 'На открито',         sr: 'Bašta',               tr: 'Açık Oturma',        ro: 'Terasă' },
+  delivery:        { en: 'Delivery',         el: 'Delivery',          bg: 'Доставка',           sr: 'Dostava',             tr: 'Teslimat',           ro: 'Livrare' },
+  takeaway:        { en: 'Takeaway',         el: 'Takeaway',          bg: 'За вкъщи',           sr: 'Za poneti',           tr: 'Paket Servis',       ro: 'La pachet' },
+  parking:         { en: 'Parking',          el: 'Πάρκινγκ',         bg: 'Паркинг',            sr: 'Parking',             tr: 'Otopark',            ro: 'Parcare' },
+  wifi:            { en: 'Wi-Fi',            el: 'Wi-Fi',             bg: 'Wi-Fi',              sr: 'Wi-Fi',               tr: 'Wi-Fi',              ro: 'Wi-Fi' },
+  live_music:      { en: 'Live Music',       el: 'Ζωντανή Μουσική',  bg: 'Жива музика',        sr: 'Živa muzika',         tr: 'Canlı Müzik',        ro: 'Muzică live' },
+  pet_friendly:    { en: 'Pet Friendly',     el: 'Δεκτά Κατοικίδια', bg: 'Домашни любимци',    sr: 'Ljubimci dobrodošli', tr: 'Evcil Hayvan Dostu', ro: 'Prietenos cu animalele' },
+};
+const cuisineLabels: Record<string, { en: string; el: string; bg: string; sr: string; tr: string; ro: string }> = {
+  seafood:   { en: 'Seafood',      el: 'Θαλασσινά',      bg: 'Морска храна',    sr: 'Morska hrana',    tr: 'Deniz Ürünleri',  ro: 'Fructe de mare' },
+  greek:     { en: 'Greek',        el: 'Ελληνική',        bg: 'Гръцка',          sr: 'Grčka',           tr: 'Yunan',           ro: 'Grecească' },
+  taverna:   { en: 'Taverna',      el: 'Ταβέρνα',         bg: 'Таверна',         sr: 'Taverna',         tr: 'Taverna',         ro: 'Tavernă' },
+  pizza:     { en: 'Pizza/Italian',el: 'Πίτσα/Ιταλική',   bg: 'Пица/Италианска', sr: 'Pica/Italijanska',tr: 'Pizza/İtalyan',   ro: 'Pizza/Italiană' },
+  grill:     { en: 'Grill',        el: 'Ψησταριά',        bg: 'Скара',           sr: 'Roštilj',         tr: 'Izgara',          ro: 'Grătar' },
+  cafe:      { en: 'Cafe',         el: 'Καφέ',            bg: 'Кафе',            sr: 'Kafić',           tr: 'Kafe',            ro: 'Cafenea' },
+  bakery:    { en: 'Bakery',       el: 'Αρτοποιείο',      bg: 'Пекарна',         sr: 'Pekara',          tr: 'Fırın',           ro: 'Brutărie' },
+  mezedes:   { en: 'Mezedes',      el: 'Μεζεδοπωλείο',    bg: 'Мезета',          sr: 'Meze',            tr: 'Meze',            ro: 'Mezedes' },
+  souvlaki:  { en: 'Souvlaki',     el: 'Σουβλατζίδικο',   bg: 'Сувлаки',         sr: 'Suvlaki',         tr: 'Souvlaki',        ro: 'Souvlaki' },
+};
+
+const filterCity = Astro.url.searchParams.get('city');
+const filterCuisine = Astro.url.searchParams.get('cuisine');
+
+let filtered = restaurants ?? [];
+if (filterCity) filtered = filtered.filter((r: any) => r.city?.toLowerCase() === filterCity.toLowerCase());
+if (filterCuisine) filtered = filtered.filter((r: any) => r.cuisine_type?.includes(filterCuisine));
+
+const cities = [...new Set((restaurants ?? []).map((r: any) => r.city).filter(Boolean))];
+---
+
+<BaseLayout
+  title={isEl ? 'Εστιατόρια & Ταβέρνες — KefaloniaBNB' : isBg ? 'Ресторанти & Таверни — KefaloniaBNB' : isSr ? 'Restorani & Taverne — KefaloniaBNB' : isTr ? 'Restoranlar & Tavernalar — KefaloniaBNB' : isRo ? 'Restaurante & Taverne — KefaloniaBNB' : 'Restaurants & Tavernas — KefaloniaBNB'}
+  description={isEl ? 'Ανακαλύψτε τα καλύτερα εστιατόρια και ταβέρνες στην Κεραμωτή και Καβάλα' : isBg ? 'Открийте най-добрите ресторанти и таверни в Керамоти и Кавала' : isSr ? 'Otkrijte najbolje restorane i taverne u Keramotiju i Kavali' : isTr ? 'Keramoti ve Kefalonia\'daki en iyi restoranları ve tavernaları keşfedin' : isRo ? 'Descoperă cele mai bune restaurante și taverne din Keramoti și Kefalonia' : 'Discover the best restaurants and tavernas in Keramoti and Kefalonia'}
+>
+  <section class="bg-[#1a1a2e] py-16 sm:py-20">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <h1 class="text-3xl sm:text-4xl font-bold text-white mb-3">{isEl ? 'Εστιατόρια & Ταβέρνες' : isBg ? 'Ресторанти & Таверни' : isSr ? 'Restorani & Taverne' : isTr ? 'Restoranlar & Tavernalar' : isRo ? 'Restaurante & Taverne' : 'Restaurants & Tavernas'}</h1>
+      <p class="text-gray-300 max-w-2xl mx-auto">{isEl ? 'Τα καλύτερα μέρη για φαγητό στην περιοχή' : isBg ? 'Най-добрите места за хранене в района' : isSr ? 'Najbolja mesta za jelo u okolini' : isTr ? 'Bölgedeki en iyi yemek yerleri' : isRo ? 'Cele mai bune locuri de mâncare din zonă' : 'The best places to eat in the area'}</p>
+    </div>
+  </section>
+
+  <section class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <!-- Filters -->
+    <div class="flex flex-wrap gap-2 mb-8">
+      <a href="/community/restaurants" class={`px-4 py-2 rounded-xl text-sm font-medium ${!filterCity && !filterCuisine ? 'bg-[#1a1a2e] text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+        {isEl ? 'Όλα' : isBg ? 'Всички' : isSr ? 'Sve' : isTr ? 'Tümü' : isRo ? 'Toate' : 'All'}
+      </a>
+      {cities.map((c: string) => (
+        <a href={`/community/restaurants?city=${encodeURIComponent(c)}`}
+          class={`px-4 py-2 rounded-xl text-sm font-medium ${filterCity === c ? 'bg-[#1a1a2e] text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+          📍 {c}
+        </a>
+      ))}
+    </div>
+
+    {filtered.length === 0 ? (
+      <div class="text-center py-16 text-gray-400">
+        <div class="text-5xl mb-4">🍽️</div>
+        <p class="text-lg font-medium">{isEl ? 'Δεν βρέθηκαν εστιατόρια' : isBg ? 'Не са намерени ресторанти' : isSr ? 'Nisu pronađeni restorani' : isTr ? 'Restoran bulunamadı' : isRo ? 'Nu s-au găsit restaurante' : 'No restaurants found'}</p>
+      </div>
+    ) : (
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filtered.map((r: any) => (
+          <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-lg transition-shadow group">
+            {r.cover_photo ? (
+              <div class="aspect-[16/10] overflow-hidden">
+                <img src={r.cover_photo} alt={r.name} class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+              </div>
+            ) : (
+              <div class="aspect-[16/10] bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center">
+                <span class="text-5xl">🍽️</span>
+              </div>
+            )}
+            <div class="p-5">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <h3 class="font-bold text-gray-900 text-lg">{r.name}</h3>
+                  {r.is_partner && <span class="text-xs bg-[#c9a96e]/10 text-[#c9a96e] px-2 py-0.5 rounded-full font-medium">Partner</span>}
+                </div>
+                {r.price_range && <span class="text-sm text-gray-400 font-mono">{priceLabels[r.price_range] ?? ''}</span>}
+              </div>
+
+              {(r.cuisine_type?.length > 0) && (
+                <div class="flex flex-wrap gap-1.5 mt-2">
+                  {r.cuisine_type.slice(0, 3).map((c: string) => (
+                    <span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">{isEl ? (cuisineLabels[c]?.el ?? c) : isBg ? (cuisineLabels[c]?.bg ?? c) : isSr ? (cuisineLabels[c]?.sr ?? c) : isTr ? (cuisineLabels[c]?.tr ?? c) : isRo ? (cuisineLabels[c]?.ro ?? c) : (cuisineLabels[c]?.en ?? c)}</span>
+                  ))}
+                </div>
+              )}
+
+              <p class="text-sm text-gray-500 mt-2 line-clamp-2">{isEl ? (r.description_el ?? r.description) : r.description}</p>
+
+              {r.address && <p class="text-xs text-gray-400 mt-2">📍 {r.address}{r.city ? `, ${r.city}` : ''}</p>}
+
+              {(r.features?.length > 0) && (
+                <div class="flex flex-wrap gap-1.5 mt-3">
+                  {r.features.slice(0, 4).map((f: string) => (
+                    <span class="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded">{isEl ? (featureLabels[f]?.el ?? f) : isBg ? (featureLabels[f]?.bg ?? f) : isSr ? (featureLabels[f]?.sr ?? f) : isTr ? (featureLabels[f]?.tr ?? f) : isRo ? (featureLabels[f]?.ro ?? f) : (featureLabels[f]?.en ?? f)}</span>
+                  ))}
+                </div>
+              )}
+
+              {/* Social & business links */}
+              {(r.website || r.tripadvisor_url || r.google_business_url || r.facebook_url || r.instagram_url) && (
+                <div class="flex flex-wrap items-center gap-2 mt-3">
+                  {r.website && (
+                    <a href={r.website} target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-[#1a1a2e] transition-colors" title="Website">
+                      <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
+                      Website
+                    </a>
+                  )}
+                  {r.tripadvisor_url && (
+                    <a href={r.tripadvisor_url} target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-green-600 transition-colors" title="TripAdvisor">
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15a3 3 0 110-6 3 3 0 010 6zm4 0a3 3 0 110-6 3 3 0 010 6zm2.5-7.5C15.5 8.12 13.88 7 12 7s-3.5 1.12-4.5 2.5h9z"/></svg>
+                      TripAdvisor
+                    </a>
+                  )}
+                  {r.google_business_url && (
+                    <a href={r.google_business_url} target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600 transition-colors" title="Google">
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                      Google
+                    </a>
+                  )}
+                  {r.facebook_url && (
+                    <a href={r.facebook_url} target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-blue-700 transition-colors" title="Facebook">
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                      Facebook
+                    </a>
+                  )}
+                  {r.instagram_url && (
+                    <a href={r.instagram_url} target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-pink-600 transition-colors" title="Instagram">
+                      <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+                      Instagram
+                    </a>
+                  )}
+                </div>
+              )}
+
+              <div class="flex items-center gap-2 mt-4 pt-3 border-t border-gray-50">
+                {r.accepts_reservations && (
+                  <a href={`/community/restaurants/${r.slug}/reserve`} class="flex-1 text-center bg-[#c9a96e] text-white py-2 rounded-lg text-sm font-medium hover:bg-[#b89556] transition-colors">
+                    🍽️ {isEl ? 'Κράτηση' : isBg ? 'Резервация' : isSr ? 'Rezervacija' : isTr ? 'Rezervasyon' : isRo ? 'Rezervă' : 'Reserve'}
+                  </a>
+                )}
+                {r.phone && (
+                  <a href={`tel:${r.phone}`} class="flex-1 text-center bg-[#1a1a2e] text-white py-2 rounded-lg text-sm font-medium hover:bg-[#2d2d4e] transition-colors">
+                    📞 {isEl ? 'Κλήση' : isBg ? 'Обадете се' : isSr ? 'Pozovi' : isTr ? 'Ara' : isRo ? 'Apelează' : 'Call'}
+                  </a>
+                )}
+                {r.google_maps_url && (
+                  <a href={r.google_maps_url} target="_blank" rel="noopener" class="flex-1 text-center bg-gray-100 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
+                    🗺️ {isEl ? 'Χάρτης' : isBg ? 'Карта' : isSr ? 'Mapa' : isTr ? 'Harita' : isRo ? 'Hartă' : 'Map'}
+                  </a>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </section>
+</BaseLayout>

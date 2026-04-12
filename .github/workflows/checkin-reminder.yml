@@ -1,0 +1,22 @@
+name: Send 48h Check-in Reminders
+
+on:
+  schedule:
+    # Runs daily at 09:00 UTC — guests get the email 2 days before check-in
+    - cron: '0 9 * * *'
+  workflow_dispatch: # allow manual trigger from GitHub UI
+
+jobs:
+  send-reminders:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call checkin-reminder cron endpoint
+        run: |
+          response=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}" \
+            "${{ secrets.SITE_URL }}/api/cron/checkin-reminder")
+          echo "HTTP status: $response"
+          if [ "$response" != "200" ]; then
+            echo "Cron endpoint returned $response — failing job"
+            exit 1
+          fi

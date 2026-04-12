@@ -1,0 +1,339 @@
+---
+import CleanerLayout from '../../../layouts/CleanerLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+
+const userId = Astro.locals.session.user.id;
+const { id } = Astro.params;
+const service = getServiceClient();
+
+const { data: cleanerProfile } = await service
+  .from('cleaner_profiles')
+  .select('id')
+  .eq('user_id', userId)
+  .single();
+
+if (!cleanerProfile) return Astro.redirect('/cleaner/dashboard');
+
+const { data: job } = await service
+  .from('cleaning_jobs')
+  .select('*, listings(title,city,address,checkin_instructions)')
+  .eq('id', id!)
+  .eq('cleaner_id', cleanerProfile.id)
+  .single();
+
+if (!job) return Astro.redirect('/cleaner/dashboard');
+
+const { data: checklist } = await service
+  .from('job_checklist_items')
+  .select('*')
+  .eq('job_id', id!)
+  .order('sort_order');
+
+const { data: photos } = await service
+  .from('job_photos')
+  .select('*')
+  .eq('job_id', id!)
+  .order('created_at');
+
+const canStart = job.status === 'scheduled';
+const canComplete = job.status === 'started';
+const totalItems = (checklist ?? []).length;
+const doneItems = (checklist ?? []).filter((i: any) => i.is_done).length;
+const afterPhotos = (photos ?? []).filter((p: any) => p.phase === 'after');
+const allChecklistDone = totalItems > 0 && doneItems === totalItems;
+const hasAfterPhoto = afterPhotos.length > 0;
+const canSubmitComplete = allChecklistDone && hasAfterPhoto;
+
+const statusColors: Record<string, string> = {
+  scheduled: 'bg-blue-100 text-blue-800',
+  started: 'bg-yellow-100 text-yellow-800',
+  completed: 'bg-purple-100 text-purple-800',
+  approved: 'bg-emerald-100 text-emerald-800',
+  disputed: 'bg-red-100 text-red-800',
+  cancelled: 'bg-gray-100 text-gray-600',
+};
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isBg = lang === 'bg';
+const isEl = lang === 'el';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const tJob = isEl ? 'Εργασία' : isBg ? 'Работа' : isSr ? 'Posao' : isTr ? 'İş' : isRo ? 'Lucrare' : 'Job';
+const tAt = isEl ? 'στις' : isBg ? 'в' : isSr ? 'u' : isTr ? 'saat' : isRo ? 'la' : 'at';
+const tEarnings = isEl ? 'Τα κέρδη σας για αυτήν την εργασία' : isBg ? 'Вашите приходи за тази работа' : isSr ? 'Vaša zarada za ovaj posao' : isTr ? 'Bu iş için kazancınız' : isRo ? 'Câștigurile dvs. pentru această lucrare' : 'Your earnings for this job';
+const tPaymentTransferred = isEl ? 'Πληρωμή μεταφέρθηκε' : isBg ? 'Плащането е преведено' : isSr ? 'Uplata izvršena' : isTr ? 'Ödeme aktarıldı' : isRo ? 'Plată transferată' : 'Payment transferred';
+const tAccessInstructions = isEl ? 'Οδηγίες Πρόσβασης Ακινήτου' : isBg ? 'Инструкции за достъп до имота' : isSr ? 'Uputstva za pristup nekretnini' : isTr ? 'Mülk Erişim Talimatları' : isRo ? 'Instrucțiuni Acces Proprietate' : 'Property Access Instructions';
+const tStartCleaning = isEl ? 'Ξεκινήστε Καθαρισμό' : isBg ? 'Започнете почистване' : isSr ? 'Započni čišćenje' : isTr ? 'Temizliğe Başla' : isRo ? 'Începe Curățenia' : 'Start Cleaning';
+const tMarkComplete = isEl ? 'Σημειώστε ως Ολοκληρωμένο' : isBg ? 'Маркирайте като завършено' : isSr ? 'Označi kao završeno' : isTr ? 'Tamamlandı Olarak İşaretle' : isRo ? 'Marchează ca Finalizată' : 'Mark as Complete';
+const tCompleteChecklist = isEl ? 'Ολοκληρώστε όλα τα στοιχεία λίστας' : isBg ? 'Завършете всички елементи от списъка' : isSr ? 'Završite sve stavke kontrolne liste' : isTr ? 'Tüm kontrol listesi öğelerini tamamlayın' : isRo ? 'Completați toate elementele din lista de verificare' : 'Complete all checklist items';
+const tDone = isEl ? 'ολοκληρώθηκαν' : isBg ? 'завършени' : isSr ? 'završeno' : isTr ? 'tamamlandı' : isRo ? 'finalizate' : 'done';
+const tUploadAfterPhoto = isEl ? 'Ανεβάστε τουλάχιστον μία φωτογραφία μετά' : isBg ? 'Качете поне една снимка след почистване' : isSr ? 'Otpremite najmanje jednu fotografiju posle' : isTr ? 'En az bir sonrası fotoğrafı yükleyin' : isRo ? 'Încărcați cel puțin o fotografie după' : 'Upload at least one after photo';
+const tChecklist = isEl ? 'Λίστα Ελέγχου' : isBg ? 'Списък за проверка' : isSr ? 'Kontrolna lista' : isTr ? 'Kontrol Listesi' : isRo ? 'Lista de Verificare' : 'Checklist';
+const tNoChecklist = isEl ? 'Δεν υπάρχουν στοιχεία λίστας ακόμα. Ο ιδιοκτήτης θα τα προσθέσει πριν αρχίσει η εργασία.' : isBg ? 'Все още няма елементи в списъка. Собственикът ще ги добави преди началото на работата.' : isSr ? 'Još nema stavki kontrolne liste. Vlasnik će ih dodati pre početka posla.' : isTr ? 'Henüz kontrol listesi öğesi yok. Mal sahibi iş başlamadan önce ekleyecek.' : isRo ? 'Niciun element în lista de verificare încă. Proprietarul le va adăuga înainte de începerea lucrării.' : 'No checklist items yet. The owner will add items before the job starts.';
+const tPhotos = isEl ? 'Φωτογραφίες' : isBg ? 'Снимки' : isSr ? 'Fotografije' : isTr ? 'Fotoğraflar' : isRo ? 'Fotografii' : 'Photos';
+const tBefore = isEl ? 'Πριν' : isBg ? 'Преди' : isSr ? 'Pre' : isTr ? 'Önce' : isRo ? 'Înainte' : 'Before';
+const tAfter = isEl ? 'Μετά' : isBg ? 'След' : isSr ? 'Posle' : isTr ? 'Sonra' : isRo ? 'După' : 'After';
+const tAddBeforePhoto = isEl ? '+ Προσθήκη φωτογραφίας πριν' : isBg ? '+ Добавете снимка преди' : isSr ? '+ Dodaj fotografiju pre' : isTr ? '+ Öncesi fotoğrafı ekle' : isRo ? '+ Adaugă fotografie înainte' : '+ Add before photo';
+const tAddAfterPhoto = isEl ? '+ Προσθήκη φωτογραφίας μετά' : isBg ? '+ Добавете снимка след' : isSr ? '+ Dodaj fotografiju posle' : isTr ? '+ Sonrası fotoğrafı ekle' : isRo ? '+ Adaugă fotografie după' : '+ Add after photo';
+const tBackToDashboard = isEl ? '← Πίσω στο Ταμπλό' : isBg ? '← Обратно към Таблото' : isSr ? '← Nazad na tablu' : isTr ? '← Panele Geri Dön' : isRo ? '← Înapoi la Panou' : '← Back to Dashboard';
+const tFailed = isEl ? 'Αποτυχία' : isBg ? 'Неуспешно' : isSr ? 'Neuspešno' : isTr ? 'Başarısız' : isRo ? 'Eșuat' : 'Failed';
+const tUploading = isEl ? 'Μεταφόρτωση…' : isBg ? 'Качване…' : isSr ? 'Otpremanje…' : isTr ? 'Yükleniyor…' : isRo ? 'Se încarcă…' : 'Uploading…';
+const tUploadFailed = isEl ? 'Η μεταφόρτωση απέτυχε. Δοκιμάστε ξανά.' : isBg ? 'Качването неуспешно. Моля, опитайте отново.' : isSr ? 'Otpremanje neuspešno. Pokušajte ponovo.' : isTr ? 'Yükleme başarısız. Lütfen tekrar deneyin.' : isRo ? 'Încărcare eșuată. Vă rugăm încercați din nou.' : 'Upload failed. Please try again.';
+const tSavePhotoFailed = isEl ? 'Αποτυχία αποθήκευσης φωτογραφίας. Δοκιμάστε ξανά.' : isBg ? 'Неуспешно запазване на снимка. Моля, опитайте отново.' : isSr ? 'Čuvanje fotografije neuspešno. Pokušajte ponovo.' : isTr ? 'Fotoğraf kaydedilemedi. Lütfen tekrar deneyin.' : isRo ? 'Salvare fotografie eșuată. Vă rugăm încercați din nou.' : 'Failed to save photo. Please try again.';
+const tSaveFailed = isEl ? 'Αποτυχία αποθήκευσης. Δοκιμάστε ξανά.' : isBg ? 'Неуспешно запазване. Моля, опитайте отново.' : isSr ? 'Čuvanje neuspešno. Pokušajte ponovo.' : isTr ? 'Kaydetme başarısız. Lütfen tekrar deneyin.' : isRo ? 'Salvare eșuată. Vă rugăm încercați din nou.' : 'Failed to save. Please try again.';
+
+const statusLabels: Record<string, string> = {
+  scheduled: isEl ? 'Προγραμματισμένη' : isBg ? 'Планирана' : isSr ? 'Zakazano' : isTr ? 'Planlandı' : isRo ? 'programată' : 'scheduled',
+  started: isEl ? 'Ξεκίνησε' : isBg ? 'Започната' : isSr ? 'Započeto' : isTr ? 'Başladı' : isRo ? 'în desfășurare' : 'started',
+  completed: isEl ? 'Ολοκληρώθηκε' : isBg ? 'Завършена' : isSr ? 'Završeno' : isTr ? 'Tamamlandı' : isRo ? 'finalizată' : 'completed',
+  approved: isEl ? 'Εγκρίθηκε' : isBg ? 'Одобрена' : isSr ? 'Odobreno' : isTr ? 'Onaylandı' : isRo ? 'aprobată' : 'approved',
+  disputed: isEl ? 'Αμφισβητήθηκε' : isBg ? 'Оспорена' : isSr ? 'Osporeno' : isTr ? 'İtiraz edildi' : isRo ? 'contestată' : 'disputed',
+  cancelled: isEl ? 'Ακυρώθηκε' : isBg ? 'Отменена' : isSr ? 'Otkazano' : isTr ? 'İptal edildi' : isRo ? 'anulată' : 'cancelled',
+};
+
+const phaseLabels: Record<string, string> = { before: tBefore, after: tAfter };
+const addPhotoLabels: Record<string, string> = { before: tAddBeforePhoto, after: tAddAfterPhoto };
+---
+
+<CleanerLayout title={`${tJob} — ${(job as any).listings?.title}`}>
+  <div class="max-w-2xl mx-auto space-y-6">
+    <div class="flex items-start justify-between">
+      <div>
+        <h1 class="text-xl font-bold text-gray-900">{(job as any).listings?.title}</h1>
+        <p class="text-sm text-gray-500">{(job as any).listings?.city} · {job.scheduled_date} {tAt} {job.scheduled_time}</p>
+        {(job as any).listings?.address && <p class="text-xs text-gray-400 mt-0.5">{(job as any).listings.address}</p>}
+      </div>
+      <span class={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[job.status]}`}>{statusLabels[job.status] ?? job.status}</span>
+    </div>
+
+    <!-- Earnings -->
+    <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+      <p class="text-xs text-gray-500">{tEarnings}</p>
+      <p class="text-3xl font-bold text-emerald-700">€{job.cleaner_payout}</p>
+      {job.status === 'approved' && <p class="text-xs text-emerald-600 mt-1">{tPaymentTransferred}</p>}
+    </div>
+
+    <!-- Check-in Instructions -->
+    {(job as any).listings?.checkin_instructions && (
+      <div class="bg-white border border-gray-100 rounded-2xl p-5">
+        <h3 class="text-sm font-semibold text-gray-700 mb-2">{tAccessInstructions}</h3>
+        <p class="text-sm text-gray-600 whitespace-pre-line">{(job as any).listings.checkin_instructions}</p>
+      </div>
+    )}
+
+    <!-- Action Buttons -->
+    {canStart && (
+      <button id="start-btn" class="w-full bg-yellow-500 text-white font-semibold py-3 rounded-xl hover:bg-yellow-600 transition-colors">
+        {tStartCleaning}
+      </button>
+    )}
+    {canComplete && (
+      <div class="space-y-2">
+        {!canSubmitComplete && (
+          <div id="hint-box" class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800 space-y-1">
+            {!allChecklistDone && <p id="hint-checklist">✗ {tCompleteChecklist} ({doneItems}/{totalItems} {tDone})</p>}
+            {!hasAfterPhoto && <p id="hint-photo">✗ {tUploadAfterPhoto}</p>}
+          </div>
+        )}
+        <button
+          id="complete-btn"
+          disabled={!canSubmitComplete}
+          class={`w-full font-semibold py-3 rounded-xl transition-colors ${canSubmitComplete ? 'bg-emerald-600 hover:bg-emerald-700 text-white' : 'bg-gray-100 text-gray-400 cursor-not-allowed'}`}
+        >
+          {tMarkComplete}
+        </button>
+      </div>
+    )}
+
+    <!-- Checklist -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-semibold text-gray-700">{tChecklist}</h3>
+        <span class="text-xs text-gray-400">{doneItems}/{totalItems} {tDone}</span>
+      </div>
+      {totalItems > 0 && (
+        <div class="w-full bg-gray-100 rounded-full h-1.5 mb-4">
+          <div class="bg-emerald-500 h-1.5 rounded-full transition-all" style={`width: ${totalItems > 0 ? Math.round(doneItems/totalItems*100) : 0}%`}></div>
+        </div>
+      )}
+      <ul class="space-y-2" id="checklist">
+        {(checklist ?? []).map((item: any) => (
+          <li class="flex items-center gap-3">
+            <input
+              type="checkbox"
+              id={`item-${item.id}`}
+              checked={item.is_done}
+              disabled={!['started'].includes(job.status)}
+              data-item-id={item.id}
+              class="checklist-item w-4 h-4 rounded accent-emerald-500 cursor-pointer"
+            />
+            <label for={`item-${item.id}`} class={`text-sm cursor-pointer ${item.is_done ? 'line-through text-gray-400' : 'text-gray-700'}`}>
+              {item.label}
+            </label>
+          </li>
+        ))}
+      </ul>
+      {(checklist ?? []).length === 0 && (
+        <p class="text-sm text-gray-400">{tNoChecklist}</p>
+      )}
+    </div>
+
+    <!-- Photos -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6 space-y-5">
+      <h3 class="text-sm font-semibold text-gray-700">{tPhotos}</h3>
+
+      {['before', 'after'].map(phase => {
+        const phasePhotos = (photos ?? []).filter((p: any) => p.phase === phase);
+        return (
+          <div>
+            <p class="text-xs font-medium text-gray-500 mb-2">{phaseLabels[phase]}</p>
+            {phasePhotos.length > 0 && (
+              <div class="grid grid-cols-3 gap-2 mb-2">
+                {phasePhotos.map((p: any) => (
+                  <img src={p.url} alt={phaseLabels[phase]} class="w-full aspect-square object-cover rounded-xl" loading="lazy" data-after-photo={phase === 'after' ? 'true' : undefined} />
+                ))}
+              </div>
+            )}
+            {['scheduled', 'started'].includes(job.status) && (
+              <label class={`inline-flex items-center gap-2 text-xs font-medium cursor-pointer px-3 py-2 rounded-xl border border-dashed border-gray-300 hover:border-[#c9a96e] transition-colors phase-upload`} data-phase={phase}>
+                <span>{addPhotoLabels[phase]}</span>
+                <input type="file" accept="image/*" class="hidden photo-input" data-phase={phase} />
+              </label>
+            )}
+          </div>
+        );
+      })}
+    </div>
+
+    <div class="pt-2">
+      <a href="/cleaner/dashboard" class="text-sm text-gray-400 hover:text-gray-600">{tBackToDashboard}</a>
+    </div>
+  </div>
+</CleanerLayout>
+
+<script define:vars={{ jobId: job.id, tStartCleaning, tMarkComplete, tFailed, tUploading, tAddBeforePhoto, tAddAfterPhoto, tUploadFailed, tSavePhotoFailed, tSaveFailed }}>
+  // Start / Complete buttons
+  async function updateStatus(status) {
+    const btnId = status === 'started' ? 'start-btn' : 'complete-btn';
+    const btn = document.getElementById(btnId);
+    if (btn) { btn.disabled = true; btn.textContent = '…'; }
+    const res = await fetch(`/api/cleaning/jobs/${jobId}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    if (res.ok) window.location.reload();
+    else {
+      const d = await res.json();
+      alert(d.error ?? tFailed);
+      if (btn) { btn.disabled = false; btn.textContent = status === 'started' ? tStartCleaning : tMarkComplete; }
+    }
+  }
+
+  document.getElementById('start-btn')?.addEventListener('click', () => updateStatus('started'));
+  document.getElementById('complete-btn')?.addEventListener('click', () => updateStatus('completed'));
+
+  // ── Dynamic complete-button state ─────────────────────────────────────────
+  let afterPhotoUploaded = document.querySelectorAll('[data-after-photo]').length > 0;
+
+  function updateCompleteButton() {
+    const btn = document.getElementById('complete-btn');
+    if (!btn) return;
+    const total  = document.querySelectorAll('.checklist-item').length;
+    const done   = document.querySelectorAll('.checklist-item:checked').length;
+    const allDone = total > 0 && done === total;
+    const ready   = allDone && afterPhotoUploaded;
+    btn.disabled = !ready;
+    btn.classList.toggle('bg-emerald-600', ready);
+    btn.classList.toggle('hover:bg-emerald-700', ready);
+    btn.classList.toggle('text-white', ready);
+    btn.classList.toggle('bg-gray-100', !ready);
+    btn.classList.toggle('text-gray-400', !ready);
+    btn.classList.toggle('cursor-not-allowed', !ready);
+
+    // Update the warning hints
+    const hintAll  = document.getElementById('hint-checklist');
+    const hintPhoto = document.getElementById('hint-photo');
+    if (hintAll)   hintAll.style.display   = allDone ? 'none' : '';
+    if (hintPhoto) hintPhoto.style.display = afterPhotoUploaded ? 'none' : '';
+    const hintBox = document.getElementById('hint-box');
+    if (hintBox) hintBox.style.display = ready ? 'none' : '';
+  }
+
+  // Checklist toggles
+  document.querySelectorAll('.checklist-item').forEach(cb => {
+    cb.addEventListener('change', async () => {
+      const itemId = cb.dataset.itemId;
+      const isDone = cb.checked;
+
+      // Optimistic UI update
+      const label = document.querySelector(`label[for="item-${itemId}"]`);
+      if (label) {
+        label.classList.toggle('line-through', isDone);
+        label.classList.toggle('text-gray-400', isDone);
+        label.classList.toggle('text-gray-700', !isDone);
+      }
+      updateCompleteButton();
+
+      // Persist to DB
+      const res = await fetch(`/api/cleaning/jobs/${jobId}/checklist`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_id: itemId, is_done: isDone }),
+      });
+      if (!res.ok) {
+        // Revert on failure
+        cb.checked = !isDone;
+        if (label) {
+          label.classList.toggle('line-through', !isDone);
+          label.classList.toggle('text-gray-400', !isDone);
+          label.classList.toggle('text-gray-700', isDone);
+        }
+        updateCompleteButton();
+        alert(tSaveFailed);
+      }
+    });
+  });
+
+  // Photo upload
+  document.querySelectorAll('.photo-input').forEach(input => {
+    input.addEventListener('change', async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      const phase = input.dataset.phase;
+      const label = input.closest('label');
+      if (label) { label.textContent = tUploading; label.style.pointerEvents = 'none'; }
+
+      // Upload to storage first
+      const formData = new FormData();
+      formData.append('file', file);
+      const uploadRes = await fetch('/api/upload/cleaning-photo', { method: 'POST', body: formData });
+      if (!uploadRes.ok) {
+        alert(tUploadFailed);
+        if (label) { label.textContent = phase === 'before' ? tAddBeforePhoto : tAddAfterPhoto; label.style.pointerEvents = ''; }
+        return;
+      }
+      const { url } = await uploadRes.json();
+
+      // Record photo in DB
+      const res = await fetch(`/api/cleaning/jobs/${jobId}/photos`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url, phase }),
+      });
+      if (res.ok) {
+        if (phase === 'after') {
+          afterPhotoUploaded = true;
+          updateCompleteButton();
+        }
+        window.location.reload();
+      } else {
+        alert(tSavePhotoFailed);
+        if (label) { label.textContent = phase === 'before' ? tAddBeforePhoto : tAddAfterPhoto; label.style.pointerEvents = ''; }
+      }
+    });
+  });
+</script>

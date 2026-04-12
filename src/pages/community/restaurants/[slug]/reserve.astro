@@ -1,0 +1,295 @@
+---
+import BaseLayout from '../../../../layouts/BaseLayout.astro';
+import { getServiceClient } from '../../../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+const { slug } = Astro.params;
+
+const session = Astro.locals.session;
+let userProfile: { full_name?: string; email?: string; phone?: string } | null = null;
+if (session) {
+  const { data } = await getServiceClient().from('profiles').select('full_name,email,phone').eq('id', session.user.id).single();
+  userProfile = data;
+}
+
+const service = getServiceClient();
+const { data: restaurant } = await service
+  .from('restaurants')
+  .select('*')
+  .eq('slug', slug)
+  .eq('is_active', true)
+  .eq('accepts_reservations', true)
+  .single();
+
+if (!restaurant) return Astro.redirect('/community/restaurants');
+
+const { data: tables } = await service
+  .from('restaurant_tables')
+  .select('id, name, capacity, location')
+  .eq('restaurant_id', restaurant.id)
+  .eq('is_active', true)
+  .order('sort_order');
+
+const maxCapacity = Math.max(...(tables ?? []).map((t: any) => t.capacity), 2);
+const maxAdvanceDays = restaurant.reservation_max_advance_days ?? 30;
+const slotMinutes = restaurant.reservation_slot_minutes ?? 30;
+const minHoursAhead = restaurant.reservation_min_hours_ahead ?? 2;
+
+// Build opening hours for reservation — use reservation-specific or general
+const hours = restaurant.opening_hours_reservation ?? restaurant.opening_hours ?? {};
+---
+
+<BaseLayout
+  title={`${isEl ? 'Κράτηση' : isBg ? 'Резервация' : isSr ? 'Rezervacija' : isTr ? 'Rezervasyon' : isRo ? 'Rezervă' : 'Reserve'} — ${restaurant.name}`}
+  description={`${isEl ? 'Κάντε κράτηση στο' : isBg ? 'Направете резервация в' : isSr ? 'Napravite rezervaciju u' : isTr ? 'Rezervasyon yapın' : isRo ? 'Fă o rezervare la' : 'Make a reservation at'} ${restaurant.name}`}
+>
+  <section class="bg-[#1a1a2e] py-12 sm:py-16">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <a href="/community/restaurants" class="text-gray-400 hover:text-white text-sm mb-4 inline-block">&larr; {isEl ? 'Εστιατόρια' : isBg ? 'Ресторанти' : isSr ? 'Restorani' : isTr ? 'Restoranlar' : isRo ? 'Restaurante' : 'Restaurants'}</a>
+      <h1 class="text-3xl font-bold text-white">{restaurant.name}</h1>
+      <p class="text-gray-300 mt-2">{isEl ? 'Κάντε κράτηση online' : isBg ? 'Направете онлайн резервация' : isSr ? 'Napravite online rezervaciju' : isTr ? 'Online rezervasyon yapın' : isRo ? 'Fă o rezervare online' : 'Make an online reservation'}</p>
+      {restaurant.address && <p class="text-xs text-gray-400 mt-1">📍 {restaurant.address}{restaurant.city ? `, ${restaurant.city}` : ''}</p>}
+    </div>
+  </section>
+
+  <section class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <form id="reserve-form" class="space-y-6 bg-white rounded-2xl border border-gray-100 p-6 sm:p-8 shadow-sm">
+      <!-- Date -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">{isEl ? 'Ημερομηνία' : isBg ? 'Дата' : isSr ? 'Datum' : isTr ? 'Tarih' : isRo ? 'Data' : 'Date'} *</label>
+        <input type="date" name="date" required id="date-input"
+          class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none" />
+      </div>
+
+      <!-- Time Slots -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">{isEl ? 'Ώρα' : isBg ? 'Час' : isSr ? 'Vreme' : isTr ? 'Saat' : isRo ? 'Ora' : 'Time'} *</label>
+        <div id="time-slots" class="flex flex-wrap gap-2">
+          <p class="text-sm text-gray-400">{isEl ? 'Επιλέξτε ημερομηνία πρώτα' : isBg ? 'Първо изберете дата' : isSr ? 'Prvo izaberite datum' : isTr ? 'Önce bir tarih seçin' : isRo ? 'Selectează mai întâi o dată' : 'Select a date first'}</p>
+        </div>
+        <input type="hidden" name="time_slot" id="time-slot-input" required />
+      </div>
+
+      <!-- Party Size -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">{isEl ? 'Αριθμός ατόμων' : isBg ? 'Брой гости' : isSr ? 'Broj gostiju' : isTr ? 'Kişi sayısı' : isRo ? 'Număr persoane' : 'Party size'} *</label>
+        <select name="guest_count" required class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none bg-white">
+          {Array.from({ length: maxCapacity }, (_, i) => i + 1).map(n => (
+            <option value={n} selected={n === 2}>{n} {n === 1 ? (isEl ? 'άτομο' : isBg ? 'човек' : isSr ? 'osoba' : isTr ? 'kişi' : isRo ? 'persoană' : 'person') : (isEl ? 'άτομα' : isBg ? 'човека' : isSr ? 'osobe' : isTr ? 'kişi' : isRo ? 'persoane' : 'people')}</option>
+          ))}
+        </select>
+      </div>
+
+      <!-- Contact Info -->
+      <div class="border-t border-gray-100 pt-6 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">{isEl ? 'Ονοματεπώνυμο' : isBg ? 'Пълно име' : isSr ? 'Ime i prezime' : isTr ? 'Ad Soyad' : isRo ? 'Nume complet' : 'Full name'} *</label>
+          <input type="text" name="guest_name" required maxlength="100"
+            class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none"
+            placeholder={isEl ? 'Γιάννης Παπαδόπουλος' : isBg ? 'Иван Иванов' : isSr ? 'Jovan Jovanović' : isTr ? 'Ahmet Yılmaz' : isRo ? 'Ion Popescu' : 'John Smith'}
+            value={userProfile?.full_name ?? ''} />
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Email</label>
+            <input type="email" name="guest_email" maxlength="200"
+              class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none"
+              value={userProfile?.email ?? ''} />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">{isEl ? 'Τηλέφωνο' : isBg ? 'Телефон' : isSr ? 'Telefon' : isTr ? 'Telefon' : isRo ? 'Telefon' : 'Phone'} *</label>
+            <input type="tel" name="guest_phone" required maxlength="20"
+              class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none"
+              placeholder="+30 69..."
+              value={userProfile?.phone ?? ''} />
+          </div>
+        </div>
+        <!-- Contact preference -->
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">{isEl ? 'Ειδοποίηση μέσω' : isBg ? 'Уведомете ме чрез' : isSr ? 'Obavesti me putem' : isTr ? 'Beni şu yolla bilgilendir' : isRo ? 'Notifică-mă prin' : 'Notify me via'} *</label>
+          <div class="flex flex-wrap gap-2">
+            <label class="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm cursor-pointer has-[:checked]:border-[#25D366] has-[:checked]:bg-[#25D366]/10">
+              <input type="radio" name="contact_preference" value="whatsapp" checked class="accent-[#25D366]" />
+              <span>WhatsApp</span>
+            </label>
+            <label class="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm cursor-pointer has-[:checked]:border-[#7360F2] has-[:checked]:bg-[#7360F2]/10">
+              <input type="radio" name="contact_preference" value="viber" class="accent-[#7360F2]" />
+              <span>Viber</span>
+            </label>
+            <label class="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm cursor-pointer has-[:checked]:border-[#0088cc] has-[:checked]:bg-[#0088cc]/10">
+              <input type="radio" name="contact_preference" value="telegram" class="accent-[#0088cc]" />
+              <span>Telegram</span>
+            </label>
+            <label class="flex items-center gap-2 px-4 py-2.5 border border-gray-200 rounded-xl text-sm cursor-pointer has-[:checked]:border-[#c9a96e] has-[:checked]:bg-[#c9a96e]/10">
+              <input type="radio" name="contact_preference" value="email" class="accent-[#c9a96e]" />
+              <span>Email</span>
+            </label>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1.5">{isEl ? 'Ειδικές απαιτήσεις' : isBg ? 'Специални изисквания' : isSr ? 'Posebni zahtevi' : isTr ? 'Özel istekler' : isRo ? 'Cereri speciale' : 'Special requests'}</label>
+          <textarea name="special_requests" rows="2" maxlength="500"
+            class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none resize-y"
+            placeholder={isEl ? 'π.χ. Αλλεργίες, παιδικό καθισματάκι...' : isBg ? 'напр. Алергии, нужда от детско столче...' : isSr ? 'npr. Alergije, dečija stolica...' : isTr ? 'ör. Alerjiler, mama sandalyesi...' : isRo ? 'ex. Alergii, scaun pentru copii...' : 'e.g. Allergies, high chair needed...'}></textarea>
+        </div>
+      </div>
+
+      <!-- Messages -->
+      <div id="form-error" class="hidden text-red-600 text-sm bg-red-50 p-3 rounded-lg"></div>
+      <div id="form-success" class="hidden text-green-700 text-sm bg-green-50 p-4 rounded-lg"></div>
+
+      <button type="submit" id="submit-btn"
+        class="w-full bg-[#c9a96e] text-white py-3 rounded-xl font-semibold hover:bg-[#b89556] transition-colors">
+        {isEl ? 'Κράτηση Τραπεζιού' : isBg ? 'Резервирайте маса' : isSr ? 'Rezerviši sto' : isTr ? 'Masa Rezerve Et' : isRo ? 'Rezervă masă' : 'Reserve Table'}
+      </button>
+    </form>
+  </section>
+</BaseLayout>
+
+<script define:vars={{ hours, slotMinutes, minHoursAhead, maxAdvanceDays, restaurantId: restaurant.id }}>
+  const dayNames = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+
+  function generateSlots(dateStr) {
+    const date = new Date(dateStr + 'T00:00:00');
+    const dayKey = dayNames[date.getDay()];
+    const hourRange = hours[dayKey];
+    if (!hourRange) return [];
+
+    // Parse "HH:MM-HH:MM"
+    const [openStr, closeStr] = hourRange.split('-');
+    if (!openStr || !closeStr) return [];
+    const [openH, openM] = openStr.split(':').map(Number);
+    const [closeH, closeM] = closeStr.split(':').map(Number);
+    const openMins = openH * 60 + openM;
+    const closeMins = closeH * 60 + closeM;
+
+    // Check min hours ahead
+    const now = new Date();
+    const today = new Date().toISOString().slice(0, 10);
+    const isToday = dateStr === today;
+
+    const slots = [];
+    for (let m = openMins; m < closeMins; m += slotMinutes) {
+      const h = Math.floor(m / 60);
+      const min = m % 60;
+      const label = `${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}`;
+
+      if (isToday) {
+        const slotTime = new Date(dateStr + `T${label}:00`);
+        const minTime = new Date(now.getTime() + minHoursAhead * 60 * 60 * 1000);
+        if (slotTime < minTime) continue;
+      }
+
+      slots.push(label);
+    }
+    return slots;
+  }
+
+  // Set date constraints
+  const dateInput = document.getElementById('date-input');
+  const today = new Date().toISOString().slice(0, 10);
+  const maxDate = new Date(Date.now() + maxAdvanceDays * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  dateInput.min = today;
+  dateInput.max = maxDate;
+
+  let selectedSlot = '';
+
+  dateInput.addEventListener('change', () => {
+    const container = document.getElementById('time-slots');
+    const hidden = document.getElementById('time-slot-input');
+    selectedSlot = '';
+    hidden.value = '';
+
+    const slots = generateSlots(dateInput.value);
+    if (slots.length === 0) {
+      var _l = document.documentElement.lang;
+      container.innerHTML = '<p class="text-sm text-gray-400">' + (_l === 'el' ? 'Δεν υπάρχουν διαθέσιμες ώρες' : _l === 'bg' ? 'Няма свободни часове за тази дата' : _l === 'sr' ? 'Nema dostupnih termina za ovaj datum' : _l === 'tr' ? 'Bu tarih için uygun saat yok' : _l === 'ro' ? 'Nu există intervale orare disponibile pentru această dată' : 'No available time slots for this date') + '</p>';
+      return;
+    }
+
+    container.innerHTML = slots.map(s =>
+      `<button type="button" class="slot-btn px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:border-[#c9a96e] hover:bg-[#c9a96e]/10 transition-colors" data-time="${s}">${s}</button>`
+    ).join('');
+
+    container.querySelectorAll('.slot-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        container.querySelectorAll('.slot-btn').forEach(b => {
+          b.className = 'slot-btn px-4 py-2 rounded-lg text-sm font-medium border border-gray-200 hover:border-[#c9a96e] hover:bg-[#c9a96e]/10 transition-colors';
+        });
+        btn.className = 'slot-btn px-4 py-2 rounded-lg text-sm font-medium border-2 border-[#c9a96e] bg-[#c9a96e]/10 text-[#c9a96e] font-semibold';
+        selectedSlot = btn.dataset.time;
+        hidden.value = selectedSlot;
+      });
+    });
+  });
+
+  // Form submit
+  const form = document.getElementById('reserve-form');
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('submit-btn');
+    const errEl = document.getElementById('form-error');
+    const okEl = document.getElementById('form-success');
+    errEl.classList.add('hidden');
+    okEl.classList.add('hidden');
+
+    if (!selectedSlot) {
+      var _l2 = document.documentElement.lang;
+      errEl.textContent = _l2 === 'el' ? 'Επιλέξτε ώρα' : _l2 === 'bg' ? 'Моля, изберете час' : _l2 === 'sr' ? 'Izaberite termin' : _l2 === 'tr' ? 'Lütfen bir saat seçin' : _l2 === 'ro' ? 'Selectează un interval orar' : 'Please select a time slot';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    btn.disabled = true;
+    var _l3 = document.documentElement.lang;
+    btn.textContent = _l3 === 'el' ? 'Υποβολή...' : _l3 === 'bg' ? 'Изпращане...' : _l3 === 'sr' ? 'Slanje...' : _l3 === 'tr' ? 'Gönderiliyor...' : _l3 === 'ro' ? 'Se trimite...' : 'Submitting...';
+
+    const fd = new FormData(form);
+    try {
+      const res = await fetch('/api/reservations/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurant_id: restaurantId,
+          date: fd.get('date'),
+          time_slot: fd.get('time_slot'),
+          guest_count: parseInt(fd.get('guest_count')),
+          guest_name: fd.get('guest_name'),
+          guest_email: fd.get('guest_email'),
+          guest_phone: fd.get('guest_phone'),
+          special_requests: fd.get('special_requests'),
+          contact_preference: fd.get('contact_preference') || 'whatsapp',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+
+      var _l4 = document.documentElement.lang;
+      okEl.innerHTML = _l4 === 'el'
+        ? '✅ Η κράτησή σας καταχωρήθηκε! Θα λάβετε επιβεβαίωση σύντομα.'
+        : _l4 === 'bg' ? '✅ Вашата резервация е изпратена! Ще получите потвърждение скоро.'
+        : _l4 === 'sr' ? '✅ Vaša rezervacija je poslata! Uskoro ćete dobiti potvrdu.'
+        : _l4 === 'tr' ? '✅ Rezervasyonunuz gönderildi! Kısa süre içinde onay alacaksınız.'
+        : _l4 === 'ro' ? '✅ Rezervarea ta a fost trimisă! Vei primi o confirmare în curând.'
+        : '✅ Your reservation has been submitted! You will receive a confirmation shortly.';
+      okEl.classList.remove('hidden');
+      form.reset();
+      var _l5 = document.documentElement.lang;
+      document.getElementById('time-slots').innerHTML = '<p class="text-sm text-gray-400">' + (_l5 === 'el' ? 'Επιλέξτε ημερομηνία πρώτα' : _l5 === 'bg' ? 'Първо изберете дата' : _l5 === 'sr' ? 'Prvo izaberite datum' : _l5 === 'tr' ? 'Önce bir tarih seçin' : _l5 === 'ro' ? 'Selectează mai întâi o dată' : 'Select a date first') + '</p>';
+      btn.disabled = true;
+      var _l6 = document.documentElement.lang;
+      btn.textContent = _l6 === 'el' ? 'Κρατήθηκε!' : _l6 === 'bg' ? 'Резервирано!' : _l6 === 'sr' ? 'Rezervisano!' : _l6 === 'tr' ? 'Rezerve edildi!' : _l6 === 'ro' ? 'Rezervat!' : 'Reserved!';
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.classList.remove('hidden');
+      btn.disabled = false;
+      var _l7 = document.documentElement.lang;
+      btn.textContent = _l7 === 'el' ? 'Κράτηση Τραπεζιού' : _l7 === 'bg' ? 'Резервирайте маса' : _l7 === 'sr' ? 'Rezerviši sto' : _l7 === 'tr' ? 'Masa Rezerve Et' : _l7 === 'ro' ? 'Rezervă masă' : 'Reserve Table';
+    }
+  });
+</script>

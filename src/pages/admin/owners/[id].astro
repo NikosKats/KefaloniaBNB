@@ -1,0 +1,382 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+// Super admin only
+const profile = Astro.locals.profile!;
+if (profile.role !== 'super_admin') return Astro.redirect('/admin');
+
+const { id } = Astro.params;
+const service = getServiceClient();
+
+// Handle POST: save profile fields on behalf of owner
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  await service.from('profiles').update({
+    full_name:            form.get('full_name')            as string || null,
+    phone:                form.get('phone')                as string || null,
+    bio:                  form.get('bio')                  as string || null,
+    company_name:         form.get('company_name')         as string || null,
+    payment_account_name: form.get('payment_account_name') as string || null,
+    payment_revolut:      form.get('payment_revolut')      as string || null,
+    payment_wise:         form.get('payment_wise')         as string || null,
+    payment_iban:         form.get('payment_iban')         as string || null,
+    payment_bic:          form.get('payment_bic')          as string || null,
+  }).eq('id', id!);
+  return Astro.redirect(`/admin/owners/${id}?saved=1`);
+}
+
+const { data: owner } = await service
+  .from('profiles')
+  .select('*, email')
+  .eq('id', id!)
+  .eq('role', 'property_owner')
+  .single();
+
+if (!owner) return Astro.redirect('/admin/owners');
+
+const { data: ownerListings } = await service
+  .from('listings')
+  .select('id, title, is_active, base_price, commission_rate')
+  .eq('owner_id', id!);
+
+const saved = Astro.url.searchParams.get('saved') === '1';
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+---
+
+<AdminLayout title={`Owner — ${owner.full_name ?? owner.email}`}>
+
+  <div class="flex items-center gap-3 mb-6">
+    <a href="/admin/owners" class="text-gray-400 hover:text-gray-600 text-sm transition-colors">← All owners</a>
+    <span class="text-gray-300">/</span>
+    <span class="text-sm text-gray-700 font-medium">{owner.full_name ?? owner.email}</span>
+  </div>
+
+  {saved && (
+    <div class="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-4 py-3 text-sm flex items-center gap-2">
+      <span>✅</span> Profile saved successfully.
+    </div>
+  )}
+
+  <div class="max-w-2xl space-y-8">
+
+    <!-- Owner summary -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+      <div class="flex-1 min-w-0">
+        <p class="font-semibold text-gray-900">{owner.full_name ?? '—'}</p>
+        {owner.company_name && <p class="text-sm text-gray-400">{owner.company_name}</p>}
+        <p class="text-sm text-gray-400">{owner.email}</p>
+        {owner.created_at && <p class="text-xs text-gray-300 mt-0.5">Joined {fmtDate(owner.created_at)}</p>}
+      </div>
+      <div class="shrink-0 flex flex-wrap gap-2">
+        {(ownerListings ?? []).map((l: any) => (
+          <a href={`/admin/listings/${l.id}`}
+            class="inline-flex items-center gap-1.5 px-2.5 py-1 bg-gray-50 hover:bg-gray-100 rounded-lg text-xs text-gray-700 border border-gray-200 transition-colors">
+            <span class={`w-1.5 h-1.5 rounded-full ${l.is_active ? 'bg-emerald-400' : 'bg-gray-300'}`}></span>
+            {l.title}
+          </a>
+        ))}
+        {(!ownerListings || ownerListings.length === 0) && (
+          <span class="text-xs text-gray-300 italic">No listings</span>
+        )}
+      </div>
+    </div>
+
+    <!-- Profile info -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <h2 class="font-semibold text-gray-900 mb-5">Profile information</h2>
+      <form method="POST" class="space-y-4">
+        <!-- Preserve bank fields when submitting profile form -->
+        <input type="hidden" name="payment_account_name" value={owner.payment_account_name ?? ''} />
+        <input type="hidden" name="payment_revolut"      value={owner.payment_revolut      ?? ''} />
+        <input type="hidden" name="payment_wise"         value={owner.payment_wise         ?? ''} />
+        <input type="hidden" name="payment_iban"         value={owner.payment_iban         ?? ''} />
+        <input type="hidden" name="payment_bic"          value={owner.payment_bic          ?? ''} />
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Full name</label>
+            <input type="text" name="full_name" value={owner.full_name ?? ''}
+              class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Company / Trading name</label>
+            <input type="text" name="company_name" value={owner.company_name ?? ''}
+              class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <input type="email" value={owner.email ?? ''} disabled
+              class="w-full px-3 py-2 border border-gray-100 bg-gray-50 rounded-xl text-sm text-gray-400 cursor-not-allowed" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+            <input type="tel" name="phone" value={owner.phone ?? ''}
+              class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Bio (optional)</label>
+          <textarea name="bio" rows={3}
+            class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 resize-none"
+          >{owner.bio ?? ''}</textarea>
+        </div>
+        <div class="flex justify-end">
+          <button type="submit"
+            class="bg-[#1a1a2e] text-white font-semibold px-5 py-2 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">
+            Save changes
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Bank Transfer / Payment Details -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <h2 class="font-semibold text-gray-900 mb-1">Bank Transfer & Payment Details</h2>
+      <p class="text-sm text-gray-500 mb-5">These details are emailed to guests when a bank transfer booking is approved.</p>
+      <form method="POST" class="space-y-4">
+        <!-- Preserve profile fields -->
+        <input type="hidden" name="full_name"    value={owner.full_name    ?? ''} />
+        <input type="hidden" name="phone"        value={owner.phone        ?? ''} />
+        <input type="hidden" name="bio"          value={owner.bio          ?? ''} />
+        <input type="hidden" name="company_name" value={owner.company_name ?? ''} />
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Account name</label>
+          <input type="text" name="payment_account_name"
+            value={owner.payment_account_name ?? ''}
+            placeholder="KefaloniaBNB"
+            class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Revolut</label>
+            <input type="text" name="payment_revolut"
+              value={owner.payment_revolut ?? ''}
+              placeholder="@kefaloniabnb"
+              class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Wise</label>
+            <input type="email" name="payment_wise"
+              value={owner.payment_wise ?? ''}
+              placeholder="payments@email.com"
+              class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">IBAN</label>
+          <input type="text" name="payment_iban"
+            value={owner.payment_iban ?? ''}
+            placeholder="GR0000000000000000000000000"
+            class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+        </div>
+
+        <div class="sm:w-1/2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">BIC / SWIFT</label>
+          <input type="text" name="payment_bic"
+            value={owner.payment_bic ?? ''}
+            placeholder="ETHNGRAA"
+            class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+        </div>
+
+        <div class="flex justify-end">
+          <button type="submit"
+            class="bg-[#1a1a2e] text-white font-semibold px-5 py-2 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">
+            Save payment details
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Payment Details Visibility Toggle -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="font-semibold text-gray-900">Bank Transfer Section Visibility</h2>
+          <p class="text-sm text-gray-500 mt-0.5">Controls whether this owner can see and edit their Bank Transfer & Payment Details in their profile.</p>
+        </div>
+        <button
+          id="payment-visibility-btn"
+          data-owner-id={id}
+          data-show={(owner as any).show_payment_details ? 'true' : 'false'}
+          class={(owner as any).show_payment_details
+            ? 'shrink-0 px-4 py-2 rounded-xl text-sm font-semibold border border-emerald-300 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors'
+            : 'shrink-0 px-4 py-2 rounded-xl text-sm font-semibold border border-gray-200 bg-gray-50 text-gray-600 hover:bg-gray-100 transition-colors'}
+        >
+          {(owner as any).show_payment_details ? '✓ Visible to owner' : 'Hidden from owner'}
+        </button>
+      </div>
+      <div id="payment-visibility-msg" class="hidden mt-3 text-sm text-red-600"></div>
+    </div>
+
+    <!-- Subscription -->
+    {(() => {
+      const subActive  = (owner as any).subscription_active === true;
+      const expiresAt  = (owner as any).subscription_expires_at as string | null;
+      const expiryFmt  = expiresAt ? new Date(expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null;
+      const isExpired  = expiresAt ? new Date(expiresAt) < new Date() : false;
+      return (
+        <div class="bg-white rounded-2xl border border-gray-100 p-6">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h2 class="font-semibold text-gray-900">Direct Contact Subscription</h2>
+              <p class="text-sm text-gray-500 mt-0.5">€299/year — unlocks WhatsApp/Viber button + 3% commission</p>
+            </div>
+            {subActive && !isExpired
+              ? <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Active</span>
+              : <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 border border-gray-200">Inactive</span>
+            }
+          </div>
+
+          {expiryFmt && (
+            <p class="text-xs text-gray-400 mb-4">
+              {isExpired ? `Expired on ${expiryFmt}` : `Renews on ${expiryFmt}`}
+            </p>
+          )}
+
+          <div class="flex flex-wrap gap-3">
+            {/* Send Stripe payment link */}
+            <button id="sub-send-link-btn"
+              class="text-sm font-semibold bg-[#1a1a2e] text-white px-4 py-2 rounded-xl hover:bg-[#2d2d4e] transition-colors">
+              {subActive ? 'Send renewal link' : 'Send subscription payment link'}
+            </button>
+
+            {/* Manual toggle — super admin override */}
+            <button id="sub-toggle-btn"
+              class={`text-sm font-semibold px-4 py-2 rounded-xl border transition-colors ${subActive ? 'border-red-300 text-red-600 hover:bg-red-50' : 'border-emerald-300 text-emerald-700 hover:bg-emerald-50'}`}>
+              {subActive ? 'Deactivate manually' : 'Activate manually'}
+            </button>
+          </div>
+
+          <div id="sub-msg" class="hidden mt-3 rounded-xl px-4 py-3 text-sm"></div>
+        </div>
+      );
+    })()}
+
+    <!-- Password reset for owner -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <h2 class="font-semibold text-gray-900 mb-1">Security</h2>
+      <p class="text-sm text-gray-500 mb-4">Send a password reset email to <strong>{owner.email}</strong>.</p>
+      <div id="reset-msg" class="hidden mb-4 rounded-xl px-4 py-3 text-sm"></div>
+      <button id="reset-btn"
+        class="text-sm font-semibold text-[#1a1a2e] border border-[#1a1a2e] px-4 py-2 rounded-xl hover:bg-[#1a1a2e] hover:text-white transition-colors">
+        Send password reset →
+      </button>
+    </div>
+
+  </div>
+</AdminLayout>
+
+<script define:vars={{ ownerEmail: owner.email }}>
+  document.getElementById('reset-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('reset-btn');
+    const msg = document.getElementById('reset-msg');
+    btn.textContent = 'Sending…';
+    btn.setAttribute('disabled', 'true');
+
+    const res = await fetch('/api/auth/reset-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: ownerEmail }),
+    });
+    const { error } = await res.json().catch(() => ({}));
+
+    msg.classList.remove('hidden', 'bg-emerald-50', 'border-emerald-200', 'text-emerald-800', 'bg-red-50', 'border-red-200', 'text-red-700');
+    if (error) {
+      msg.className = 'mb-4 rounded-xl px-4 py-3 text-sm bg-red-50 border border-red-200 text-red-700';
+      msg.textContent = error;
+      btn.textContent = 'Send password reset →';
+      btn.removeAttribute('disabled');
+    } else {
+      msg.className = 'mb-4 rounded-xl px-4 py-3 text-sm bg-emerald-50 border border-emerald-200 text-emerald-800';
+      msg.textContent = '✅ Reset link sent to ' + ownerEmail;
+      btn.classList.add('hidden');
+    }
+  });
+</script>
+
+<script define:vars={{ ownerId: id }}>
+  // ── Subscription: send payment link ────────────────────────────────────────
+  document.getElementById('sub-send-link-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('sub-send-link-btn');
+    const msg = document.getElementById('sub-msg');
+    btn.textContent = 'Sending…';
+    btn.setAttribute('disabled', 'true');
+
+    const res = await fetch('/api/subscription/checkout', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ profile_id: ownerId }),
+    });
+    const data = await res.json().catch(() => ({}));
+
+    msg.classList.remove('hidden');
+    if (data.url) {
+      msg.className = 'mt-3 rounded-xl px-4 py-3 text-sm bg-emerald-50 border border-emerald-200 text-emerald-800';
+      msg.innerHTML = '✅ Payment link sent to owner\'s email. <a href="' + data.url + '" target="_blank" class="underline font-medium ml-1">Open link →</a>';
+    } else {
+      msg.className = 'mt-3 rounded-xl px-4 py-3 text-sm bg-red-50 border border-red-200 text-red-700';
+      msg.textContent = data.error ?? 'Failed to generate link';
+    }
+    btn.textContent = 'Send subscription payment link';
+    btn.removeAttribute('disabled');
+  });
+
+  // ── Subscription: manual toggle ────────────────────────────────────────────
+  document.getElementById('sub-toggle-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('sub-toggle-btn');
+    const msg = document.getElementById('sub-msg');
+    btn.setAttribute('disabled', 'true');
+
+    const res = await fetch(`/api/admin/owners/${ownerId}/subscription`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+    });
+    const data = await res.json().catch(() => ({}));
+
+    msg.classList.remove('hidden');
+    if (res.ok) {
+      msg.className = 'mt-3 rounded-xl px-4 py-3 text-sm bg-emerald-50 border border-emerald-200 text-emerald-800';
+      msg.textContent = '✅ Subscription updated. Reloading…';
+      setTimeout(() => location.reload(), 1200);
+    } else {
+      msg.className = 'mt-3 rounded-xl px-4 py-3 text-sm bg-red-50 border border-red-200 text-red-700';
+      msg.textContent = data.error ?? 'Failed to update subscription';
+      btn.removeAttribute('disabled');
+    }
+  });
+
+  // ── Payment details visibility toggle ──────────────────────────────────────
+  document.getElementById('payment-visibility-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('payment-visibility-btn');
+    const errMsg = document.getElementById('payment-visibility-msg');
+    const ownerId = btn.dataset.ownerId;
+    const currentShow = btn.dataset.show === 'true';
+    const newShow = !currentShow;
+
+    btn.disabled = true;
+    btn.textContent = 'Saving…';
+
+    const res = await fetch(`/api/admin/owners/${ownerId}/payment-details-visibility`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ show: newShow }),
+    });
+
+    if (res.ok) {
+      location.reload();
+    } else {
+      const d = await res.json().catch(() => ({}));
+      errMsg.textContent = d.error ?? 'Failed to update';
+      errMsg.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = currentShow ? '✓ Visible to owner' : 'Hidden from owner';
+    }
+  });
+</script>

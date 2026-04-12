@@ -1,0 +1,471 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+// Super admin only
+const profile = Astro.locals.profile!;
+if (profile.role !== 'super_admin') return Astro.redirect('/admin');
+
+const service = getServiceClient();
+
+// Handle POST: update platform settings
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const action = form.get('action') as string | null;
+
+  if (action === 'save_bank') {
+    const bankFields = ['bank_account_name', 'bank_revolut', 'bank_wise', 'bank_iban', 'bank_bic'] as const;
+    for (const key of bankFields) {
+      const value = (form.get(key) as string | null) || null;
+      await service
+        .from('platform_settings')
+        .upsert({ key, value: value as any, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+    }
+    return Astro.redirect('/admin/platform?saved=1');
+  }
+
+  const commission_rate = parseFloat(form.get('commission_rate') as string);
+  const apply_to_all   = form.get('apply_to_all') === 'on';
+
+  if (!isNaN(commission_rate) && commission_rate >= 0 && commission_rate <= 50) {
+    await service
+      .from('platform_settings')
+      .upsert({ key: 'commission_rate', value: commission_rate as any, updated_at: new Date().toISOString() }, { onConflict: 'key' });
+
+    // Apply to all listings that aren't on the subscribed-owner rate (3%)
+    if (apply_to_all) {
+      await service
+        .from('listings')
+        .update({ commission_rate })
+        .neq('commission_rate', 3);
+    }
+  }
+  return Astro.redirect('/admin/platform?saved=1');
+}
+
+// Load current settings
+const [settingsRes, statsRes, ownersRes, ownersListRes] = await Promise.all([
+  service.from('platform_settings').select('key,value'),
+  service.from('bookings').select('total_price,platform_fee,owner_payout,payout_status').in('payment_status', ['paid']),
+  service.from('profiles').select('id', { count: 'exact', head: true }).eq('role', 'property_owner'),
+  service.from('profiles').select('id,full_name,email,company_name,allow_host_messaging,show_payment_details').eq('role', 'property_owner').order('full_name'),
+]);
+
+const settings: Record<string, any> = {};
+for (const row of settingsRes.data ?? []) {
+  settings[row.key] = row.value;
+}
+const commissionRate = settings.commission_rate !== undefined ? Number(settings.commission_rate) : 5;
+const ownersList: any[] = ownersListRes.data ?? [];
+
+const telegramManagement = settings.telegram_booking_management !== false; // default ON
+const bankAccountName = (settings.bank_account_name as string) ?? '';
+const bankRevolut     = (settings.bank_revolut     as string) ?? '';
+const bankWise        = (settings.bank_wise        as string) ?? '';
+const bankIban        = (settings.bank_iban        as string) ?? '';
+const bankBic         = (settings.bank_bic         as string) ?? '';
+
+const allBookings = statsRes.data ?? [];
+const totalGross     = allBookings.reduce((s, b) => s + Number(b.total_price ?? 0), 0);
+const totalFees      = allBookings.reduce((s, b) => s + Number(b.platform_fee ?? 0), 0);
+const totalPayouts   = allBookings.reduce((s, b) => s + Number(b.owner_payout ?? 0), 0);
+const pendingPayouts = allBookings.filter(b => b.payout_status === 'pending').reduce((s, b) => s + Number(b.owner_payout ?? 0), 0);
+const ownerCount     = ownersRes.count ?? 0;
+
+const saved = Astro.url.searchParams.get('saved') === '1';
+
+function fmtEur(v: number) {
+  return `€${Number(v).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+---
+
+<AdminLayout title="Platform Settings">
+
+  {saved && (
+    <div class="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-4 py-3 text-sm flex items-center gap-2">
+      <span>✅</span> Platform settings saved.
+    </div>
+  )}
+
+  <div class="max-w-3xl space-y-8">
+
+    <!-- Platform revenue snapshot -->
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      {[
+        { label: 'Total gross revenue', value: fmtEur(totalGross),     icon: '💶', color: 'text-emerald-600' },
+        { label: 'Platform fees earned', value: fmtEur(totalFees),     icon: '💎', color: 'text-purple-600' },
+        { label: 'Owner payouts sent',   value: fmtEur(totalPayouts),  icon: '✅', color: 'text-emerald-600' },
+        { label: 'Pending payouts',      value: fmtEur(pendingPayouts),icon: '⏳', color: 'text-amber-600' },
+      ].map((c) => (
+        <div class="bg-white rounded-2xl p-5 border border-gray-100">
+          <div class="text-2xl mb-2">{c.icon}</div>
+          <p class={`text-xl font-bold ${c.color}`}>{c.value}</p>
+          <p class="text-xs text-gray-400 mt-0.5">{c.label}</p>
+        </div>
+      ))}
+    </div>
+
+    <!-- Commission settings -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <h2 class="font-semibold text-gray-900 mb-1">Commission rate</h2>
+      <p class="text-sm text-gray-500 mb-5">
+        This is the percentage you keep from each booking. The rest goes to the property owner.
+        Currently <strong>{commissionRate}%</strong> platform / <strong>{100 - commissionRate}%</strong> owner.
+        Platform has <strong>{ownerCount}</strong> active {ownerCount !== 1 ? 'owners' : 'owner'}.
+      </p>
+      <form method="POST" class="space-y-4">
+        <div class="flex flex-col sm:flex-row sm:items-end gap-4">
+          <div class="w-full sm:w-40">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Commission (%)</label>
+            <input type="number" name="commission_rate" min="0" max="50" step="0.5"
+              value={commissionRate}
+              class="w-full px-3 py-2 min-h-[44px] border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+          </div>
+          <div class="pb-2">
+            <p class="text-sm text-gray-400">Owner receives <strong id="owner-pct">{100 - commissionRate}%</strong></p>
+          </div>
+        </div>
+
+        <!-- Visual breakdown bar -->
+        <div class="rounded-xl overflow-hidden flex h-5 text-xs font-semibold">
+          <div id="platform-bar" class="bg-[#1a1a2e] text-white flex items-center justify-center transition-all" style={`width:${commissionRate}%`}>
+            {commissionRate >= 8 && `${commissionRate}%`}
+          </div>
+          <div id="owner-bar" class="bg-emerald-400 text-white flex items-center justify-center flex-1">
+            {100 - commissionRate}%
+          </div>
+        </div>
+        <div class="flex gap-4 text-xs text-gray-500">
+          <span><span class="inline-block w-3 h-3 rounded bg-[#1a1a2e] mr-1"></span>Platform fee</span>
+          <span><span class="inline-block w-3 h-3 rounded bg-emerald-400 mr-1"></span>Owner payout</span>
+        </div>
+
+        <div class="flex items-center gap-2 pt-1">
+          <input type="checkbox" name="apply_to_all" id="apply-all" class="rounded" checked />
+          <label for="apply-all" class="text-sm text-gray-600">
+            Apply this rate to all existing listings (skips subscribed owners at 3%)
+          </label>
+        </div>
+
+        <div class="pt-1">
+          <button type="submit"
+            class="bg-[#1a1a2e] text-white font-semibold px-5 py-2.5 min-h-[44px] rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">
+            Save commission rate
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Telegram Booking Management -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <div class="flex items-center justify-between">
+        <div>
+          <h2 class="font-semibold text-gray-900 mb-1">Telegram Booking Management</h2>
+          <p class="text-sm text-gray-500">
+            When enabled, "Direct with Owner" bookings can be approved/declined via Telegram bot buttons.
+            When disabled, these bookings can only be managed from the admin dashboard.
+            Either way, dashboard management is always available.
+          </p>
+        </div>
+        <label class="relative inline-flex items-center cursor-pointer shrink-0 ml-4">
+          <input
+            type="checkbox"
+            class="sr-only peer"
+            id="telegram-mgmt-toggle"
+            checked={telegramManagement}
+          />
+          <div class="w-12 h-7 bg-gray-200 peer-checked:bg-emerald-500 rounded-full transition-colors"></div>
+          <div class="absolute left-1 top-1 w-5 h-5 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"></div>
+        </label>
+      </div>
+      <div id="telegram-mgmt-status" class={`mt-3 text-xs font-medium px-3 py-1.5 rounded-lg inline-block ${telegramManagement ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+        {telegramManagement ? '✓ Telegram + Dashboard management active' : 'Dashboard-only management'}
+      </div>
+    </div>
+
+    <!-- Host Messaging — per owner -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <h2 class="font-semibold text-gray-900 mb-1">Host Messaging</h2>
+      <p class="text-sm text-gray-500 mb-5">
+        Control which property owners can enable a direct messaging widget (WhatsApp, Viber, Telegram) on their listing pages.
+        Only owners you enable here will see the Host Messaging section in their listing editor.
+      </p>
+      {ownersList.length === 0 ? (
+        <p class="text-sm text-gray-400 italic">No property owners yet.</p>
+      ) : (
+        <div class="divide-y divide-gray-100">
+          {ownersList.map((owner: any) => (
+            <div class="flex items-center justify-between py-3 gap-4">
+              <div class="min-w-0">
+                <p class="text-sm font-medium text-gray-800 truncate">{owner.full_name ?? owner.email}</p>
+                {owner.company_name && <p class="text-xs text-gray-400 truncate">{owner.company_name}</p>}
+                {!owner.full_name && <p class="text-xs text-gray-400 truncate">{owner.email}</p>}
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  class="sr-only peer host-msg-toggle"
+                  data-id={owner.id}
+                  data-name={owner.full_name ?? owner.email}
+                  checked={owner.allow_host_messaging ?? false}
+                />
+                <div class="w-10 h-6 bg-gray-200 peer-checked:bg-emerald-500 rounded-full transition-colors"></div>
+                <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
+              </label>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+
+    <!-- Bank Transfer Section Visibility — per owner -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <h2 class="font-semibold text-gray-900 mb-1">Bank Transfer Section Visibility</h2>
+      <p class="text-sm text-gray-500 mb-5">
+        Control which property owners can see and edit their Bank Transfer &amp; Payment Details in their profile.
+        Off by default — enable per owner when you want them to manage their own bank details.
+      </p>
+      {ownersList.length === 0 ? (
+        <p class="text-sm text-gray-400 italic">No property owners yet.</p>
+      ) : (
+        <div class="divide-y divide-gray-100">
+          {ownersList.map((owner: any) => (
+            <div class="flex items-center justify-between py-3 gap-4">
+              <div class="min-w-0">
+                <p class="text-sm font-medium text-gray-800 truncate">{owner.full_name ?? owner.email}</p>
+                {owner.company_name && <p class="text-xs text-gray-400 truncate">{owner.company_name}</p>}
+                {!owner.full_name && <p class="text-xs text-gray-400 truncate">{owner.email}</p>}
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer shrink-0">
+                <input
+                  type="checkbox"
+                  class="sr-only peer bank-visibility-toggle"
+                  data-id={owner.id}
+                  data-name={owner.full_name ?? owner.email}
+                  checked={owner.show_payment_details ?? false}
+                />
+                <div class="w-10 h-6 bg-gray-200 peer-checked:bg-emerald-500 rounded-full transition-colors"></div>
+                <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
+              </label>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+
+    <!-- Platform default bank transfer details -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <h2 class="font-semibold text-gray-900 mb-1">Platform Bank Transfer Details</h2>
+      <p class="text-sm text-gray-500 mb-5">
+        Default bank details sent to guests when a booking is confirmed via bank transfer.
+        Per-owner details (set in each owner's profile) always take priority. Leave fields blank to fall back to environment variables.
+      </p>
+      <form method="POST" class="space-y-4">
+        <input type="hidden" name="action" value="save_bank" />
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Account name</label>
+          <input type="text" name="bank_account_name" value={bankAccountName}
+            placeholder="KefaloniaBNB"
+            class="w-full px-3 py-2 min-h-[44px] border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Revolut</label>
+            <input type="text" name="bank_revolut" value={bankRevolut}
+              placeholder="@kefaloniabnb"
+              class="w-full px-3 py-2 min-h-[44px] border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Wise</label>
+            <input type="email" name="bank_wise" value={bankWise}
+              placeholder="payments@kefaloniabnb.com"
+              class="w-full px-3 py-2 min-h-[44px] border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">IBAN</label>
+          <input type="text" name="bank_iban" value={bankIban}
+            placeholder="GR0000000000000000000000000"
+            class="w-full px-3 py-2 min-h-[44px] border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+        </div>
+
+        <div class="sm:w-1/2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">BIC / SWIFT</label>
+          <input type="text" name="bank_bic" value={bankBic}
+            placeholder="ETHNGRAA"
+            class="w-full px-3 py-2 min-h-[44px] border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+        </div>
+
+        <div class="pt-1">
+          <button type="submit"
+            class="bg-[#1a1a2e] text-white font-semibold px-5 py-2.5 min-h-[44px] rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">
+            Save bank details
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Business model reference card -->
+    <div class="bg-gray-50 rounded-2xl border border-gray-200 p-6">
+      <h2 class="font-semibold text-gray-900 mb-3">Competitive positioning</h2>
+
+      <!-- Mobile card view -->
+      <div class="lg:hidden space-y-3">
+        {[
+          { name: 'Your platform', host: `${commissionRate}%`, guest: '0%', total: `${commissionRate}%`, highlight: true },
+          { name: 'OTA platform', host: '3%', guest: '14–16%', total: '~17–19%', highlight: false },
+          { name: 'Booking.com', host: '15–25%', guest: '0%', total: '15–25%', highlight: false },
+          { name: 'VRBO', host: '5%', guest: '6–12%', total: '~11–17%', highlight: false },
+        ].map((p) => (
+          <div class={`rounded-xl p-4 ${p.highlight ? 'bg-[#1a1a2e]/5 border border-[#1a1a2e]/10' : 'bg-white border border-gray-100'}`}>
+            <p class={`font-semibold mb-2 ${p.highlight ? 'text-[#1a1a2e]' : 'text-gray-700'}`}>{p.name}</p>
+            <div class="grid grid-cols-3 gap-2 text-sm">
+              <div>
+                <p class="text-xs text-gray-400">Host fee</p>
+                <p class={`font-medium ${p.highlight ? 'text-[#1a1a2e]' : 'text-gray-600'}`}>{p.host}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400">Guest fee</p>
+                <p class={`font-medium ${p.highlight ? 'text-emerald-600' : 'text-gray-600'}`}>{p.guest}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400">Total take</p>
+                <p class={`font-medium ${p.highlight ? 'text-[#1a1a2e]' : 'text-gray-700'}`}>{p.total}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <!-- Desktop table view -->
+      <div class="hidden lg:block">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="text-left text-gray-500 border-b border-gray-200">
+              <th class="pb-2 font-medium">Platform</th>
+              <th class="pb-2 font-medium text-right">Host fee</th>
+              <th class="pb-2 font-medium text-right">Guest fee</th>
+              <th class="pb-2 font-medium text-right">Total take</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <tr class="bg-[#1a1a2e]/5">
+              <td class="py-2 font-semibold text-[#1a1a2e]">Your platform</td>
+              <td class="py-2 text-right font-bold text-[#1a1a2e]">{commissionRate}%</td>
+              <td class="py-2 text-right text-emerald-600 font-semibold">0%</td>
+              <td class="py-2 text-right font-bold text-[#1a1a2e]">{commissionRate}%</td>
+            </tr>
+            <tr>
+              <td class="py-2 text-gray-600">OTA platform</td>
+              <td class="py-2 text-right text-gray-500">3%</td>
+              <td class="py-2 text-right text-red-500">14–16%</td>
+              <td class="py-2 text-right text-gray-700 font-medium">~17–19%</td>
+            </tr>
+            <tr>
+              <td class="py-2 text-gray-600">Booking.com</td>
+              <td class="py-2 text-right text-red-500">15–25%</td>
+              <td class="py-2 text-right text-gray-500">0%</td>
+              <td class="py-2 text-right text-gray-700 font-medium">15–25%</td>
+            </tr>
+            <tr>
+              <td class="py-2 text-gray-600">VRBO</td>
+              <td class="py-2 text-right text-gray-500">5%</td>
+              <td class="py-2 text-right text-gray-500">6–12%</td>
+              <td class="py-2 text-right text-gray-700 font-medium">~11–17%</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+</AdminLayout>
+
+<script>
+  const rateInput = document.querySelector('input[name="commission_rate"]') as HTMLInputElement;
+  const ownerPct  = document.getElementById('owner-pct')!;
+  const platBar   = document.getElementById('platform-bar')!;
+  const ownerBar  = document.getElementById('owner-bar')!;
+
+  rateInput?.addEventListener('input', () => {
+    const rate = Math.min(100, Math.max(0, parseFloat(rateInput.value) || 0));
+    const own  = 100 - rate;
+    ownerPct.textContent = `${own}%`;
+    platBar.style.width  = `${rate}%`;
+    platBar.textContent  = rate >= 8 ? `${rate}%` : '';
+    ownerBar.textContent = `${own}%`;
+  });
+
+  // Bank transfer visibility per-owner toggles
+  document.querySelectorAll('.bank-visibility-toggle').forEach((cb) => {
+    cb.addEventListener('change', async function () {
+      const toggle = cb as HTMLInputElement;
+      const id     = toggle.dataset.id!;
+      const name   = toggle.dataset.name ?? 'Owner';
+      const show   = toggle.checked;
+      toggle.disabled = true;
+      const res = await fetch(`/api/admin/owners/${id}/payment-details-visibility`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ show }),
+      });
+      if (res.ok) {
+        (window as any).adminToast(show ? `✅ Bank details enabled for ${name}` : `🏦 Bank details hidden for ${name}`, show ? 'success' : 'info');
+      } else {
+        toggle.checked = !show;
+        (window as any).adminToast('❌ Failed to update bank details visibility', 'error');
+      }
+      toggle.disabled = false;
+    });
+  });
+
+  // Telegram booking management toggle
+  const telegramToggle = document.getElementById('telegram-mgmt-toggle') as HTMLInputElement | null;
+  const telegramStatus = document.getElementById('telegram-mgmt-status');
+  telegramToggle?.addEventListener('change', async function () {
+    const enabled = telegramToggle.checked;
+    telegramToggle.disabled = true;
+    const res = await fetch('/api/admin/platform-settings', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ key: 'telegram_booking_management', value: enabled }),
+    });
+    if (res.ok) {
+      if (telegramStatus) {
+        telegramStatus.textContent = enabled ? '✓ Telegram + Dashboard management active' : 'Dashboard-only management';
+        telegramStatus.className = `mt-3 text-xs font-medium px-3 py-1.5 rounded-lg inline-block ${enabled ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500'}`;
+      }
+      (window as any).adminToast(enabled ? '✅ Telegram management enabled' : '📋 Dashboard-only mode activated', enabled ? 'success' : 'info');
+    } else {
+      telegramToggle.checked = !enabled;
+      (window as any).adminToast('❌ Failed to update setting', 'error');
+    }
+    telegramToggle.disabled = false;
+  });
+
+  // Host messaging per-owner toggles
+  document.querySelectorAll('.host-msg-toggle').forEach((cb) => {
+    cb.addEventListener('change', async function () {
+      const toggle = cb as HTMLInputElement;
+      const id     = toggle.dataset.id!;
+      const name   = toggle.dataset.name ?? 'Owner';
+      const allow  = toggle.checked;
+      toggle.disabled = true;
+      const res = await fetch('/api/admin/owners/host-messaging', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, allow }),
+      });
+      if (res.ok) {
+        (window as any).adminToast(allow ? `✅ Host messaging enabled for ${name}` : `💬 Host messaging disabled for ${name}`, allow ? 'success' : 'info');
+      } else {
+        toggle.checked = !allow;
+        (window as any).adminToast('❌ Failed to update host messaging permission', 'error');
+      }
+      toggle.disabled = false;
+    });
+  });
+</script>

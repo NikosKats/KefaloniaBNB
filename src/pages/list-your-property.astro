@@ -1,0 +1,588 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { type Lang } from '../i18n/translations.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as Lang;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://kefaloniabnb.com';
+const contactEmail = 'info@kefaloniabnb.com';
+
+const benefits = [
+  {
+    icon: '💰',
+    title: isEl ? 'Μεγιστοποιήστε τα Έσοδά σας' : isBg ? 'Максимизирайте приходите си' : isSr ? 'Максимизирајте своје приходе' : isTr ? 'Gelirinizi Maksimize Edin' : isRo ? 'Maximizați-vă Veniturile' : 'Maximise Your Revenue',
+    body: isEl
+      ? 'Διαχειριζόμαστε απευθείας κρατήσεις χωρίς προμήθεια OTA. Κρατάτε περισσότερα ανά διανυκτέρευση σε σχέση με άλλες πλατφόρμες.'
+      : isBg
+      ? 'Обработваме директни резервации без комисиона от OTA. Запазвате повече на нощувка в сравнение с другите платформи за резервации.'
+      : isSr
+      ? 'Обрађујемо директне резервације без ОТА провизије. Задржавате више по ноћи него на другим платформама за резервације.'
+      : isTr
+      ? 'Doğrudan rezervasyonları OTA komisyonu olmadan yönetiyoruz. Diğer rezervasyon platformlarından daha fazlasını gecelik olarak kazanırsınız.'
+      : isRo
+      ? 'Gestionăm rezervările directe fără comision OTA. Păstrați mai mult pe noapte decât pe alte platforme de rezervare.'
+      : 'We handle direct bookings with no OTA commission. You keep more per night than on other booking platforms.',
+  },
+  {
+    icon: '📅',
+    title: isEl ? 'Πλήρης Διαχείριση Κρατήσεων' : isBg ? 'Пълно управление на резервации' : isSr ? 'Потпуна контрола резервација' : isTr ? 'Tam Rezervasyon Yönetimi' : isRo ? 'Management Complet al Rezervărilor' : 'Full Booking Management',
+    body: isEl
+      ? 'Αυτοματοποιημένο ημερολόγιο διαθεσιμότητας, επιλογή άμεσης κράτησης, προσαρμοσμένες τιμές ανά σεζόν και υποστήριξη προκαταβολής.'
+      : isBg
+      ? 'Автоматизиран календар за наличност, опция за незабавна резервация, персонализирани цени по сезон и поддръжка на депозити.'
+      : isSr
+      ? 'Аутоматизован календар доступности, опција тренутне резервације, прилагођене цене по сезони и подршка за депозите.'
+      : isTr
+      ? 'Otomatik müsaitlik takvimi, anında rezervasyon seçeneği, sezona göre özel fiyatlandırma ve depozit desteği.'
+      : isRo
+      ? 'Calendar automat de disponibilitate, opțiune de rezervare instantanee, prețuri personalizate pe sezon și suport pentru depozit.'
+      : 'Automated availability calendar, instant booking option, custom pricing per season, and deposit support.',
+  },
+  {
+    icon: '🧹',
+    title: isEl ? 'Καθαρισμός Κατ\' Απαίτηση' : isBg ? 'Почистване при поискване' : isSr ? 'Чишћење по захтеву' : isTr ? 'Talep Üzerine Temizlik' : isRo ? 'Curățenie la Cerere' : 'On-Demand Cleaning',
+    body: isEl
+      ? 'Χρησιμοποιήστε την ενσωματωμένη Αγορά Καθαρισμού για να βρείτε ελεγμένους τοπικούς καθαριστές μετά από κάθε checkout επισκέπτη — χωρίς κυνήγι επαφών.'
+      : isBg
+      ? 'Използвайте вградения пазар за почистване, за да намерите проверени местни почистващи след всяко напускане на гост — без излишни обаждания и търсење.'
+      : isSr
+      ? 'Користите наш уграђени тржиште чишћења да пронађете проверене локалне чистаче после сваког одласка госта — без трагања за контактима.'
+      : isTr
+      ? 'Her misafir çıkışının ardından yerel temizlikçi bulmak için yerleşik Temizlik Pazarımızı kullanın — iletişim aramak zorunda kalmadan.'
+      : isRo
+      ? 'Utilizați Piața noastră de Curățenie integrată pentru a găsi curățători locali verificați după fiecare checkout — fără a căuta contacte.'
+      : 'Use our built-in Cleaning Marketplace to find vetted local cleaners after every guest checkout — no chasing contacts.',
+  },
+  {
+    icon: '📊',
+    title: isEl ? 'Πίνακας Ελέγχου Ιδιοκτήτη' : isBg ? 'Табло за управление на собственика' : isSr ? 'Контролна табла власника' : isTr ? 'Mülk Sahibi Paneli' : isRo ? 'Panou Proprietar' : 'Owner Dashboard',
+    body: isEl
+      ? 'Δείτε όλες τις κρατήσεις σας, τα μηνύματα επισκεπτών, τις αποδόσεις και τους επερχόμενους καθαρισμούς σε μία ιδιωτική πύλη — 24/7.'
+      : isBg
+      ? 'Вижте всички ваши резервации, съобщения от гости, плащания и предстоящи почиствания в един личен портал — 24/7.'
+      : isSr
+      ? 'Погледајте све своје резервације, поруке гостију, исплате и предстојеће чишћење у једном приватном порталу — 24/7.'
+      : isTr
+      ? 'Tüm rezervasyonlarınızı, misafir mesajlarınızı, ödemelerinizi ve yaklaşan temizlikleri tek bir özel portalda görün — 24/7.'
+      : isRo
+      ? 'Vedeți toate rezervările, mesajele oaspeților, plățile și curățeniile viitoare într-un singur portal privat — 24/7.'
+      : 'See all your bookings, guest messages, payouts, and upcoming cleanings in one private portal — 24/7.',
+  },
+  {
+    icon: '📣',
+    title: isEl ? 'Καταχώριση Βελτιστοποιημένη για SEO' : isBg ? 'Обява, оптимизирана за SEO' : isSr ? 'Оглас оптимизован за SEO' : isTr ? 'SEO Optimize Edilmiş İlan' : isRo ? 'Anunț Optimizat SEO' : 'SEO-Optimised Listing',
+    body: isEl
+      ? 'Το ακίνητό σας αποκτά επαγγελματική σελίδα καταχώρισης, δομημένα δεδομένα για Google και τοποθέτηση στον κατάλογο βιλών μας.'
+      : isBg
+      ? 'Вашият имот получава професионална страница за обява, структурирани данни за Google и място в нашия каталог с вили.'
+      : isSr
+      ? 'Ваша некретнина добија професионалну страницу огласа, структуриране податке за Google и место у нашем каталогу вила.'
+      : isTr
+      ? 'Mülkünüz profesyonel bir ilan sayfası, Google için yapılandırılmış veri ve villa dizinimizde yer alır.'
+      : isRo
+      ? 'Proprietatea dvs. primește o pagină profesională de anunț, date structurate pentru Google și plasare în directorul nostru de vile.'
+      : 'Your property gets a professional listing page, structured data for Google, and placement in our villa directory.',
+  },
+  {
+    icon: '🔒',
+    title: isEl ? 'Διαφανής Προμήθεια' : isBg ? 'Прозрачна комисиона' : isSr ? 'Провизија без скривених трошкова' : isTr ? 'Şeffaf Komisyon' : isRo ? 'Comision Transparent' : 'Transparent Commission',
+    body: isEl
+      ? 'Απλό, σταθερό ποσοστό προμήθειας συμφωνημένο εξαρχής. Χωρίς κρυφές χρεώσεις, χωρίς τελευταίες εκπλήξεις.'
+      : isBg
+      ? 'Просто, фиксирано комисионно ставка, договорена предварително. Без скрити такси, без изненади в последния момент.'
+      : isSr
+      ? 'Једноставна, фиксна провизија договорена унапред. Без скривених накнада, без изненађења у последњем тренутку.'
+      : isTr
+      ? 'Önceden belirlenen basit, sabit komisyon oranı. Gizli ücret yok, son dakika sürprizleri yok.'
+      : isRo
+      ? 'Rată de comision simplă, fixă, convenită în avans. Fără taxe ascunse, fără surprize de ultim moment.'
+      : 'Simple, fixed commission rate agreed upfront. No hidden fees, no last-minute surprises.',
+  },
+];
+
+const steps = [
+  {
+    n: '01',
+    title: isEl ? 'Επικοινωνήστε' : isBg ? 'Свържете се с нас' : isSr ? 'Контактирајте нас' : isTr ? 'İletişime Geçin' : isRo ? 'Contactați-ne' : 'Get in touch',
+    body: isEl
+      ? 'Στείλτε μας τα στοιχεία του ακινήτου σας μέσω της παρακάτω φόρμας ή στείλτε μας email απευθείας. Θα απαντήσουμε εντός 24 ωρών.'
+      : isBg
+      ? 'Изпратете ни данните за вашия имот чрез формата по-долу или ни пишете директно на имейл. Ще отговорим в рамките на 24 часа.'
+      : isSr
+      ? 'Пошаљите нам детаље о вашој некретнини путем формулара испод или нам пишите директно на имејл. Одговорићемо у року од 24 сата.'
+      : isTr
+      ? 'Mülk bilgilerinizi aşağıdaki form aracılığıyla gönderin veya bize doğrudan e-posta yazın. 24 saat içinde yanıt vereceğiz.'
+      : isRo
+      ? 'Trimiteți-ne detaliile proprietății prin formularul de mai jos sau scrieți-ne direct pe email. Vom răspunde în 24 de ore.'
+      : 'Send us your property details via the form below or email us directly. We\'ll respond within 24 hours.',
+  },
+  {
+    n: '02',
+    title: isEl ? 'Δημιουργούμε την καταχώρισή σας' : isBg ? 'Създаваме вашата обява' : isSr ? 'Постављамо ваш оглас' : isTr ? 'İlanınızı Oluşturuyoruz' : isRo ? 'Vă configurăm anunțul' : 'We set up your listing',
+    body: isEl
+      ? 'Η ομάδα μας δημιουργεί επαγγελματική καταχώριση με τις φωτογραφίες, την περιγραφή και τις τιμές σας. Εσείς αξιολογείτε και εγκρίνετε.'
+      : isBg
+      ? 'Нашият екип създава професионална обява с вашите снимки, описание и цени. Вие преглеждате и одобрявате.'
+      : isSr
+      ? 'Наш тим креира професионалан оглас са вашим фотографијама, описом и ценама. Ви прегледате и одобравате.'
+      : isTr
+      ? 'Ekibimiz fotoğraflarınız, açıklamanız ve fiyatlandırmanızla profesyonel bir ilan oluşturur. Siz inceler ve onaylarsınız.'
+      : isRo
+      ? 'Echipa noastră creează un anunț profesional cu fotografiile, descrierea și prețurile dvs. Dvs. verificați și aprobați.'
+      : 'Our team creates a professional listing with your photos, description, and pricing. You review and approve.',
+  },
+  {
+    n: '03',
+    title: isEl ? 'Αρχίστε να δέχεστε κρατήσεις' : isBg ? 'Започнете да приемате резервации' : isSr ? 'Почните да примате резервације' : isTr ? 'Rezervasyon Almaya Başlayın' : isRo ? 'Începeți să acceptați rezervări' : 'Start accepting bookings',
+    body: isEl
+      ? 'Το ακίνητό σας ενεργοποιείται στην πλατφόρμα μας. Οι επισκέπτες κάνουν κράτηση απευθείας, ενημερώνεστε άμεσα.'
+      : isBg
+      ? 'Вашият имот се публикува на нашата платформа. Гостите резервират директно, а вие получавате незабавно уведомление.'
+      : isSr
+      ? 'Ваша некретнина је уживо на нашој платформи. Гости резервишу директно, а ви добијате тренутну обавештење.'
+      : isTr
+      ? 'Mülkünüz platformumuzda yayına girer. Misafirler doğrudan rezervasyon yapar, siz anında bildirim alırsınız.'
+      : isRo
+      ? 'Proprietatea dvs. devine activă pe platforma noastră. Oaspeții rezervă direct, sunteți notificat instant.'
+      : 'Your property goes live on our platform. Guests book directly, you get notified instantly.',
+  },
+  {
+    n: '04',
+    title: isEl ? 'Διαχειριστείτε τα πάντα στον πίνακα ελέγχου σας' : isBg ? 'Управлявайте всичко от таблото си' : isSr ? 'Управљајте свим у вашој контролној табли' : isTr ? 'Her Şeyi Panelinizde Yönetin' : isRo ? 'Gestionați totul în panoul dvs.' : 'Manage everything in your dashboard',
+    body: isEl
+      ? 'Συνδεθείτε στην ιδιωτική πύλη ιδιοκτήτη σας για να παρακολουθείτε κρατήσεις, να προγραμματίζετε καθαρισμούς και να βλέπετε τα έσοδά σας.'
+      : isBg
+      ? 'Влезте в личния си портал за собственици, за да проследявате резервации, да планирате почиствания и да преглеждате приходите си.'
+      : isSr
+      ? 'Пријавите се у свој приватни портал за власнике да бисте пратили резервације, заказивали чишћење и прегледали своје приходе.'
+      : isTr
+      ? 'Rezervasyonları takip etmek, temizlikleri planlamak ve kazançlarınızı görüntülemek için özel mülk sahibi portalınıza giriş yapın.'
+      : isRo
+      ? 'Conectați-vă la portalul privat de proprietar pentru a urmări rezervările, programa curățeniile și vizualiza câștigurile.'
+      : 'Log into your private owner portal to track bookings, schedule cleanings, and view your earnings.',
+  },
+  {
+    n: '05',
+    title: isEl ? 'Λαμβάνετε τις αποδόσεις σας' : isBg ? 'Получавайте плащанията си' : isSr ? 'Примајте своје исплате' : isTr ? 'Ödemelerinizi Alın' : isRo ? 'Primiți plățile' : 'Receive your payouts',
+    body: isEl
+      ? 'Μετά από κάθε επιβεβαιωμένη διαμονή, η απόδοσή σας επεξεργάζεται αυτόματα μείον την συμφωνημένη προμήθεια.'
+      : isBg
+      ? 'След всяко потвърдено настаняване плащането ви се обработва автоматично, след приспадане на договорената комисиона.'
+      : isSr
+      ? 'После сваког потврђеног боравка, ваша исплата се обрађује аутоматски умањена за договорену провизију.'
+      : isTr
+      ? 'Her onaylı konaklama sonrasında ödemeniz, anlaşılan komisyon düşüldükten sonra otomatik olarak işlenir.'
+      : isRo
+      ? 'După fiecare sejur confirmat, plata dvs. este procesată automat minus comisionul convenit.'
+      : 'After each confirmed stay, your payout is processed automatically minus the agreed commission.',
+  },
+];
+
+const faqs = [
+  {
+    q: isEl ? 'Τι προμήθεια χρεώνετε;' : isBg ? 'Каква комисиона начислявате?' : isSr ? 'Коју провизију наплаћујете?' : isTr ? 'Ne kadar komisyon alıyorsunuz?' : isRo ? 'Ce comision percepeți?' : 'What commission do you charge?',
+    a: isEl
+      ? 'Η προμήθειά μας συμφωνείται ατομικά βάσει του τύπου ακινήτου, της τοποθεσίας και του αναμενόμενου όγκου. Είναι πάντα διαφανής — χωρίς κρυφές χρεώσεις.'
+      : isBg
+      ? 'Нашата комисиона се договаря индивидуално въз основа на вида на имота, местоположението и очаквания обем. Тя е винаги прозрачна — без скрити такси.'
+      : isSr
+      ? 'Наша провизија се договара индивидуално на основу врсте некретнине, локације и очекиваног обима. Увек је транспарентна — без скривених накнада.'
+      : isTr
+      ? 'Komisyonumuz mülk türü, konum ve beklenen hacme göre bireysel olarak belirlenir. Her zaman şeffaftır — gizli ücret yoktur.'
+      : isRo
+      ? 'Comisionul nostru este convenit individual în funcție de tipul proprietății, locație și volumul estimat. Este întotdeauna transparent — fără taxe ascunse.'
+      : 'Our commission is agreed individually based on your property type, location, and expected volume. It is always transparent — no hidden fees.',
+  },
+  {
+    q: isEl ? 'Μπορώ να παραμείνω καταχωρισμένος σε άλλες πλατφόρμες;' : isBg ? 'Мога ли да остана обявен в други платформи?' : isSr ? 'Могу ли остати оглашен на другим платформама?' : isTr ? 'Diğer platformlarda ilan vermeye devam edebilir miyim?' : isRo ? 'Pot să rămân listat pe alte platforme?' : 'Can I still list on other platforms?',
+    a: isEl
+      ? 'Ναι. Δεν απαιτούμε αποκλειστικότητα. Πολλοί ιδιοκτήτες μας χρησιμοποιούν παράλληλα με OTA, επωφελούμενοι από απευθείας κρατήσεις χωρίς προμήθεια πλατφόρμας.'
+      : isBg
+      ? 'Да. Не изискваме изключителност. Много собственици ни използват едновременно с OTA платформи, като се възползват от директни резервации без комисиона от платформата.'
+      : isSr
+      ? 'Да. Не захтевамо ексклузивност. Многи власници нас користе паралелно са ОТА платформама, профитирајући од директних резервација без платформске провизије.'
+      : isTr
+      ? 'Evet. Münhasırlık gerektirmiyoruz. Pek çok mülk sahibi bizi OTA platformlarıyla birlikte kullanarak platform komisyonu olmadan doğrudan rezervasyonlardan yararlanır.'
+      : isRo
+      ? 'Da. Nu solicităm exclusivitate. Mulți proprietari ne folosesc alături de OTA-uri, beneficiind de rezervări directe cu zero comision de platformă.'
+      : 'Yes. We do not require exclusivity. Many owners use us alongside OTAs, benefiting from direct bookings with zero platform commission.',
+  },
+  {
+    q: isEl ? 'Πώς διαχειρίζομαι τη διαθεσιμότητά μου;' : isBg ? 'Как да управлявам наличността си?' : isSr ? 'Како да управљам својом доступношћу?' : isTr ? 'Müsaitliğimi nasıl yönetirim?' : isRo ? 'Cum îmi gestionez disponibilitatea?' : 'How do I manage my availability?',
+    a: isEl
+      ? 'Ο πίνακας ελέγχου ιδιοκτήτη σας περιλαμβάνει πλήρες ημερολόγιο διαθεσιμότητας. Μπορείτε να μπλοκάρετε ημερομηνίες, να ορίζετε ελάχιστες διαμονές και να διαχειρίζεστε τιμές ανά περίοδο.'
+      : isBg
+      ? 'Таблото на собственика включва пълен календар за наличност. Можете да блокирате дати, да задавате минимален престой и да управлявате цените по период.'
+      : isSr
+      ? 'Контролна табла власника укључује потпун календар доступности. Можете да блокирате датуме, поставите минималне боравке и управљате ценама по периоду.'
+      : isTr
+      ? 'Mülk sahibi paneliniz tam bir müsaitlik takvimi içerir. Tarihleri engelleyebilir, minimum konaklamaları ayarlayabilir ve döneme göre fiyatlandırma yönetebilirsiniz.'
+      : isRo
+      ? 'Panoul dvs. de proprietar include un calendar complet de disponibilitate. Puteți bloca date, seta sejururi minime și gestiona prețuri pe perioadă.'
+      : 'Your owner dashboard includes a full availability calendar. You can block dates, set minimum stays, and manage pricing per period.',
+  },
+  {
+    q: isEl ? 'Τι γίνεται με τον καθαρισμό μεταξύ επισκεπτών;' : isBg ? 'Как се организира почистването между гостите?' : isSr ? 'Шта је са чишћењем између гостију?' : isTr ? 'Misafirler arasındaki temizlik nasıl yapılır?' : isRo ? 'Ce se întâmplă cu curățenia între oaspeți?' : 'What about cleaning between guests?',
+    a: isEl
+      ? 'Έχετε πρόσβαση στην Αγορά Καθαρισμού μας — δημοσιεύστε αίτημα καθαρισμού μετά από κάθε checkout, λάβετε προσφορές από ελεγμένους τοπικούς καθαριστές και πληρώστε τους απευθείας μέσω της πλατφόρμας.'
+      : isBg
+      ? 'Имате достъп до нашия пазар за почистване — публикувайте заявка след всяко напускане, получавайте оферти от проверени местни почистващи и ги плащайте директно през платформата.'
+      : isSr
+      ? 'Имате приступ нашем тржишту чишћења — поставите захтев за чишћење после сваког одласка, примите понуде од проверених локалних чистача и платите их директно преко платформе.'
+      : isTr
+      ? 'Temizlik Pazarımıza erişiminiz var — her çıkış sonrası temizlik talebi oluşturun, incelenmiş yerel temizlikçilerden teklif alın ve platform üzerinden doğrudan ödeyin.'
+      : isRo
+      ? 'Aveți acces la Piața noastră de Curățenie — postați o cerere de curățenie după fiecare checkout, primiți oferte de la curățători locali verificați și plătiți-i direct prin platformă.'
+      : 'You have access to our Cleaning Marketplace — post a cleaning request after each checkout, receive bids from vetted local cleaners, and pay them directly through the platform.',
+  },
+  {
+    q: isEl ? 'Πόσο γρήγορα επιβεβαιώνονται οι κρατήσεις;' : isBg ? 'Колко бързо се потвърждават резервациите?' : isSr ? 'Колико брзо се потврђују резервације?' : isTr ? 'Rezervasyonlar ne kadar hızlı onaylanır?' : isRo ? 'Cât de repede se confirmă rezervările?' : 'How quickly are bookings confirmed?',
+    a: isEl
+      ? 'Μπορείτε να επιλέξετε άμεση κράτηση (επιβεβαιώνεται αυτόματα) ή χειροκίνητη αξιολόγηση (εγκρίνετε κάθε αίτημα εντός 24 ωρών).'
+      : isBg
+      ? 'Можете да изберете незабавна резервация (потвърждава се автоматично) или ръчен преглед (одобрявате всяка заявка в рамките на 24 часа).'
+      : isSr
+      ? 'Можете да изаберете тренутну резервацију (потврђује се аутоматски) или ручни преглед (одобравате сваки захтев у року од 24 сата).'
+      : isTr
+      ? 'Anında rezervasyon (otomatik onay) veya manuel inceleme (her talebi 24 saat içinde onaylarsınız) seçeneğini tercih edebilirsiniz.'
+      : isRo
+      ? 'Puteți alege rezervare instantanee (confirmare automată) sau verificare manuală (aprobați fiecare cerere în 24 de ore).'
+      : 'You can choose instant booking (confirmed automatically) or manual review (you approve each request within 24 hours).',
+  },
+  {
+    q: isEl ? 'Χρειάζεται να βρίσκομαι στην Καβάλα για να διαχειρίζομαι το ακίνητό μου;' : isBg ? 'Трябва ли да съм в Kefalonia, за да управлявам имота си?' : isSr ? 'Да ли морам бити у Кавали да бих управљао некретнином?' : isTr ? 'Mülkümü yönetmek için Kefalonia\'da olmam gerekiyor mu?' : isRo ? 'Trebuie să fiu în Kefalonia pentru a-mi gestiona proprietatea?' : 'Do I need to be in Kefalonia to manage my property?',
+    a: isEl
+      ? 'Όχι. Όλα διαχειρίζονται εξ αποστάσεως μέσω του πίνακα ελέγχου σας. Η αγορά καθαρισμού επίσης εξαλείφει την ανάγκη να οργανώνετε εσείς τα logistics αλλαγής επισκεπτών επί τόπου.'
+      : isBg
+      ? 'Не. Всичко се управлява дистанционно чрез таблото ви. Пазарът за почистване също елиминира необходимостта вие лично да организирате смяната на гостите на място.'
+      : isSr
+      ? 'Не. Све се управља даљински преко ваше контролне табле. Тржиште чишћења такође уклања потребу да лично организујете логистику смене гостију на лицу места.'
+      : isTr
+      ? 'Hayır. Her şey paneliniz üzerinden uzaktan yönetilir. Temizlik pazarı, misafir değişim lojistiğini yerinde organize etme ihtiyacını da ortadan kaldırır.'
+      : isRo
+      ? 'Nu. Totul este gestionat de la distanță prin panoul dvs. Piața de curățenie elimină, de asemenea, nevoia de a organiza logistica schimburilor la fața locului.'
+      : 'No. Everything is managed remotely through your dashboard. The cleaning marketplace also removes the need for you to organise turnover logistics on the ground.',
+  },
+  {
+    q: isEl ? 'Πώς λειτουργούν οι αποδόσεις;' : isBg ? 'Как работят плащанията?' : isSr ? 'Како функционишу исплате?' : isTr ? 'Ödemeler nasıl çalışır?' : isRo ? 'Cum funcționează plățile?' : 'How do payouts work?',
+    a: isEl
+      ? 'Οι αποδόσεις πραγματοποιούνται μετά την ολοκλήρωση κάθε επιβεβαιωμένης διαμονής. Λαμβάνετε το μερίδιό σας (συνολική αξία κράτησης μείον προμήθεια) μέσω τραπεζικής μεταφοράς.'
+      : isBg
+      ? 'Плащанията се извършват след приключване на всяко потвърдено настаняване. Получавате своя дял (обща стойност на резервацията минус комисиона) чрез банков превод.'
+      : isSr
+      ? 'Исплате се врше после завршетка сваког потврђеног боравка. Добијате свој удео (укупна вредност резервације минус провизија) путем банковног трансфера.'
+      : isTr
+      ? 'Ödemeler, her onaylı konaklama tamamlandıktan sonra yapılır. Payınızı (toplam rezervasyon değeri eksi komisyon) banka transferi yoluyla alırsınız.'
+      : isRo
+      ? 'Plățile se fac după finalizarea fiecărui sejur confirmat. Primiți partea dvs. (valoarea totală a rezervării minus comisionul) prin transfer bancar.'
+      : 'Payouts are made after each confirmed stay is completed. You receive your share (total booking value minus commission) via bank transfer.',
+  },
+];
+
+const submitted = Astro.url.searchParams.get('submitted') === '1';
+---
+
+<BaseLayout
+  title="List Your Property — KefaloniaBNB"
+  description="Partner with KefaloniaBNB to maximise your rental income. Professional listing management, direct bookings, on-demand cleaning, and a private owner dashboard."
+>
+
+  <!-- Hero -->
+  <section class="bg-[#1a1a2e] text-white">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-28 text-center">
+      <div class="inline-flex items-center gap-2 bg-white/10 rounded-full px-4 py-1.5 text-sm text-[#c9a96e] font-medium mb-6">
+        <span>🏡</span> {isEl ? 'Πρόγραμμα Ιδιοκτητών Ακινήτων' : isBg ? 'Програма за собственици на имоти' : isSr ? 'Програм за власнике некретнина' : isTr ? 'Mülk Sahibi Programı' : isRo ? 'Program pentru Proprietari' : 'Property Owner Programme'}
+      </div>
+      <h1 class="text-4xl md:text-5xl font-bold leading-tight mb-5">
+        {isEl ? 'Καταχωρίστε τη βίλα σας.' : isBg ? 'Публикувайте вилата си.' : isSr ? 'Огласите некретнину.' : isTr ? 'Mülkünüzü listeleyin.' : isRo ? 'Listați-vă vila.' : 'List your villa.'}<br class="hidden md:block" /> {isEl ? 'Κερδίστε περισσότερα. Λιγότερο άγχος.' : isBg ? 'Печелете повече. По-малко стрес.' : isSr ? 'Почните да зарађујете. Мање стреса.' : isTr ? 'Kazanmaya başlayın. Daha az stres.' : isRo ? 'Câștigați mai mult. Mai puțin stres.' : 'Earn more. Stress less.'}
+      </h1>
+      <p class="text-lg text-gray-300 max-w-xl mx-auto mb-8">
+        {isEl ? 'Εντάξτε την πλατφόρμα KefaloniaBNB και αποκτήστε απευθείας κρατήσεις χωρίς προμήθεια OTA, ιδιωτικό πίνακα ελέγχου ιδιοκτήτη και καθαρισμό κατ\' απαίτηση μεταξύ επισκεπτών.' : isBg ? 'Присъединете се към платформата KefaloniaBNB и получете директни резервации без комисиона от OTA, личен портал за собственици и почистване при поискване между гостите.' : isSr ? 'Придружите се KefaloniaBNB платформи и добијте директне резервације без ОТА провизије, приватну контролну таблу за власнике и чишћење по захтеву између гостију.' : isTr ? 'KefaloniaBNB platformuna katılın ve OTA komisyonu olmadan doğrudan rezervasyon, özel mülk sahibi paneli ve misafirler arasında talep üzerine temizlik hizmetine kavuşun.' : isRo ? 'Alăturați-vă platformei KefaloniaBNB și obțineți rezervări directe fără comision OTA, un panou privat de proprietar și curățenie la cerere între oaspeți.' : 'Join the KefaloniaBNB platform and get direct bookings with no OTA commission, a private owner dashboard, and on-demand cleaning between guests.'}
+      </p>
+      <div class="flex flex-col sm:flex-row gap-3 justify-center">
+        <a href="#enquire" class="bg-[#c9a96e] text-white font-semibold px-8 py-3.5 rounded-xl hover:opacity-90 transition-opacity text-sm">
+          {isEl ? 'Υποβάλετε Ερώτημα — Είναι Δωρεάν' : isBg ? 'Направете запитване — Безплатно е' : isSr ? 'Пријавите се — Бесплатно је' : isTr ? 'Şimdi Sorgulayın — Ücretsiz' : isRo ? 'Solicitați Acum — Este Gratuit' : 'Enquire Now — It\'s Free'}
+        </a>
+        <a href="/admin/login" class="bg-white/10 text-white font-semibold px-8 py-3.5 rounded-xl hover:bg-white/20 transition-colors text-sm">
+          {isEl ? 'Ήδη συνεργάτης; Σύνδεση →' : isBg ? 'Вече партньор? Влезте →' : isSr ? 'Већ партнер? Пријавите се →' : isTr ? 'Zaten ortak mısınız? Giriş yapın →' : isRo ? 'Deja partener? Conectați-vă →' : 'Already a partner? Sign in →'}
+        </a>
+      </div>
+      <p class="text-gray-500 text-xs mt-4">{isEl ? 'Χωρίς δέσμευση. Θα σας στείλουμε πλήρη πρόταση πριν συμφωνηθεί οτιδήποτε.' : isBg ? 'Без ангажимент. Ще ви изпратим пълна оферта, преди да бъде договорено нещо.' : isSr ? 'Без обавезе. Послаћемо вам потпуну понуду пре него што се ишта договори.' : isTr ? 'Taahhüt yok. Herhangi bir şey kararlaştırılmadan önce size tam bir teklif göndereceğiz.' : isRo ? 'Fără obligații. Vă vom trimite o propunere completă înainte de a se conveni ceva.' : 'No commitment. We\'ll send you a full proposal before anything is agreed.'}</p>
+    </div>
+  </section>
+
+  <!-- Stats bar -->
+  <section class="border-b border-gray-100">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8 grid grid-cols-3 gap-4 text-center">
+      <div>
+        <p class="text-3xl font-bold text-gray-900">0%</p>
+        <p class="text-sm text-gray-500 mt-0.5">{isEl ? 'Προμήθεια OTA' : isBg ? 'Комисиона OTA' : isSr ? 'ОТА провизија' : isTr ? 'OTA komisyonu' : isRo ? 'Comision OTA' : 'OTA commission'}</p>
+      </div>
+      <div>
+        <p class="text-3xl font-bold text-gray-900">24/7</p>
+        <p class="text-sm text-gray-500 mt-0.5">{isEl ? 'Πίνακας ιδιοκτήτη' : isBg ? 'Табло на собственика' : isSr ? 'Табла власника' : isTr ? 'Mülk sahibi paneli' : isRo ? 'Panou proprietar' : 'Owner dashboard'}</p>
+      </div>
+      <div>
+        <p class="text-3xl font-bold text-gray-900">1</p>
+        <p class="text-sm text-gray-500 mt-0.5">{isEl ? 'Πλατφόρμα για τα πάντα' : isBg ? 'Платформа за всичко' : isSr ? 'Платформа за све' : isTr ? 'Her şey için platform' : isRo ? 'Platformă pentru tot' : 'Platform for everything'}</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Benefits -->
+  <section class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <h2 class="text-3xl font-bold text-gray-900 text-center mb-3">{isEl ? 'Γιατί να καταχωρίσετε μαζί μας;' : isBg ? 'Защо да публикувате при нас?' : isSr ? 'Зашто огласити некретнину код нас?' : isTr ? 'Neden bizimle ilan verin?' : isRo ? 'De ce să listați cu noi?' : 'Why list with us?'}</h2>
+    <p class="text-gray-500 text-center mb-12 max-w-lg mx-auto">{isEl ? 'Κάνουμε τη βαριά δουλειά ώστε να εστιάζετε σε αυτό που έχει σημασία — τους επισκέπτες και το ακίνητό σας.' : isBg ? 'Ние вършим тежката работа, за да можете да се фокусирате върху важното — гостите и вашия имот.' : isSr ? 'Ми обављамо тежак посао да бисте се могли фокусирати на оно што је важно — госте и вашу некретнину.' : isTr ? 'Ağır işi biz yapıyoruz, böylece siz önemli olan şeylere odaklanabilirsiniz — misafirleriniz ve mülkünüz.' : isRo ? 'Noi ne ocupăm de partea grea, ca să vă puteți concentra pe ceea ce contează — oaspeții și proprietatea dvs.' : 'We do the heavy lifting so you can focus on what matters — your guests and your property.'}</p>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+      {benefits.map(b => (
+        <div class="bg-white rounded-2xl border border-gray-100 p-6 hover:border-[#c9a96e] transition-colors">
+          <p class="text-3xl mb-3">{b.icon}</p>
+          <h3 class="font-semibold text-gray-900 mb-2">{b.title}</h3>
+          <p class="text-sm text-gray-500 leading-relaxed">{b.body}</p>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="bg-gray-50 py-20">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-3xl font-bold text-gray-900 text-center mb-3">{isEl ? 'Πώς λειτουργεί' : isRo ? 'Cum funcționează' : 'How it works'}</h2>
+      <p class="text-gray-500 text-center mb-12">{isEl ? 'Από την πρώτη επαφή έως την πρώτη σας κράτηση σε πέντε απλά βήματα.' : isRo ? 'De la primul contact la prima rezervare în cinci pași simpli.' : 'From first contact to your first booking in five simple steps.'}</p>
+
+      <div class="space-y-6">
+        {steps.map(s => (
+          <div class="flex gap-5 items-start">
+            <div class="flex-shrink-0 w-12 h-12 rounded-2xl bg-[#1a1a2e] text-[#c9a96e] flex items-center justify-center font-bold text-sm">
+              {s.n}
+            </div>
+            <div class="pt-1">
+              <h3 class="font-semibold text-gray-900 mb-1">{s.title}</h3>
+              <p class="text-sm text-gray-500 leading-relaxed">{s.body}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- What you get -->
+  <section class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <div class="md:grid md:grid-cols-2 md:gap-16 items-center">
+      <div>
+        <h2 class="text-3xl font-bold text-gray-900 mb-4">{isEl ? 'Ο πίνακας ελέγχου ιδιοκτήτη σας' : isRo ? 'Panoul dvs. de proprietar' : 'Your owner dashboard'}</h2>
+        <p class="text-gray-500 mb-8 leading-relaxed">
+          {isEl ? 'Όλα όσα χρειάζεστε για να διαχειριστείτε τα έσοδα ενοικίασης, τις κρατήσεις και τις λειτουργίες ακινήτου σας — σε μία ιδιωτική, φιλική για κινητά πύλη.' : isRo ? 'Tot ce aveți nevoie pentru a vă gestiona veniturile din închirieri, rezervările și operațiunile proprietății — într-un portal privat, optimizat pentru mobil.' : 'Everything you need to manage your rental income, bookings, and property operations — in one private, mobile-friendly portal.'}
+        </p>
+        <ul class="space-y-3">
+          {[
+            isEl ? 'Ημερολόγιο κρατήσεων σε πραγματικό χρόνο με διαχείριση διαθεσιμότητας' : isRo ? 'Calendar de rezervări în timp real cu gestionarea disponibilității' : 'Real-time booking calendar with availability management',
+            isEl ? 'Άμεσες ειδοποιήσεις για νέες κρατήσεις και πληρωμές' : isRo ? 'Notificări instant pentru rezervări noi și plăți' : 'Instant notifications for new bookings and payments',
+            isEl ? 'Ανταλλαγή μηνυμάτων με επισκέπτες και προβολή λεπτομερειών κράτησης' : isRo ? 'Mesagerie cu oaspeții și vizualizare detalii rezervare' : 'Guest messaging and booking detail view',
+            isEl ? 'Αίτημα καθαρισμού μετά το checkout με ένα tap' : isRo ? 'Cerere de curățenie după checkout cu o singură apăsare' : 'Post-checkout cleaning request in one tap',
+            isEl ? 'Ιστορικό αποδόσεων και σύνοψη εσόδων' : isRo ? 'Istoric plăți și rezumat câștiguri' : 'Payout history and earnings summary',
+            isEl ? 'Εποχιακές τιμές και έλεγχος ελάχιστης διαμονής' : isRo ? 'Prețuri sezoniere și control sejur minim' : 'Seasonal pricing and minimum stay controls',
+            isEl ? 'Επιλογή ιδιωτικής καταχώρισης για ακίνητα εκτός αγοράς' : isRo ? 'Opțiune de listare privată pentru proprietăți off-market' : 'Private listing option for off-market properties',
+          ].map(item => (
+            <li class="flex items-start gap-3 text-sm text-gray-700">
+              <span class="flex-shrink-0 w-5 h-5 bg-[#c9a96e]/20 text-[#c9a96e] rounded-full flex items-center justify-center text-xs font-bold mt-0.5">✓</span>
+              {item}
+            </li>
+          ))}
+        </ul>
+      </div>
+      <div class="mt-12 md:mt-0 space-y-4">
+        <div class="bg-[#1a1a2e] rounded-3xl p-6 text-white">
+          <p class="text-xs font-medium text-[#c9a96e] mb-3 uppercase tracking-wide">{isEl ? 'Απευθείας έναντι OTA κράτησης' : isRo ? 'Rezervare directă vs OTA' : 'Direct vs OTA booking'}</p>
+          <div class="space-y-3 text-sm">
+            {[
+              { label: isEl ? 'Ο επισκέπτης πληρώνει' : isRo ? 'Oaspetele plătește' : 'Guest pays', direct: '€1,200', ota: '€1,200' },
+              { label: isEl ? 'Τέλος πλατφόρμας' : isRo ? 'Taxă platformă' : 'Platform fee', direct: '€0', ota: '–€180 (15%)' },
+              { label: isEl ? 'Η προμήθειά μας' : isRo ? 'Comisionul nostru' : 'Our commission', direct: '–€60 (5%)', ota: '—' },
+              { label: isEl ? 'Εσείς λαμβάνετε' : isRo ? 'Dvs. primiți' : 'You receive', direct: '€1,140', ota: '€1,020', highlight: true },
+            ].map(r => (
+              <div class={`flex justify-between gap-4 ${r.highlight ? 'border-t border-white/10 pt-3 font-bold' : ''}`}>
+                <span class="text-gray-400">{r.label}</span>
+                <div class="flex gap-6 text-right">
+                  <span class={r.highlight ? 'text-[#c9a96e]' : 'text-white'}>{r.direct}</span>
+                  <span class={r.highlight ? 'text-gray-500' : 'text-gray-400 line-through'}>{r.ota}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div class="mt-3 flex justify-end gap-6 text-xs text-gray-500">
+            <span>{isEl ? 'Απευθείας' : isRo ? 'Direct' : 'Direct'}</span><span>{isEl ? 'Μέσω OTA' : isRo ? 'Prin OTA' : 'Via OTA'}</span>
+          </div>
+          <p class="text-xs text-gray-500 mt-3">{isEl ? 'Ενδεικτικό παράδειγμα. Ποσοστό προμήθειας συμφωνείται ανά ακίνητο.' : isRo ? 'Exemplu ilustrativ. Rata comisionului se stabilește per proprietate.' : 'Illustrative example. Commission rate agreed per property.'}</p>
+        </div>
+
+        <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-5">
+          <p class="text-sm font-semibold text-emerald-800 mb-1">{isEl ? '🧹 Αγορά Καθαρισμού συμπεριλαμβάνεται' : isRo ? '🧹 Piața de Curățenie inclusă' : '🧹 Cleaning Marketplace included'}</p>
+          <p class="text-sm text-emerald-700">{isEl ? 'Μετά από κάθε checkout, δημοσιεύστε αίτημα καθαρισμού και λάβετε προσφορές από τοπικούς καθαριστές εντός ωρών. Χωρίς συντονισμό, χωρίς τηλεφωνήματα.' : isRo ? 'După fiecare checkout, postați o cerere de curățenie și primiți oferte de la curățători locali în câteva ore. Fără coordonare, fără telefoane.' : 'After every checkout, post a cleaning request and get bids from local cleaners within hours. No coordinating, no calling around.'}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="bg-gray-50 py-20">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+      <h2 class="text-3xl font-bold text-gray-900 text-center mb-12">{isEl ? 'Κοινές ερωτήσεις' : isRo ? 'Întrebări frecvente' : 'Common questions'}</h2>
+      <div class="space-y-4">
+        {faqs.map(faq => (
+          <details class="group bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <summary class="flex items-center justify-between px-6 py-4 cursor-pointer text-sm font-medium text-gray-900 list-none">
+              {faq.q}
+              <span class="ml-4 flex-shrink-0 text-gray-400 group-open:rotate-180 transition-transform">▾</span>
+            </summary>
+            <div class="px-6 pb-4 text-sm text-gray-500 leading-relaxed">{faq.a}</div>
+          </details>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Enquiry form -->
+  <section id="enquire" class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <div class="text-center mb-10">
+      <h2 class="text-3xl font-bold text-gray-900 mb-3">{isEl ? 'Έτοιμοι να συνεργαστείτε μαζί μας;' : isRo ? 'Pregătiți să colaborați cu noi?' : 'Ready to partner with us?'}</h2>
+      <p class="text-gray-500">{isEl ? 'Συμπληρώστε τη φόρμα και θα επικοινωνήσουμε μαζί σας εντός 24 ωρών με εξατομικευμένη πρόταση.' : isRo ? 'Completați formularul și vă vom contacta în 24 de ore cu o propunere personalizată.' : 'Fill in the form and we\'ll come back to you within 24 hours with a tailored proposal.'}</p>
+    </div>
+
+    {submitted ? (
+      <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-8 text-center">
+        <p class="text-4xl mb-3">✉️</p>
+        <h3 class="font-bold text-gray-900 mb-2">{isEl ? 'Το μήνυμα ελήφθη!' : isRo ? 'Mesaj primit!' : 'Message received!'}</h3>
+        <p class="text-sm text-gray-500">{isEl ? 'Θα επικοινωνήσουμε μαζί σας εντός 24 ωρών. Εν τω μεταξύ, εξερευνήστε τις τρέχουσες καταχωρίσεις μας.' : isRo ? 'Vă vom contacta în 24 de ore. Între timp, nu ezitați să' : 'We\'ll be in touch within 24 hours. In the meantime, feel free to'} <a href="/rentals" class="text-[#c9a96e] hover:opacity-80">{isEl ? 'δείτε τις τρέχουσες καταχωρίσεις μας' : isRo ? 'răsfoiți listările noastre curente' : 'browse our current listings'}</a>{isEl ? '' : '.'}</p>
+      </div>
+    ) : (
+      <form
+        id="owner-enquiry-form"
+        class="bg-white rounded-2xl border border-gray-100 p-8 space-y-5"
+      >
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{isEl ? 'Το Όνομά σας' : isRo ? 'Numele Dvs.' : 'Your Name'} <span class="text-red-400">*</span></label>
+            <input type="text" id="name" required placeholder={isEl ? 'Πλήρες όνομα' : isRo ? 'Nume complet' : 'Full name'}
+              class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{isEl ? 'Email' : isRo ? 'Email' : 'Email'} <span class="text-red-400">*</span></label>
+            <input type="email" id="email" required placeholder="you@example.com"
+              class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{isEl ? 'Τηλέφωνο / WhatsApp' : isRo ? 'Telefon / WhatsApp' : 'Phone / WhatsApp'}</label>
+            <input type="tel" id="phone" placeholder="+30 6xx xxx xxxx"
+              class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{isEl ? 'Τοποθεσία Ακινήτου' : isRo ? 'Locația Proprietății' : 'Property Location'} <span class="text-red-400">*</span></label>
+            <input type="text" id="location" required placeholder={isEl ? 'π.χ. Κεραμωτί, Καβάλα' : isRo ? 'ex. Keramoti, Kefalonia' : 'e.g. Keramoti, Kefalonia'}
+              class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none" />
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{isEl ? 'Τύπος Ακινήτου' : isRo ? 'Tip Proprietate' : 'Property Type'}</label>
+            <select id="property_type"
+              class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none bg-white">
+              <option value="">{isEl ? 'Επιλέξτε…' : isRo ? 'Selectați…' : 'Select…'}</option>
+              <option>{isEl ? 'Βίλα' : isRo ? 'Vilă' : 'Villa'}</option>
+              <option>{isEl ? 'Σπίτι' : isRo ? 'Casă' : 'House'}</option>
+              <option>{isEl ? 'Διαμέρισμα' : isRo ? 'Apartament' : 'Apartment'}</option>
+              <option>{isEl ? 'Εξοχικό' : isRo ? 'Cabană' : 'Cottage'}</option>
+              <option>{isEl ? 'Στούντιο' : isRo ? 'Garsonieră' : 'Studio'}</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{isEl ? 'Υπνοδωμάτια' : isRo ? 'Dormitoare' : 'Bedrooms'}</label>
+            <select id="bedrooms"
+              class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none bg-white">
+              <option value="">{isEl ? 'Επιλέξτε…' : isRo ? 'Selectați…' : 'Select…'}</option>
+              <option>1</option><option>2</option><option>3</option>
+              <option>4</option><option>5</option><option>6+</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{isEl ? 'Πείτε μας για το ακίνητό σας' : isRo ? 'Spuneți-ne despre proprietatea dvs.' : 'Tell us about your property'}</label>
+          <textarea id="message" rows="4" placeholder={isEl ? 'π.χ. καταχωρισμένο σε άλλες πλατφόρμες, νυχτερινή τιμή, ειδικές ανάγκες…' : isRo ? 'Ex. listată pe alte platforme, tarif pe noapte, nevoi specifice…' : 'E.g. currently listed on other platforms, nightly rate, any specific needs…'}
+            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none resize-none"></textarea>
+        </div>
+
+        <div id="form-error" class="hidden text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3"></div>
+
+        <button type="submit" id="submit-btn"
+          class="w-full bg-[#c9a96e] text-white font-semibold py-3.5 rounded-xl hover:opacity-90 transition-opacity">
+          {isEl ? 'Αποστολή Ερωτήματος' : isRo ? 'Trimiteți Cererea' : 'Send Enquiry'}
+        </button>
+        <p class="text-xs text-gray-400 text-center">{isEl ? 'Απαντάμε εντός 24 ωρών. Χωρίς spam, ποτέ.' : isRo ? 'Răspundem în 24 de ore. Fără spam, niciodată.' : 'We respond within 24 hours. No spam, ever.'}</p>
+      </form>
+    )}
+  </section>
+
+</BaseLayout>
+
+<script>
+  const form = document.getElementById('owner-enquiry-form') as HTMLFormElement | null;
+  const errEl = document.getElementById('form-error') as HTMLElement | null;
+  const btn = document.getElementById('submit-btn') as HTMLButtonElement | null;
+
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!btn || !errEl) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    errEl.classList.add('hidden');
+
+    const name     = (document.getElementById('name') as HTMLInputElement).value.trim();
+    const email    = (document.getElementById('email') as HTMLInputElement).value.trim();
+    const phone    = (document.getElementById('phone') as HTMLInputElement).value.trim();
+    const location = (document.getElementById('location') as HTMLInputElement).value.trim();
+    const property_type = (document.getElementById('property_type') as HTMLSelectElement).value;
+    const bedrooms = (document.getElementById('bedrooms') as HTMLSelectElement).value;
+    const message  = (document.getElementById('message') as HTMLTextAreaElement).value.trim();
+
+    const body = [
+      `Name: ${name}`,
+      `Email: ${email}`,
+      phone ? `Phone: ${phone}` : null,
+      `Location: ${location}`,
+      property_type ? `Type: ${property_type}` : null,
+      bedrooms ? `Bedrooms: ${bedrooms}` : null,
+      message ? `\nMessage:\n${message}` : null,
+    ].filter(Boolean).join('\n');
+
+    const res = await fetch('/api/inquiries', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name,
+        email,
+        phone: phone || undefined,
+        message: `[Owner Enquiry — List My Property]\n\n${body}`,
+      }),
+    });
+
+    if (res.ok) {
+      window.location.href = '/list-your-property?submitted=1#enquire';
+    } else {
+      errEl.textContent = 'Something went wrong. Please email us directly at info@kefaloniabnb.com';
+      errEl.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = 'Send Enquiry';
+    }
+  });
+</script>

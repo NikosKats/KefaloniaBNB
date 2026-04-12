@@ -1,0 +1,376 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isBg = lang === 'bg';
+const isEl = lang === 'el';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://kefaloniabnb.com';
+const effectiveDate = '1 June 2025';
+const controllerEmail = 'info@kefaloniabnb.com';
+
+const tLegal = isEl ? 'Νομικά' : isBg ? 'Правна информация' : isSr ? 'Правне информације' : isTr ? 'Yasal' : isRo ? 'Juridic' : 'Legal';
+const tTitle = isEl ? 'Πολιτική Απορρήτου' : isBg ? 'Политика за поверителност' : isSr ? 'Политика приватности' : isTr ? 'Gizlilik Politikası' : isRo ? 'Politica de Confidențialitate' : 'Privacy Policy';
+const tEffective = isEl ? 'Ημερομηνία ισχύος' : isBg ? 'Дата на влизане в сила' : isSr ? 'Датум ступања на снагу' : isTr ? 'Yürürlük tarihi' : isRo ? 'În vigoare' : 'Effective date';
+const tUpdated = isEl ? 'Τελευταία ενημέρωση' : isBg ? 'Последна актуализация' : isSr ? 'Последње ажурирање' : isTr ? 'Son güncelleme' : isRo ? 'Actualizat' : 'Last updated';
+const tLegalNote = isEl ? 'Η παρούσα πολιτική είναι διαθέσιμη στα Αγγλικά ως νομικά δεσμευτικό κείμενο.' : isBg ? 'Тази политика е достъпна на английски като правно обвързващ документ.' : isSr ? 'Ова политика је доступна на енглеском као правно обавезујући документ.' : isTr ? 'Bu politika yasal olarak bağlayıcı metin olarak İngilizce olarak sunulmaktadır.' : isRo ? 'Această politică este disponibilă în engleză ca document obligatoriu din punct de vedere juridic.' : '';
+
+const schemas = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'Privacy Policy', item: `${siteUrl}/privacy-policy` },
+    ],
+  },
+];
+---
+
+<BaseLayout
+  title="Privacy Policy — KefaloniaBNB"
+  description="KefaloniaBNB Privacy Policy. Learn how we collect, use, store, and protect your personal data in compliance with the EU General Data Protection Regulation (GDPR) and Greek law."
+  schema={schemas}
+>
+
+  <!-- Hero -->
+  <section class="relative bg-[#1a1a2e] overflow-hidden">
+    <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(ellipse at 70% 50%, #c9a96e 0%, transparent 60%);"></div>
+    <div class="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 text-center">
+      <p class="text-[#c9a96e] text-xs font-semibold uppercase tracking-[0.2em] mb-4">{tLegal}</p>
+      <h1 class="text-4xl sm:text-5xl font-bold text-white leading-tight mb-6">{tTitle}</h1>
+      <p class="text-white/50 text-sm">{tEffective}: {effectiveDate} &nbsp;·&nbsp; {tUpdated}: {effectiveDate}</p>
+      {tLegalNote && <p class="text-white/40 text-xs mt-3">{tLegalNote}</p>}
+    </div>
+  </section>
+
+  <!-- Body -->
+  <section class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
+
+    <div class="prose prose-gray max-w-none
+      prose-headings:font-bold prose-headings:text-gray-900
+      prose-h2:text-2xl prose-h2:mt-14 prose-h2:mb-4 prose-h2:pb-2 prose-h2:border-b prose-h2:border-gray-100
+      prose-h3:text-lg prose-h3:mt-8 prose-h3:mb-3
+      prose-p:text-gray-600 prose-p:leading-relaxed
+      prose-li:text-gray-600 prose-li:leading-relaxed
+      prose-a:text-[#c9a96e] prose-a:no-underline hover:prose-a:underline
+      prose-strong:text-gray-800">
+
+      <p class="text-gray-500 text-sm bg-blue-50 border border-blue-100 rounded-lg px-5 py-4 not-prose mb-10">
+        This Privacy Policy explains how <strong class="text-gray-800">KefaloniaBNB</strong> ("<strong class="text-gray-800">we</strong>", "<strong class="text-gray-800">us</strong>", "<strong class="text-gray-800">our</strong>") collects, uses, stores, shares, and protects your personal data when you use <a href={siteUrl} class="text-[#c9a96e]">kefaloniabnb.com</a> or interact with us by any means. We are committed to complying with the <strong class="text-gray-800">EU General Data Protection Regulation (GDPR)</strong> (Regulation 2016/679), the Greek law implementing it (Law 4624/2019), and all other applicable data protection legislation.
+      </p>
+
+      <!-- 1 -->
+      <h2>1. Data Controller</h2>
+      <p>
+        The data controller responsible for your personal data is:
+      </p>
+      <p>
+        <strong>KefaloniaBNB</strong><br />
+        Operating in Kefalonia &amp; Keramoti, Greece<br />
+        Email: <a href={`mailto:${controllerEmail}`}>{controllerEmail}</a><br />
+        Website: <a href={siteUrl}>{siteUrl}</a>
+      </p>
+      <p>
+        If you have any questions about how we handle your data, or wish to exercise any of your rights, please contact us at the email address above.
+      </p>
+
+      <!-- 2 -->
+      <h2>2. Data We Collect</h2>
+
+      <h3>2.1 Data you provide directly</h3>
+      <ul>
+        <li><strong>Booking data:</strong> full name, email address, phone number, number of guests, check-in and check-out dates, and any special requests you submit when making a booking.</li>
+        <li><strong>Account data:</strong> if you create an owner or admin account, your name, email address, and password (stored as a bcrypt hash — we never store plain-text passwords).</li>
+        <li><strong>Inquiry data:</strong> name, email, phone, and message content when you submit a contact or inquiry form.</li>
+        <li><strong>Review data:</strong> any review or rating text you voluntarily submit after a stay.</li>
+        <li><strong>Communication data:</strong> emails, Telegram messages, or other communications you send to us or that we facilitate between you and a property owner.</li>
+      </ul>
+
+      <h3>2.2 Data collected automatically</h3>
+      <ul>
+        <li><strong>Log data:</strong> IP address, browser type and version, operating system, referring URL, pages visited, and timestamps, collected automatically by our web server and hosting infrastructure (Cloudflare Workers / Cloudflare CDN).</li>
+        <li><strong>Device data:</strong> device type, screen resolution, and language preference, collected via standard browser APIs.</li>
+        <li><strong>Cookies and local storage:</strong> session identifiers and preference data. See Section 10 for full cookie details.</li>
+      </ul>
+
+      <h3>2.3 Data from third parties</h3>
+      <ul>
+        <li><strong>Payment data:</strong> Stripe, our payment processor, shares with us a tokenised payment confirmation, last four digits of the card, card type, and transaction reference. We never receive or store your full card number, CVV, or bank account credentials.</li>
+        <li><strong>Telegram:</strong> if you connect your Telegram account to a booking, we receive and store your Telegram chat ID solely to send you booking updates.</li>
+      </ul>
+
+      <h3>2.4 Data we do NOT collect</h3>
+      <p>
+        We do not collect special categories of personal data (health data, biometric data, racial or ethnic origin, political opinions, religious beliefs, etc.) and we ask that you do not submit such data to us.
+      </p>
+
+      <!-- 3 -->
+      <h2>3. How We Use Your Data</h2>
+
+      <p>We use your personal data only for the purposes listed below, each tied to a specific legal basis under Article 6 GDPR:</p>
+
+      <div class="not-prose overflow-x-auto mb-8">
+        <table class="w-full text-sm border-collapse">
+          <thead>
+            <tr class="bg-gray-50">
+              <th class="text-left px-4 py-3 text-gray-700 font-semibold border border-gray-200 w-1/2">Purpose</th>
+              <th class="text-left px-4 py-3 text-gray-700 font-semibold border border-gray-200">Legal basis (Art. 6 GDPR)</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <tr>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Processing and managing your booking</td>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Performance of a contract (Art. 6(1)(b))</td>
+            </tr>
+            <tr class="bg-gray-50/50">
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Sending booking confirmations, updates, and check-in/check-out reminders</td>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Performance of a contract (Art. 6(1)(b))</td>
+            </tr>
+            <tr>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Sharing necessary booking details with the property owner</td>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Performance of a contract (Art. 6(1)(b))</td>
+            </tr>
+            <tr class="bg-gray-50/50">
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Processing payments via Stripe</td>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Performance of a contract (Art. 6(1)(b))</td>
+            </tr>
+            <tr>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Responding to inquiries and customer support requests</td>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Legitimate interests (Art. 6(1)(f))</td>
+            </tr>
+            <tr class="bg-gray-50/50">
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Preventing fraud, abuse, and unauthorised access</td>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Legitimate interests (Art. 6(1)(f))</td>
+            </tr>
+            <tr>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Maintaining platform security and audit logs</td>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Legitimate interests (Art. 6(1)(f))</td>
+            </tr>
+            <tr class="bg-gray-50/50">
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Complying with Greek tax and accounting obligations</td>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Legal obligation (Art. 6(1)(c))</td>
+            </tr>
+            <tr>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Sending marketing emails about similar properties or offers (opt-out available)</td>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Legitimate interests (Art. 6(1)(f)) / Consent (Art. 6(1)(a)) where required</td>
+            </tr>
+            <tr class="bg-gray-50/50">
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Improving the platform through aggregated analytics</td>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Legitimate interests (Art. 6(1)(f))</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        We do not use your data for automated decision-making or profiling that produces legal or similarly significant effects.
+      </p>
+
+      <!-- 4 -->
+      <h2>4. Who We Share Your Data With</h2>
+      <p>
+        We share your personal data only where necessary and only with the following categories of recipient:
+      </p>
+
+      <h3>4.1 Property Owners</h3>
+      <p>
+        When you make a booking, we share your name, email address, phone number, and booking details with the relevant property Owner so they can manage your stay. Owners receive only the data necessary to fulfil the booking and are required to handle it in accordance with applicable data protection law.
+      </p>
+
+      <h3>4.2 Payment processor — Stripe</h3>
+      <p>
+        Payment data is processed by <strong>Stripe, Inc.</strong> (or its European entity Stripe Payments Europe, Ltd.), subject to Stripe's own Privacy Policy and Data Processing Agreement. Stripe is certified under the EU-US Data Privacy Framework. We share only the data Stripe requires to process the transaction.
+      </p>
+
+      <h3>4.3 Infrastructure and hosting</h3>
+      <ul>
+        <li><strong>Cloudflare, Inc.</strong> — website hosting, CDN, DDoS protection, and Workers compute. Cloudflare may process request metadata (IP address, headers) in its infrastructure, including in the United States, under standard contractual clauses.</li>
+        <li><strong>Supabase, Inc.</strong> — our database provider. Booking data, user accounts, and platform content are stored in Supabase infrastructure in the EU (Frankfurt, Germany). Supabase acts as a data processor under a Data Processing Agreement.</li>
+      </ul>
+
+      <h3>4.4 Communication services</h3>
+      <ul>
+        <li><strong>Resend / email provider:</strong> transactional emails (booking confirmations, reminders) are sent via our email delivery provider. Your name and email address are passed to this provider solely to deliver the email.</li>
+        <li><strong>Telegram Messenger:</strong> if you connect your Telegram account, messages are transmitted via the Telegram Bot API. Telegram's own privacy policy applies to data processed by Telegram.</li>
+      </ul>
+
+      <h3>4.5 Legal and regulatory disclosures</h3>
+      <p>
+        We may disclose personal data to courts, law enforcement authorities, regulatory bodies, or other third parties where we are required to do so by applicable law, or where we believe in good faith that disclosure is necessary to protect our rights, your safety, or the safety of others.
+      </p>
+
+      <h3>4.6 No sale of data</h3>
+      <p>
+        <strong>We do not sell, rent, or trade your personal data to any third party for their own marketing purposes.</strong>
+      </p>
+
+      <!-- 5 -->
+      <h2>5. International Data Transfers</h2>
+      <p>
+        Some of our third-party processors (Cloudflare, Stripe, Supabase) may transfer or process data outside the European Economic Area (EEA). Where such transfers occur, we ensure they are protected by one or more of the following safeguards:
+      </p>
+      <ul>
+        <li>An <strong>adequacy decision</strong> by the European Commission;</li>
+        <li><strong>Standard Contractual Clauses (SCCs)</strong> approved by the European Commission; or</li>
+        <li>Certification under an approved framework such as the <strong>EU-US Data Privacy Framework</strong>.</li>
+      </ul>
+      <p>
+        You may request a copy of the applicable transfer safeguards by contacting us at <a href={`mailto:${controllerEmail}`}>{controllerEmail}</a>.
+      </p>
+
+      <!-- 6 -->
+      <h2>6. Data Retention</h2>
+      <p>
+        We retain personal data only for as long as necessary for the purposes described in this Policy, or as required by law. Our standard retention periods are:
+      </p>
+      <ul>
+        <li><strong>Booking and payment records:</strong> 10 years from the date of the booking, in compliance with Greek accounting and tax law (Law 4308/2014).</li>
+        <li><strong>Inquiry data (no booking made):</strong> 12 months from the date of inquiry, then deleted.</li>
+        <li><strong>Account data:</strong> for the duration of the account plus 12 months after closure.</li>
+        <li><strong>Audit logs and security logs:</strong> 12 months.</li>
+        <li><strong>Marketing communications preferences:</strong> until you opt out, then immediately suppressed (the opt-out record itself is kept indefinitely to honour your preference).</li>
+        <li><strong>Telegram chat IDs:</strong> deleted when the associated booking record is deleted or on request.</li>
+      </ul>
+      <p>
+        When data is no longer needed we delete or anonymise it securely.
+      </p>
+
+      <!-- 7 -->
+      <h2>7. Your Rights Under GDPR</h2>
+      <p>
+        As a data subject under the GDPR you have the following rights, exercisable free of charge by contacting us at <a href={`mailto:${controllerEmail}`}>{controllerEmail}</a>:
+      </p>
+      <ul>
+        <li><strong>Right of access (Art. 15):</strong> you may request a copy of the personal data we hold about you and information about how it is processed.</li>
+        <li><strong>Right to rectification (Art. 16):</strong> you may ask us to correct inaccurate or incomplete personal data.</li>
+        <li><strong>Right to erasure / "right to be forgotten" (Art. 17):</strong> you may ask us to delete your personal data where there is no compelling reason for us to continue processing it. Note that we may be required to retain certain data to comply with our legal obligations.</li>
+        <li><strong>Right to restriction of processing (Art. 18):</strong> you may ask us to restrict processing of your data in certain circumstances, e.g. while accuracy is disputed.</li>
+        <li><strong>Right to data portability (Art. 20):</strong> you may request a structured, machine-readable copy of data you have provided to us, where processing is based on consent or contract.</li>
+        <li><strong>Right to object (Art. 21):</strong> you may object at any time to processing based on legitimate interests, including direct marketing. Where you object to marketing, we will stop immediately.</li>
+        <li><strong>Right to withdraw consent (Art. 7(3)):</strong> where processing is based on your consent, you may withdraw it at any time without affecting the lawfulness of processing before withdrawal.</li>
+        <li><strong>Right to lodge a complaint:</strong> you have the right to lodge a complaint with the <strong>Hellenic Data Protection Authority (HDPA)</strong> — <a href="https://www.dpa.gr" target="_blank" rel="noopener noreferrer">www.dpa.gr</a> — or with the supervisory authority in your country of residence.</li>
+      </ul>
+      <p>
+        We will respond to all requests within <strong>30 days</strong>. In complex cases we may extend this by a further two months and will notify you accordingly.
+      </p>
+
+      <!-- 8 -->
+      <h2>8. Data Security</h2>
+      <p>
+        We implement appropriate technical and organisational measures to protect your personal data against unauthorised access, alteration, disclosure, or destruction, including:
+      </p>
+      <ul>
+        <li>All data in transit is encrypted using TLS 1.2 or higher (HTTPS enforced site-wide).</li>
+        <li>All data at rest in Supabase is encrypted using AES-256.</li>
+        <li>Passwords are hashed using bcrypt; we never store plain-text credentials.</li>
+        <li>Access to personal data is restricted on a strict need-to-know basis; admin access requires authenticated accounts.</li>
+        <li>Payment card data is never transmitted to or stored on our servers — all card processing is handled exclusively by Stripe's PCI-DSS-certified infrastructure.</li>
+        <li>Row-Level Security (RLS) policies on our database prevent one user from accessing another user's data.</li>
+        <li>We maintain audit logs of significant data access and modification events.</li>
+      </ul>
+      <p>
+        Despite these measures, no system is completely secure. In the event of a personal data breach that is likely to result in a risk to your rights and freedoms, we will notify the HDPA within 72 hours and, where required, notify affected individuals without undue delay, in accordance with Art. 33–34 GDPR.
+      </p>
+
+      <!-- 9 -->
+      <h2>9. Children's Privacy</h2>
+      <p>
+        The Platform is not directed at children under the age of 16. We do not knowingly collect personal data from children. If you believe we have inadvertently collected data from a child, please contact us immediately at <a href={`mailto:${controllerEmail}`}>{controllerEmail}</a> and we will delete it.
+      </p>
+
+      <!-- 10 -->
+      <h2>10. Cookies and Tracking Technologies</h2>
+
+      <h3>10.1 What we use</h3>
+      <p>
+        We use a minimal set of cookies and browser storage mechanisms:
+      </p>
+
+      <div class="not-prose overflow-x-auto mb-8">
+        <table class="w-full text-sm border-collapse">
+          <thead>
+            <tr class="bg-gray-50">
+              <th class="text-left px-4 py-3 text-gray-700 font-semibold border border-gray-200">Name / Type</th>
+              <th class="text-left px-4 py-3 text-gray-700 font-semibold border border-gray-200">Purpose</th>
+              <th class="text-left px-4 py-3 text-gray-700 font-semibold border border-gray-200">Duration</th>
+              <th class="text-left px-4 py-3 text-gray-700 font-semibold border border-gray-200">Category</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-gray-100">
+            <tr>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Session cookie</td>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Maintains your login session for admin/owner accounts</td>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Session</td>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Strictly necessary</td>
+            </tr>
+            <tr class="bg-gray-50/50">
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Language preference</td>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Remembers your selected language</td>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">1 year</td>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Functional</td>
+            </tr>
+            <tr>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Cloudflare (_cf_*)</td>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Bot detection, DDoS protection, performance optimisation</td>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Session / 1 year</td>
+              <td class="px-4 py-3 text-gray-600 border border-gray-200">Strictly necessary</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>10.2 What we do NOT use</h3>
+      <p>
+        We do not use advertising cookies, cross-site tracking pixels, Google Analytics, Facebook Pixel, or any third-party behavioural analytics or retargeting tools.
+      </p>
+
+      <h3>10.3 Managing cookies</h3>
+      <p>
+        You can control and delete cookies through your browser settings. Blocking strictly necessary cookies may affect the functionality of the Platform (e.g. you will not be able to stay logged in). Blocking functional cookies will mean your language preference is not remembered between sessions.
+      </p>
+
+      <!-- 11 -->
+      <h2>11. Third-Party Links</h2>
+      <p>
+        The Platform may contain links to third-party websites (e.g. Google Maps, WhatsApp, Viber). We are not responsible for the privacy practices of those sites. We recommend you read their privacy policies before providing any personal data to them.
+      </p>
+
+      <!-- 12 -->
+      <h2>12. Changes to This Policy</h2>
+      <p>
+        We may update this Privacy Policy from time to time. When we do, we will revise the "Last updated" date at the top of the page. For significant changes we will notify users by posting a prominent notice on the Platform or by direct email where we hold your email address. Your continued use of the Platform after any update constitutes acceptance of the revised Policy.
+      </p>
+
+      <!-- 13 -->
+      <h2>13. Contact and Complaints</h2>
+      <p>
+        For any privacy-related questions, requests to exercise your rights, or concerns about how we handle your data:
+      </p>
+      <p>
+        <strong>Data Controller — KefaloniaBNB</strong><br />
+        Email: <a href={`mailto:${controllerEmail}`}>{controllerEmail}</a><br />
+        Website: <a href={siteUrl}>{siteUrl}</a>
+      </p>
+      <p>
+        If you are not satisfied with our response, you have the right to lodge a complaint with:
+      </p>
+      <p>
+        <strong>Hellenic Data Protection Authority (HDPA)</strong><br />
+        Kifisias 1–3, 115 23 Athens, Greece<br />
+        Tel: +30 210 6475 600<br />
+        Website: <a href="https://www.dpa.gr" target="_blank" rel="noopener noreferrer">www.dpa.gr</a><br />
+        Email: <a href="mailto:contact@dpa.gr">contact@dpa.gr</a>
+      </p>
+
+      <div class="not-prose mt-16 pt-8 border-t border-gray-100 text-sm text-gray-400">
+        This Privacy Policy was last updated on {effectiveDate}. Prior versions are available on request.
+      </div>
+
+    </div>
+  </section>
+
+</BaseLayout>

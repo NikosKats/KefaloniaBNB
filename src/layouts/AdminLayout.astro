@@ -1,0 +1,638 @@
+---
+import '../styles/global.css';
+import { getServiceClient } from '../lib/supabase.ts';
+
+interface Props {
+  title: string;
+}
+const { title } = Astro.props;
+const session = Astro.locals.session;
+const path = Astro.url.pathname;
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+const role = Astro.locals.profile?.role ?? 'admin';
+const isOwner = role === 'property_owner';
+const isRestaurantOwner = role === 'restaurant_owner';
+const isSuperAdmin = role === 'super_admin';
+
+const vapidKey = import.meta.env.PUBLIC_VAPID_KEY ?? '';
+
+// PWA manifest page key — varies by role
+const manifestPage = isRestaurantOwner ? 'admin-restaurant' : isOwner ? 'admin-owner' : 'admin';
+const pwaTitle = isRestaurantOwner ? 'Kefalonia Restaurant' : isOwner ? 'Kefalonia Owner' : 'Kefalonia Admin';
+
+// Fetch recent notifications for bell
+const userId = session?.user?.id;
+const accessToken = session?.access_token ?? '';
+const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL ?? '';
+const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY ?? '';
+
+let recentNotifications: any[] = [];
+if (userId) {
+  const service = getServiceClient();
+  // Only super_admin/admin see all events; owners see only their own
+  let eventsQuery = service
+    .from('admin_events')
+    .select('id, type, title, message, entity_type, entity_id, owner_id, created_at')
+    .order('created_at', { ascending: false })
+    .limit(12);
+  if (!isSuperAdmin && role !== 'admin') {
+    // Property owners and restaurant owners only see their own events
+    eventsQuery = eventsQuery.eq('owner_id', userId);
+  }
+  const { data } = await eventsQuery;
+  recentNotifications = data ?? [];
+}
+
+const NOTIF_LABELS: Record<string, string> = {
+  new_request: 'New cleaning request available',
+  bid_received: 'New bid received on your request',
+  bid_accepted: 'Your bid has been accepted!',
+  bid_rejected: 'A bid was not selected',
+  job_scheduled: 'Job scheduled',
+  job_started: 'Cleaner has started the job',
+  job_completed: 'Cleaner marked the job complete',
+  job_approved: 'Job approved — payment released!',
+  payment_received: 'Payment received',
+  payout_sent: 'Payout sent',
+  dispute_raised: 'A dispute has been raised',
+  dispute_resolved: 'Dispute resolved',
+};
+
+const adminLabels: Record<string, Record<string, string>> = {
+  dashboard:  { en: 'Dashboard',  el: 'Πίνακας Ελέγχου', bg: 'Табло', sr: 'Контролна табла', tr: 'Gösterge Paneli', ro: 'Panou' },
+  bookings:   { en: 'Bookings',   el: 'Κρατήσεις', bg: 'Резервации', sr: 'Резервације', tr: 'Rezervasyonlar', ro: 'Rezervări' },
+  cleaning:   { en: 'Cleaning',   el: 'Καθαρισμός', bg: 'Почистване', sr: 'Чишћење', tr: 'Temizlik', ro: 'Curățenie' },
+  listings:   { en: 'Listings',   el: 'Καταχωρίσεις', bg: 'Обяви', sr: 'Огласи', tr: 'İlanlar', ro: 'Proprietăți' },
+  reviews:    { en: 'Reviews',    el: 'Κριτικές', bg: 'Отзиви', sr: 'Рецензије', tr: 'Yorumlar', ro: 'Recenzii' },
+  coupons:    { en: 'Coupons',    el: 'Κουπόνια', bg: 'Купони', sr: 'Купони', tr: 'Kuponlar', ro: 'Cupoane' },
+  featured:   { en: 'Featured',   el: 'Προβεβλημένα', bg: 'Препоръчани', sr: 'Истакнуто', tr: 'Öne Çıkan', ro: 'Recomandate' },
+  telegram:   { en: 'Telegram',   el: 'Telegram', bg: 'Telegram', sr: 'Telegram', tr: 'Telegram', ro: 'Telegram' },
+  content:    { en: 'Content',    el: 'Περιεχόμενο', bg: 'Съдържание', sr: 'Садржај', tr: 'İçerik', ro: 'Conținut' },
+  payouts:    { en: 'Payouts',    el: 'Πληρωμές', bg: 'Плащания', sr: 'Исплате', tr: 'Ödemeler', ro: 'Plăți' },
+  owners:     { en: 'Owners',     el: 'Ιδιοκτήτες', bg: 'Собственици', sr: 'Власници', tr: 'Sahipler', ro: 'Proprietari' },
+  analytics:  { en: 'Analytics',  el: 'Αναλυτικά', bg: 'Аналитика', sr: 'Аналитика', tr: 'Analitik', ro: 'Analize' },
+  platform:   { en: 'Platform',   el: 'Πλατφόρμα', bg: 'Платформа', sr: 'Платформа', tr: 'Platform', ro: 'Platformă' },
+  profile:    { en: 'My Profile', el: 'Προφίλ', bg: 'Моят профил', sr: 'Мој профил', tr: 'Profilim', ro: 'Profil' },
+  sign_out:   { en: 'Sign out',   el: 'Αποσύνδεση', bg: 'Изход', sr: 'Одјава', tr: 'Çıkış', ro: 'Deconectare' },
+  view_site:  { en: 'View site ↗', el: 'Δείτε σελίδα ↗', bg: 'Виж сайта ↗', sr: 'Погледај сајт ↗', tr: 'Siteyi gör ↗', ro: 'Vezi Site ↗' },
+  admin_panel:{ en: 'Admin Panel', el: 'Πίνακας Admin', bg: 'Админ панел', sr: 'Админ панел', tr: 'Yönetim Paneli', ro: 'Panou Admin' },
+  reservations:{ en: 'Reservations', el: 'Κρατήσεις', bg: 'Резервации', sr: 'Резервације', tr: 'Rezervasyonlar', ro: 'Rezervări' },
+  tables:      { en: 'Tables',       el: 'Τραπέζια', bg: 'Маси', sr: 'Столови', tr: 'Masalar', ro: 'Mese' },
+  settings:    { en: 'Settings',     el: 'Ρυθμίσεις', bg: 'Настройки', sr: 'Подешавања', tr: 'Ayarlar', ro: 'Setări' },
+  qr_codes:    { en: 'QR Codes',     el: 'QR Codes', bg: 'QR Кодове', sr: 'QR Кодови', tr: 'QR Kodlar', ro: 'Coduri QR' },
+  cleaners:    { en: 'Cleaners',     el: 'Καθαριστές', bg: 'Чистачи', sr: 'Чистачи', tr: 'Temizlikçiler', ro: 'Curățători' },
+  partners:    { en: 'Partners',     el: 'Συνεργάτες', bg: 'Партньори', sr: 'Партнери', tr: 'İş Ortakları', ro: 'Parteneri' },
+  blog:        { en: 'Blog',         el: 'Ιστολόγιο', bg: 'Блог', sr: 'Блог', tr: 'Blog', ro: 'Blog' },
+  guests:      { en: 'Guests',       el: 'Επισκέπτες', bg: 'Гости', sr: 'Гости', tr: 'Misafirler', ro: 'Oaspeți' },
+  reports:     { en: 'Reports',      el: 'Αναφορές', bg: 'Доклади', sr: 'Извештаји', tr: 'Raporlar', ro: 'Rapoarte' },
+  technicians: { en: 'Technicians',  el: 'Τεχνικοί', bg: 'Техници', sr: 'Техничари', tr: 'Teknisyenler', ro: 'Tehnicieni' },
+  restaurants: { en: 'Restaurants',  el: 'Εστιατόρια', bg: 'Ресторанти', sr: 'Ресторани', tr: 'Restoranlar', ro: 'Restaurante' },
+  community:   { en: 'Community',    el: 'Κοινότητα', bg: 'Общност', sr: 'Заједница', tr: 'Topluluk', ro: 'Comunitate' },
+  members:     { en: 'Members',      el: 'Μέλη', bg: 'Членове', sr: 'Чланови', tr: 'Üyeler', ro: 'Membri' },
+  rest_owners: { en: 'Restaurant Owners', el: 'Ιδιοκτήτες Εστιατορίων', bg: 'Собственици на ресторанти', sr: 'Власници ресторана', tr: 'Restoran Sahipleri', ro: 'Proprietari Restaurante' },
+  banner:      { en: 'Banner',       el: 'Banner', bg: 'Банер', sr: 'Банер', tr: 'Banner', ro: 'Banner' },
+  referrals:   { en: 'Referrals',    el: 'Παραπομπές', bg: 'Препоръки', sr: 'Препоруке', tr: 'Yönlendirmeler', ro: 'Referințe' },
+};
+function al(key: string) { return adminLabels[key]?.[lang] ?? adminLabels[key]?.en ?? key; }
+
+// Nav varies by role
+const navItems = isRestaurantOwner ? [
+  { href: '/admin/restaurant',              label: al('dashboard'),     icon: '▤' },
+  { href: '/admin/restaurant/reservations', label: al('reservations'),  icon: '📅' },
+  { href: '/admin/restaurant/tables',       label: al('tables'),        icon: '🪑' },
+  { href: '/admin/qr-codes',               label: al('qr_codes'),      icon: '📱' },
+  { href: '/admin/restaurant/settings',     label: al('settings'),      icon: '⚙️' },
+  { href: '/admin/profile',                 label: al('profile'),       icon: '👤' },
+] : isOwner ? [
+  { href: '/admin',           label: al('dashboard'), icon: '▤' },
+  { href: '/admin/bookings',  label: al('bookings'),  icon: '📅' },
+  { href: '/admin/listings',  label: al('listings'),  icon: '🏡' },
+  { href: '/admin/analytics', label: al('analytics'), icon: '📊' },
+  { href: '/admin/qr-codes',  label: al('qr_codes'),  icon: '📱' },
+  { href: '/owner/cleaning',  label: al('cleaning'),  icon: '🧹' },
+  { href: '/admin/payouts',   label: al('payouts'),   icon: '💶' },
+  { href: '/admin/profile',   label: al('profile'),   icon: '👤' },
+] : [
+  { href: '/admin',           label: al('dashboard'), icon: '▤' },
+  { href: '/admin/bookings',  label: al('bookings'),  icon: '📅' },
+  { href: '/admin/listings',  label: al('listings'),  icon: '🏡' },
+  { href: '/admin/cleaning',         label: al('cleaning'),     icon: '🧹' },
+  { href: '/admin/cleaning/cleaners', label: al('cleaners'),    icon: '👷' },
+  { href: '/admin/partners',  label: al('partners'),     icon: '🤝' },
+  { href: '/admin/reviews',   label: al('reviews'),      icon: '⭐' },
+  { href: '/admin/coupons',   label: al('coupons'),      icon: '🏷️' },
+  { href: '/admin/featured',  label: al('featured'),     icon: '⭐' },
+  { href: '/admin/telegram',  label: al('telegram'),     icon: '✈️' },
+  { href: '/admin/content',   label: al('content'),      icon: '📄' },
+  { href: '/admin/blog',      label: al('blog'),         icon: '✍️' },
+  { href: '/admin/analytics', label: al('analytics'),    icon: '📊' },
+  { href: '/admin/guests',    label: al('guests'),       icon: '👥' },
+  { href: '/admin/reports',      label: al('reports'),       icon: '📋' },
+  { href: '/admin/technicians',  label: al('technicians'),   icon: '🔧' },
+  { href: '/admin/restaurants',  label: al('restaurants'),   icon: '🍽️' },
+  { href: '/admin/restaurant/reservations', label: al('reservations'), icon: '📋' },
+  { href: '/admin/community',   label: al('community'),     icon: '💬' },
+  { href: '/admin/members',     label: al('members'),       icon: '👥' },
+  { href: '/admin/qr-codes',    label: al('qr_codes'),      icon: '📱' },
+  ...(isSuperAdmin ? [
+    { href: '/admin/owners',              label: al('owners'),         icon: '🏘️' },
+    { href: '/admin/restaurant-owners',   label: al('rest_owners'),    icon: '🍽️' },
+    { href: '/admin/banner',              label: al('banner'),         icon: '📢' },
+    { href: '/admin/platform',            label: al('platform'),       icon: '⚙️' },
+    { href: '/admin/referrals',           label: al('referrals'),      icon: '🔗' },
+  ] : []),
+  { href: '/admin/profile',   label: al('profile'),   icon: '👤' },
+];
+
+function isActive(href: string) {
+  if (href === '/admin') return path === '/admin';
+  if (href === '/admin/restaurant') return path === '/admin/restaurant';
+  if (href === '/admin/cleaning') return path.startsWith('/admin/cleaning') && !path.startsWith('/admin/cleaning/cleaners');
+  if (href === '/admin/restaurants') return path === '/admin/restaurants';
+  return path.startsWith(href);
+}
+---
+
+<!DOCTYPE html>
+<html lang="en" class="dark overflow-hidden h-screen">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title} – Admin | KefaloniaBNB</title>
+  <meta name="robots" content="noindex, nofollow" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="manifest" href={`/api/manifest?page=${manifestPage}`} />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content={pwaTitle} />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#1a1a2e" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" />
+</head>
+<!-- Notification data for persistent unread count -->
+<div id="notif-data" class="hidden"
+  data-notifications={JSON.stringify(recentNotifications.map((n: any) => ({ id: n.id, created_at: n.created_at })))}
+  aria-hidden="true"
+></div>
+<!-- Realtime config (hidden, read by client script) -->
+<div id="rt-cfg"
+  data-url={supabaseUrl}
+  data-key={supabaseAnonKey}
+  data-uid={userId ?? ''}
+  data-token={accessToken}
+  class="hidden"
+  aria-hidden="true"
+></div>
+<!-- Toast container -->
+<div id="toast-container" class="fixed top-4 right-4 z-[9999] flex flex-col gap-2 pointer-events-none"></div>
+<body class="bg-gray-50 text-gray-900 antialiased font-['Inter'] overflow-hidden h-screen">
+  <div class="flex h-screen overflow-hidden">
+
+    <!-- ── Mobile overlay backdrop ──────────────────────────────────────── -->
+    <div
+      id="sidebar-backdrop"
+      class="fixed inset-0 bg-black/50 z-20 lg:hidden hidden"
+      aria-hidden="true"
+    ></div>
+
+    <!-- ── Sidebar (desktop: always visible · mobile: slide-in drawer) ──── -->
+    <aside
+      id="sidebar"
+      class="fixed lg:static inset-y-0 left-0 z-30 flex flex-col w-72 lg:w-64 bg-[#1a1a2e] text-white shrink-0
+             -translate-x-full lg:translate-x-0 transition-transform duration-300 ease-in-out"
+    >
+      <!-- Drawer header -->
+      <div class="px-6 py-6 border-b border-white/10 flex items-center justify-between">
+        <div>
+          <p class="font-bold text-lg tracking-tight">KefaloniaBNB</p>
+          <p class="text-xs text-gray-400 mt-0.5">{al('admin_panel')}</p>
+        </div>
+        <!-- Close button — mobile only -->
+        <button
+          id="sidebar-close"
+          class="lg:hidden text-gray-400 hover:text-white transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md"
+          aria-label="Close menu"
+        >
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Nav links -->
+      <nav class="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
+        {navItems.map((item) => (
+          <a
+            href={item.href}
+            class={`flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-sm font-medium transition-colors ${
+              isActive(item.href)
+                ? 'bg-white/10 text-white'
+                : 'text-gray-400 hover:bg-white/5 hover:text-white'
+            }`}
+          >
+            <span class="text-base">{item.icon}</span>
+            {item.label}
+          </a>
+        ))}
+      </nav>
+
+      <!-- Footer -->
+      <div class="px-3 py-4 border-t border-white/10">
+        <p class="text-xs text-gray-500 px-3 mb-2 truncate">{session?.user?.email}</p>
+        <form method="POST" action="/api/auth/logout">
+          <button type="submit" class="w-full flex items-center gap-3 px-3 py-2.5 min-h-[44px] rounded-lg text-sm text-gray-400 hover:bg-white/5 hover:text-white transition-colors">
+            <span>↩</span> {al('sign_out')}
+          </button>
+        </form>
+      </div>
+    </aside>
+
+    <!-- ── Main content ──────────────────────────────────────────────────── -->
+    <div class="flex-1 flex flex-col min-w-0 overflow-hidden">
+
+      <!-- Top bar -->
+      <header class="bg-white border-b border-gray-200 px-4 lg:px-6 py-4 flex items-center justify-between shrink-0">
+        <div class="flex items-center gap-3">
+          <!-- Hamburger — mobile only -->
+          <button
+            id="sidebar-open"
+            class="lg:hidden text-gray-500 hover:text-gray-900 transition-colors min-w-[44px] min-h-[44px] flex items-center justify-center rounded-md hover:bg-gray-100"
+            aria-label="Open menu"
+          >
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"/>
+            </svg>
+          </button>
+          <h1 class="text-lg lg:text-xl font-semibold text-gray-900 truncate">{title}</h1>
+        </div>
+
+        <div class="flex items-center gap-2 lg:gap-4">
+          <!-- Notification Bell -->
+          {userId && (
+            <div id="notif-wrapper" class="relative">
+              <button id="notif-btn" class="relative min-w-[44px] min-h-[44px] flex items-center justify-center rounded-lg hover:bg-gray-100 transition-colors" aria-label="Notifications">
+                <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+                </svg>
+                <span id="notif-badge" class="hidden absolute top-0.5 right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-0.5 leading-none">0</span>
+              </button>
+              <!-- Notification panel -->
+              <div id="notif-panel" class="hidden absolute right-0 sm:right-0 top-11 w-[calc(100vw-2rem)] sm:w-80 bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden">
+                <div class="px-4 py-3 border-b border-white/10 flex items-center justify-between">
+                  <p class="text-sm font-semibold text-white">{isEl ? 'Ειδοποιήσεις' : isBg ? 'Известия' : isSr ? 'Обавештења' : isTr ? 'Bildirimler' : isRo ? 'Notificări' : 'Notifications'}</p>
+                  <span class="text-xs text-white/50">{recentNotifications.length} {isEl ? 'πρόσφατες' : isBg ? 'скорошни' : isSr ? 'недавних' : isTr ? 'yeni' : isRo ? 'recente' : 'recent'}</span>
+                </div>
+                <div class="max-h-72 overflow-y-auto" id="notif-list">
+                  {recentNotifications.length === 0 && (
+                    <p class="text-sm text-white/40 text-center py-8">{isEl ? 'Δεν υπάρχουν ειδοποιήσεις ακόμα' : isBg ? 'Все още няма известия' : isSr ? 'Још нема обавештења' : isTr ? 'Henüz bildirim yok' : isRo ? 'Nicio notificare încă' : 'No notifications yet'}</p>
+                  )}
+                  {recentNotifications.map((n: any) => {
+                    const href = n.entity_type === 'bookings' && n.entity_id
+                      ? `/admin/bookings/${n.entity_id}`
+                      : n.entity_type === 'listings' && n.entity_id
+                      ? `/admin/listings/${n.entity_id}`
+                      : n.entity_type === 'profiles' && n.entity_id
+                      ? `/admin/owners`
+                      : null;
+                    const timeAgo = new Date(n.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+                    const icon = n.type.startsWith('booking.created') ? '🏡'
+                      : n.type.startsWith('booking.confirmed') ? '✅'
+                      : n.type.startsWith('booking.cancelled') ? '❌'
+                      : n.type.startsWith('payment') ? '💳'
+                      : n.type.startsWith('owner') ? '👤'
+                      : '🔔';
+                    return (
+                      <div class="px-4 py-3 border-b border-white/5 hover:bg-white/5 transition-colors">
+                        {href ? (
+                          <a href={href} class="block">
+                            <p class="text-sm text-white font-medium">{icon} {n.title}</p>
+                            {n.message && <p class="text-xs text-white/50 mt-0.5 truncate">{n.message}</p>}
+                            <p class="text-xs text-white/35 mt-0.5">{timeAgo}</p>
+                          </a>
+                        ) : (
+                          <div>
+                            <p class="text-sm text-white font-medium">{icon} {n.title}</p>
+                            {n.message && <p class="text-xs text-white/50 mt-0.5 truncate">{n.message}</p>}
+                            <p class="text-xs text-white/35 mt-0.5">{timeAgo}</p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          )}
+
+          <!-- Language switcher -->
+          <div class="flex items-center gap-0.5 bg-gray-100 rounded-xl p-0.5">
+            {[
+              { code: 'en', flag: '🇬🇧' },
+              { code: 'el', flag: '🇬🇷' },
+              { code: 'bg', flag: '🇧🇬' },
+              { code: 'sr', flag: '🇷🇸' },
+              { code: 'tr', flag: '🇹🇷' },
+              { code: 'ro', flag: '🇷🇴' },
+            ].map((l) => (
+              <a
+                href={`?lang=${l.code}`}
+                class={`min-w-[36px] min-h-[36px] lg:min-w-[40px] lg:min-h-[40px] flex items-center justify-center rounded-lg text-sm transition-colors ${lang === l.code ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700 hover:bg-white/50'}`}
+              >{l.flag}</a>
+            ))}
+          </div>
+          <a href="/" target="_blank" class="min-w-[44px] min-h-[44px] flex items-center justify-center gap-1 text-sm text-gray-500 hover:text-gray-900 transition-colors whitespace-nowrap" aria-label="View site">
+            <!-- Icon only on mobile, text+icon on sm+ -->
+            <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/>
+            </svg>
+            <span class="hidden sm:inline">{al('view_site')}</span>
+          </a>
+        </div>
+      </header>
+
+      <!-- Content -->
+      <main class="flex-1 overflow-auto p-4 lg:p-6">
+        <slot />
+      </main>
+    </div>
+  </div>
+
+  <script>
+    const sidebar   = document.getElementById('sidebar');
+    const backdrop  = document.getElementById('sidebar-backdrop');
+    const openBtn   = document.getElementById('sidebar-open');
+    const closeBtn  = document.getElementById('sidebar-close');
+
+    function openSidebar() {
+      sidebar?.classList.remove('-translate-x-full');
+      backdrop?.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+    function closeSidebar() {
+      sidebar?.classList.add('-translate-x-full');
+      backdrop?.classList.add('hidden');
+      document.body.style.overflow = '';
+    }
+
+    // Global toast helper — callable from any page script via window.adminToast(msg, type)
+    (window as any).adminToast = function(msg: string, type: string = 'success') {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const bg = type === 'error' ? '#ef4444' : type === 'info' ? '#6b7280' : '#10b981';
+      const t = document.createElement('div');
+      t.className = 'pointer-events-auto flex items-center gap-3 px-4 py-3 rounded-2xl shadow-lg text-sm font-medium max-w-xs';
+      t.style.cssText = `background:${bg};color:white;animation:slideIn 0.25s ease-out`;
+      t.innerHTML = `<span class="flex-1">${msg}</span><button style="opacity:.6;font-size:1.1rem;line-height:1;cursor:pointer;background:none;border:none;color:inherit" onclick="this.closest('div').remove()">×</button>`;
+      container.appendChild(t);
+      setTimeout(() => { t.style.transition = 'opacity 0.3s'; t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3500);
+    };
+
+    openBtn?.addEventListener('click', openSidebar);
+    closeBtn?.addEventListener('click', closeSidebar);
+    backdrop?.addEventListener('click', closeSidebar);
+
+    // Close on nav link tap (mobile UX)
+    sidebar?.querySelectorAll('a').forEach((a) => {
+      a.addEventListener('click', () => {
+        if (window.innerWidth < 1024) closeSidebar();
+      });
+    });
+
+    // Notification bell toggle + persistent unread count
+    const STORAGE_KEY = 'notif_last_read_admin';
+    const badge = document.getElementById('notif-badge') as HTMLElement | null;
+    const notifDataEl = document.getElementById('notif-data') as HTMLElement | null;
+    const serverNotifs: Array<{ id: string; created_at: string }> = JSON.parse(
+      notifDataEl?.dataset.notifications ?? '[]'
+    );
+    const lastRead = localStorage.getItem(STORAGE_KEY) ?? '1970-01-01T00:00:00Z';
+    let unreadCount = serverNotifs.filter(n => new Date(n.created_at) > new Date(lastRead)).length;
+
+    function updateBadge() {
+      if (!badge) return;
+      if (unreadCount > 0) {
+        badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+        badge.classList.remove('hidden');
+      } else {
+        badge.classList.add('hidden');
+      }
+    }
+    updateBadge();
+
+    const notifBtn = document.getElementById('notif-btn');
+    const notifPanel = document.getElementById('notif-panel');
+    notifBtn?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      notifPanel?.classList.toggle('hidden');
+      if (!notifPanel?.classList.contains('hidden')) {
+        localStorage.setItem(STORAGE_KEY, new Date().toISOString());
+        unreadCount = 0;
+        updateBadge();
+      }
+    });
+    document.addEventListener('click', (e) => {
+      if (!document.getElementById('notif-wrapper')?.contains(e.target as Node)) {
+        notifPanel?.classList.add('hidden');
+      }
+    });
+  </script>
+
+  <script>
+    import { createClient } from '@supabase/supabase-js';
+
+    const EVENT_ICONS: Record<string, string> = {
+      'booking.created': '🏡',
+      'booking.confirmed': '✅',
+      'booking.cancelled': '❌',
+      'payment.deposit_received': '💳',
+      'payment.full_received': '💰',
+      'owner.accepted_invite': '👤',
+    };
+
+    function playNotifSound() {
+      try {
+        const AC = window.AudioContext || (window as any).webkitAudioContext;
+        const ctx = new AC();
+        [[700, 0], [900, 0.18], [1100, 0.34]].forEach(([freq, delay]) => {
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain); gain.connect(ctx.destination);
+          osc.type = 'sine'; osc.frequency.value = freq as number;
+          const t = ctx.currentTime + (delay as number);
+          gain.gain.setValueAtTime(0, t);
+          gain.gain.linearRampToValueAtTime(0.25, t + 0.02);
+          gain.gain.exponentialRampToValueAtTime(0.001, t + 0.28);
+          osc.start(t); osc.stop(t + 0.3);
+        });
+      } catch {}
+    }
+
+    function getEventHref(entityType: string | null, entityId: string | null): string | null {
+      if (!entityId) return null;
+      if (entityType === 'bookings') return `/admin/bookings/${entityId}`;
+      if (entityType === 'listings') return `/admin/listings/${entityId}`;
+      if (entityType === 'profiles') return `/admin/owners`;
+      return null;
+    }
+
+    function showEventToast(event: { type: string; title: string; message?: string; entity_type?: string; entity_id?: string }) {
+      const container = document.getElementById('toast-container');
+      if (!container) return;
+      const icon = EVENT_ICONS[event.type] ?? '🔔';
+      const href = getEventHref(event.entity_type ?? null, event.entity_id ?? null);
+      const toast = document.createElement('div');
+      toast.className = 'pointer-events-auto bg-[#1a1a2e] border border-white/10 rounded-2xl shadow-xl px-4 py-3 flex items-center gap-3 max-w-sm';
+      toast.style.animation = 'slideIn 0.25s ease-out';
+      toast.innerHTML = `
+        <span class="text-xl flex-shrink-0">${icon}</span>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm font-semibold text-white leading-snug">${event.title}</p>
+          ${event.message ? `<p class="text-xs text-gray-300 mt-0.5 truncate">${event.message}</p>` : ''}
+          ${href ? `<a href="${href}" class="text-xs text-[#c9a96e] font-medium hover:opacity-80">View →</a>` : ''}
+        </div>
+        <button class="text-white/40 hover:text-white text-lg leading-none flex-shrink-0" onclick="this.closest('div').remove()">×</button>
+      `;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 10000);
+    }
+
+    const cfg = document.getElementById('rt-cfg') as HTMLElement | null;
+    const supabaseUrl = cfg?.dataset.url;
+    const supabaseAnonKey = cfg?.dataset.key;
+    const userId = cfg?.dataset.uid;
+    const accessToken = cfg?.dataset.token;
+
+    if (supabaseUrl && supabaseAnonKey && userId && accessToken) {
+      const client = createClient(supabaseUrl, supabaseAnonKey);
+      client.realtime.setAuth(accessToken);
+
+      const rtBadge = document.getElementById('notif-badge') as HTMLElement | null;
+      const ADMIN_KEY = 'notif_last_read_admin';
+
+      function bumpBadge() {
+        const cur = parseInt(rtBadge?.textContent ?? '0', 10) || 0;
+        const next = cur + 1;
+        if (rtBadge) {
+          rtBadge.textContent = next > 99 ? '99+' : String(next);
+          rtBadge.classList.remove('hidden');
+        }
+        localStorage.removeItem(ADMIN_KEY);
+      }
+
+      // ── Subscribe to admin_events for all platform notifications ──────────
+      client
+        .channel('admin-events-realtime')
+        .on(
+          'postgres_changes',
+          { event: 'INSERT', schema: 'public', table: 'admin_events' },
+          (payload: any) => {
+            const ev = payload.new;
+            if (!ev) return;
+
+            // Play sound for important events
+            if (['booking.created', 'payment.deposit_received', 'payment.full_received', 'owner.accepted_invite'].includes(ev.type)) {
+              playNotifSound();
+            }
+
+            // Show toast
+            showEventToast(ev);
+            bumpBadge();
+
+            // Add to notification panel
+            const list = document.getElementById('notif-list');
+            if (list) {
+              const empty = list.querySelector('p.text-center');
+              if (empty) empty.remove();
+              const icon = EVENT_ICONS[ev.type] ?? '🔔';
+              const href = getEventHref(ev.entity_type, ev.entity_id);
+              const item = document.createElement('div');
+              item.className = 'px-4 py-3 border-b border-white/5 bg-amber-400/10 hover:bg-white/5 transition-colors';
+              item.innerHTML = href
+                ? `<a href="${href}" class="block">
+                    <p class="text-sm text-white font-medium">${icon} ${ev.title}</p>
+                    ${ev.message ? `<p class="text-xs text-white/50 mt-0.5 truncate">${ev.message}</p>` : ''}
+                    <p class="text-xs text-white/35 mt-0.5">Just now</p>
+                  </a>`
+                : `<div>
+                    <p class="text-sm text-white font-medium">${icon} ${ev.title}</p>
+                    ${ev.message ? `<p class="text-xs text-white/50 mt-0.5 truncate">${ev.message}</p>` : ''}
+                    <p class="text-xs text-white/35 mt-0.5">Just now</p>
+                  </div>`;
+              list.insertBefore(item, list.firstChild);
+            }
+
+            // If on the bookings page, show a refresh banner for new bookings
+            if (ev.type === 'booking.created') {
+              const banner = document.getElementById('new-booking-banner');
+              if (banner) {
+                const cur = parseInt(banner.dataset.count ?? '0') + 1;
+                banner.dataset.count = String(cur);
+                const txt = banner.querySelector('#new-booking-count');
+                if (txt) txt.textContent = cur === 1 ? '1 new booking' : `${cur} new bookings`;
+                banner.classList.remove('hidden');
+              }
+            }
+          }
+        )
+        .subscribe();
+    }
+  </script>
+
+  <style>
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateX(100%); }
+      to   { opacity: 1; transform: translateX(0); }
+    }
+  </style>
+
+  <!-- Service Worker & Push Subscription for Admin PWA -->
+  <script is:inline define:vars={{ vapidKey }}>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then(function(reg) {
+        if (navigator.clearAppBadge) navigator.clearAppBadge();
+        if (reg.active) reg.active.postMessage({ type: 'CLEAR_BADGE' });
+      }).catch(function() {});
+    }
+    if ('PushManager' in window && 'Notification' in window && vapidKey) {
+      function urlBase64ToUint8Array(base64String) {
+        var padding = '='.repeat((4 - base64String.length % 4) % 4);
+        var base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+        var rawData = atob(base64);
+        var outputArray = new Uint8Array(rawData.length);
+        for (var i = 0; i < rawData.length; ++i) outputArray[i] = rawData.charCodeAt(i);
+        return outputArray;
+      }
+      async function autoSubscribe() {
+        try {
+          if (Notification.permission === 'default') {
+            var perm = await Notification.requestPermission();
+            if (perm !== 'granted') return;
+          }
+          if (Notification.permission !== 'granted') return;
+          var reg = await navigator.serviceWorker.ready;
+          var existing = await reg.pushManager.getSubscription();
+          if (existing) return; // already subscribed
+          var sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(vapidKey),
+          });
+          var subJson = sub.toJSON();
+          await fetch('/api/push/subscribe', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ endpoint: subJson.endpoint, keys: { p256dh: subJson.keys.p256dh, auth: subJson.keys.auth } }),
+          });
+        } catch(e) {}
+      }
+      // Auto-prompt admin users after 2 seconds
+      setTimeout(function() { autoSubscribe(); }, 2000);
+    }
+  </script>
+</body>
+</html>

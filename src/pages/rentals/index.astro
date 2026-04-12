@@ -1,0 +1,203 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ListingCard from '../../components/listing/ListingCard.astro';
+import type { ListingWithDetails } from '../../types/index.ts';
+import { t, type Lang } from '../../i18n/translations.ts';
+import { getActiveFeaturedListingIds } from '../../lib/featured.ts';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as Lang;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+const supabase = Astro.locals.supabase;
+const url = Astro.url;
+
+// Filters from query params
+const minGuests   = parseInt(url.searchParams.get('guests') ?? '0') || 0;
+const minBeds     = parseInt(url.searchParams.get('bedrooms') ?? '0') || 0;
+const petFriendly = url.searchParams.get('pets') === 'true';
+const beachAccess = url.searchParams.get('beach') === 'true';
+const search      = url.searchParams.get('q') ?? '';
+const region      = url.searchParams.get('region') ?? '';   // 'kefalonia' | 'thassos' | ''
+const cityFilter  = url.searchParams.get('city') ?? '';
+
+let query = supabase
+  .from('listings')
+  .select('*, listing_images(*), listing_amenities(amenities(*))')
+  .eq('is_active', true);
+
+if (minGuests > 0) query = query.gte('max_guests', minGuests);
+if (minBeds > 0)   query = query.gte('bedrooms', minBeds);
+if (search)        query = query.ilike('title', `%${search}%`);
+if (region === 'kefalonia')  query = query.ilike('region', '%Kefalonia%');
+if (region === 'thassos') query = query.ilike('region', '%Thassos%');
+if (cityFilter)    query = query.ilike('city', `%${cityFilter}%`);
+
+const [rawRes, featuredIds] = await Promise.all([
+  query.order('avg_rating', { ascending: false }),
+  getActiveFeaturedListingIds(),
+]);
+
+let listings: ListingWithDetails[] = (rawRes.data ?? []).map((l: any) => ({
+  ...l,
+  listing_images: l.listing_images ?? [],
+  amenities: (l.listing_amenities ?? []).map((la: any) => la.amenities).filter(Boolean),
+}));
+
+// Client-side filter on amenities (done after join)
+if (petFriendly) listings = listings.filter((l) => l.amenities.some((a) => a.key === 'pet_friendly'));
+if (beachAccess) listings = listings.filter((l) => l.amenities.some((a) => a.key === 'beach_access'));
+
+// Fetch user's favorited listing IDs
+const session = Astro.locals.session;
+let favoritedIds: Set<string> = new Set();
+if (session) {
+  const { data: favData } = await getServiceClient().from('favorites').select('listing_id').eq('user_id', session.user.id);
+  favoritedIds = new Set((favData ?? []).map((f: any) => f.listing_id));
+}
+
+// Featured listings first (by rating), then the rest (by rating)
+const featuredSet = new Set(featuredIds);
+listings = [
+  ...listings.filter((l) => featuredSet.has(l.id)),
+  ...listings.filter((l) => !featuredSet.has(l.id)),
+];
+
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://kefaloniabnb.com';
+const schemas = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'Vacation Rentals', item: `${siteUrl}/rentals` },
+    ],
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: 'Vacation Rentals in Keramoti & Kefalonia, Greece',
+    description: 'Luxury vacation villas available for direct booking in Keramoti and Kefalonia, Northern Greece.',
+    url: `${siteUrl}/rentals`,
+    numberOfItems: listings.length,
+    itemListElement: listings.map((l, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: `${siteUrl}/rentals/${l.slug}`,
+      name: l.title,
+    })),
+  },
+];
+---
+
+<BaseLayout
+  title="Vacation Rentals in Keramoti & Kefalonia, Greece – Book Direct"
+  description="Browse luxury villa rentals in Keramoti and Kefalonia, Northern Greece. Direct booking, best rates guaranteed, no OTA platform fees. Private garden, beach access, sleeps up to 12."
+  schema={schemas}
+>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+
+    <!-- Header -->
+    <div class="mb-8">
+      <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-2">
+        {region === 'thassos'
+          ? (isEl ? 'Ενοικιάσεις στη Θάσο' : isBg ? 'Наеми на остров Thassos' : isSr ? 'Острво Тасос — некретнине' : isTr ? 'Tasos Adası Kiralamaları' : isRo ? 'Închirieri pe Insula Thassos' : 'Thassos Island Rentals')
+          : region === 'kefalonia'
+          ? (isEl ? 'Ενοικιάσεις στην Περιοχή Καβάλας' : isBg ? 'Наеми в района на Kefalonia' : isSr ? 'Кавалски регион — некретнине' : isTr ? 'Kefalonia Bölgesi Kiralamaları' : isRo ? 'Închirieri în Regiunea Kefalonia' : 'Kefalonia Region Rentals')
+          : (isEl ? 'Όλα τα Ακίνητα' : isBg ? 'Всички имоти' : isSr ? 'Сва одредишта' : isTr ? 'Tüm Mülkler' : isRo ? 'Toate Proprietățile' : 'All Properties')}
+      </h1>
+      <p class="text-gray-500">
+        {region === 'thassos'
+          ? (isEl ? 'Βίλες σε όλη τη Θάσο — Χρυσή Αμμουδιά, Ποτός, Λιμένας, Λιμενάρια και πέρα.' : isBg ? 'Вили из целия Thassos — Golden Beach, Potos, Limenas, Limenaria и още.' : isSr ? 'Villas across Thassos — Golden Beach, Potos, Limenas, Limenaria and beyond.' : isTr ? 'Tasos genelinde villalar — Golden Beach, Potos, Limenas, Limenaria ve daha fazlası.' : isRo ? 'Vile în toată Thassos — Golden Beach, Potos, Limenas, Limenaria și mai departe.' : 'Villas across Thassos — Golden Beach, Potos, Limenas, Limenaria and beyond.')
+          : region === 'kefalonia'
+          ? (isEl ? 'Ακίνητα σε όλη την περιοχή Καβάλας — Κεραμωτή, Νέα Πέραμος, Νέα Ηρακλίτσα, Οφρύνιο και πλέον.' : isBg ? 'Имоти из целия район на Kefalonia — Keramoti, Nea Peramos, Nea Iraklitsa, Ofrinio и още.' : isSr ? 'Properties across the Kefalonia region — Keramoti, Nea Peramos, Nea Iraklitsa, Ofrinio and more.' : isTr ? 'Kefalonia bölgesi genelinde mülkler — Keramoti, Nea Peramos, Nea Iraklitsa, Ofrinio ve daha fazlası.' : isRo ? 'Proprietăți în regiunea Kefalonia — Keramoti, Nea Peramos, Nea Iraklitsa, Ofrinio și altele.' : 'Properties across the Kefalonia region — Keramoti, Nea Peramos, Nea Iraklitsa, Ofrinio and more.')
+          : (isEl ? 'Εξοχικές κατοικίες στην Καβάλα & Θάσο. Κλείστε απευθείας με ιδιοκτήτες — μηδενικές χρεώσεις επισκεπτών.' : isBg ? 'Ваканционни наеми в Kefalonia & Thassos. Резервирайте директно при собствениците — нулеви такси за гости.' : isSr ? 'Vacation rentals across Kefalonia & Thassos. Book direct with owners — zero guest fees.' : isTr ? 'Kefalonia ve Tasos genelinde tatil kiralamaları. Mülk sahipleriyle doğrudan rezervasyon yapın — sıfır misafir ücreti.' : isRo ? 'Închirieri de vacanță în Kefalonia și Thassos. Rezervați direct cu proprietarii — zero comisioane pentru oaspeți.' : 'Vacation rentals across Kefalonia & Thassos. Book direct with owners — zero guest fees.')}
+      </p>
+    </div>
+
+    <!-- Filters bar -->
+    <form method="GET" class="flex flex-wrap gap-3 mb-8 p-4 bg-gray-50 rounded-2xl">
+      <!-- Destination -->
+      <select name="region" class="border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none bg-white focus:ring-2 focus:ring-[#1a1a2e] cursor-pointer">
+        <option value="" selected={!region}>{isEl ? 'Όλοι οι Προορισμοί' : isBg ? 'Всички дестинации' : isSr ? 'All Destinations' : isTr ? 'Tüm Destinasyonlar' : isRo ? 'Toate Destinațiile' : 'All Destinations'}</option>
+        <option value="kefalonia" selected={region === 'kefalonia'}>{isEl ? 'Περιοχή Καβάλας' : isBg ? 'Район Kefalonia' : isSr ? 'Kefalonia Region' : isTr ? 'Kefalonia Bölgesi' : isRo ? 'Regiunea Kefalonia' : 'Kefalonia Region'}</option>
+        <option value="thassos" selected={region === 'thassos'}>{isEl ? 'Νησί Θάσος' : isBg ? 'Остров Thassos' : isSr ? 'Thassos Island' : isTr ? 'Tasos Adası' : isRo ? 'Insula Thassos' : 'Thassos Island'}</option>
+      </select>
+      <!-- Search -->
+      <div class="flex-1 min-w-[160px]">
+        <input
+          type="text"
+          name="q"
+          placeholder={isEl ? 'Αναζήτηση ακινήτων…' : isBg ? 'Търсене на имоти…' : isSr ? 'Search properties…' : isTr ? 'Mülk ara…' : isRo ? 'Caută proprietăți…' : 'Search properties…'}
+          value={search}
+          class="w-full border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#1a1a2e] focus:border-transparent bg-white"
+        />
+      </div>
+      <select name="guests" class="border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none bg-white focus:ring-2 focus:ring-[#1a1a2e] cursor-pointer">
+        <option value="">{isEl ? 'Οποιοσδήποτε αριθμός' : isBg ? 'Произволен брой' : isSr ? 'Any guests' : isTr ? 'Herhangi bir sayı' : isRo ? 'Orice număr' : 'Any guests'}</option>
+        {[2,4,6,8,10,12].map((n) => (
+          <option value={n} selected={minGuests === n}>{n}+ {isEl ? 'επισκέπτες' : isBg ? 'гости' : isSr ? 'guests' : isTr ? 'misafir' : isRo ? 'oaspeți' : 'guests'}</option>
+        ))}
+      </select>
+      <select name="bedrooms" class="border border-gray-300 rounded-xl px-4 py-2.5 text-sm outline-none bg-white focus:ring-2 focus:ring-[#1a1a2e] cursor-pointer">
+        <option value="">{isEl ? 'Οποιοσδήποτε αριθμός' : isBg ? 'Произволен брой' : isSr ? 'Any bedrooms' : isTr ? 'Herhangi bir sayı' : isRo ? 'Orice număr' : 'Any bedrooms'}</option>
+        {[1,2,3,4,5].map((n) => (
+          <option value={n} selected={minBeds === n}>{n}+ {isEl ? 'ΥΔ' : isBg ? 'сп.' : isSr ? 'BR' : isTr ? 'YO' : isRo ? 'dorm.' : 'BR'}</option>
+        ))}
+      </select>
+      <label class="flex items-center gap-2 border border-gray-300 rounded-xl px-4 py-2.5 text-sm bg-white cursor-pointer hover:bg-gray-50">
+        <input type="checkbox" name="beach" value="true" checked={beachAccess} class="rounded" />
+        {isEl ? 'Πρόσβαση στην παραλία' : isBg ? 'Достъп до плажа' : isSr ? 'Beach access' : isTr ? 'Plaj erişimi' : isRo ? 'Acces la plajă' : 'Beach access'}
+      </label>
+      <label class="flex items-center gap-2 border border-gray-300 rounded-xl px-4 py-2.5 text-sm bg-white cursor-pointer hover:bg-gray-50">
+        <input type="checkbox" name="pets" value="true" checked={petFriendly} class="rounded" />
+        {isEl ? 'Φιλικό προς κατοικίδια' : isBg ? 'Позволени домашни любимци' : isSr ? 'Pet friendly' : isTr ? 'Evcil hayvan dostu' : isRo ? 'Acceptă animale' : 'Pet friendly'}
+      </label>
+      <button type="submit" class="bg-[#1a1a2e] text-white font-semibold px-5 py-2.5 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors cursor-pointer">
+        {isEl ? 'Αναζήτηση' : isBg ? 'Търсене' : isSr ? 'Search' : isTr ? 'Ara' : isRo ? 'Caută' : 'Search'}
+      </button>
+      {(search || minGuests || minBeds || petFriendly || beachAccess || region || cityFilter) && (
+        <a href="/rentals" class="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-900 px-3 py-2.5 transition-colors">
+          Clear
+        </a>
+      )}
+    </form>
+
+    <!-- Quick destination tabs -->
+    <div class="flex flex-wrap gap-2 mb-8">
+      <a href="/rentals" class={`text-xs font-medium px-4 py-2 rounded-full border transition-colors ${!region ? 'bg-[#1a1a2e] text-white border-[#1a1a2e]' : 'border-gray-200 text-gray-600 hover:border-[#c9a96e] hover:text-gray-900'}`}>
+        {isEl ? 'Όλοι οι Προορισμοί' : isBg ? 'Всички дестинации' : isSr ? 'All Destinations' : isTr ? 'Tüm Destinasyonlar' : isRo ? 'Toate Destinațiile' : 'All Destinations'}
+      </a>
+      <a href="/rentals?region=kefalonia" class={`text-xs font-medium px-4 py-2 rounded-full border transition-colors ${region === 'kefalonia' ? 'bg-[#1a1a2e] text-white border-[#1a1a2e]' : 'border-gray-200 text-gray-600 hover:border-[#c9a96e] hover:text-gray-900'}`}>
+        🏖 {isEl ? 'Περιοχή Καβάλας' : isBg ? 'Район Kefalonia' : isSr ? 'Kefalonia Region' : isTr ? 'Kefalonia Bölgesi' : isRo ? 'Regiunea Kefalonia' : 'Kefalonia Region'}
+      </a>
+      <a href="/rentals?region=thassos" class={`text-xs font-medium px-4 py-2 rounded-full border transition-colors ${region === 'thassos' ? 'bg-[#1a1a2e] text-white border-[#1a1a2e]' : 'border-gray-200 text-gray-600 hover:border-[#c9a96e] hover:text-gray-900'}`}>
+        🏝 {isEl ? 'Νησί Θάσος' : isBg ? 'Остров Thassos' : isSr ? 'Thassos Island' : isTr ? 'Tasos Adası' : isRo ? 'Insula Thassos' : 'Thassos Island'}
+      </a>
+      <a href="/locations" class="text-xs font-medium px-4 py-2 rounded-full border border-gray-200 text-gray-500 hover:border-[#c9a96e] hover:text-gray-900 transition-colors ml-auto">
+        {isEl ? 'Όλοι οι προορισμοί →' : isBg ? 'Всички дестинации →' : isSr ? 'Browse all destinations →' : isTr ? 'Tüm destinasyonlara göz at →' : isRo ? 'Răsfoiește toate destinațiile →' : 'Browse all destinations →'}
+      </a>
+    </div>
+
+    <!-- Grid -->
+    {listings.length > 0 ? (
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        {listings.map((listing) => (
+          <ListingCard listing={listing} featured={featuredSet.has(listing.id)} showFavorite={!!session} isFavorited={favoritedIds.has(listing.id)} />
+        ))}
+      </div>
+    ) : (
+      <div class="text-center py-20">
+        <p class="text-5xl mb-4">🏡</p>
+        <h3 class="text-xl font-semibold text-gray-900 mb-2">{isEl ? 'Δεν βρέθηκαν ακίνητα' : isBg ? 'Няма намерени имоти' : isSr ? 'No properties found' : isTr ? 'Mülk bulunamadı' : isRo ? 'Nicio proprietate găsită' : 'No properties found'}</h3>
+        <p class="text-gray-500 mb-6">{isEl ? 'Δοκιμάστε να αλλάξετε τα φίλτρα σας ή περιηγηθείτε σε όλους τους προορισμούς.' : isBg ? 'Опитайте да промените филтрите или разгледайте всички дестинации.' : isSr ? 'Try adjusting your filters or browse all destinations.' : isTr ? 'Filtrelerinizi değiştirmeyi deneyin veya tüm destinasyonlara göz atın.' : isRo ? 'Încercați să ajustați filtrele sau răsfoiți toate destinațiile.' : 'Try adjusting your filters or browse all destinations.'}</p>
+        <a href="/rentals" class="inline-block bg-[#1a1a2e] text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">
+          {isEl ? 'Εκκαθάριση φίλτρων' : isBg ? 'Изчистване на филтрите' : isSr ? 'Clear filters' : isTr ? 'Filtreleri temizle' : isRo ? 'Șterge filtrele' : 'Clear filters'}
+        </a>
+      </div>
+    )}
+  </div>
+</BaseLayout>

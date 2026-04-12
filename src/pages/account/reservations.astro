@@ -1,0 +1,157 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isBg = lang === 'bg';
+const isEl = lang === 'el';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const t = {
+  myReservations: isEl ? 'Οι Κρατήσεις μου' : isBg ? 'Моите резервации' : isSr ? 'Моје резервације' : isTr ? 'Restoran Rezervasyonlarım' : isRo ? 'Rezervările Mele' : 'My Reservations',
+  restaurantBookings: isEl ? 'Κρατήσεις εστιατορίου' : isBg ? 'Ресторантски резервации' : isSr ? 'Ресторанске резервације' : isTr ? 'Restoran rezervasyonları' : isRo ? 'Rezervări restaurant' : 'Restaurant bookings',
+  browseRestaurants: isEl ? 'Περιήγηση Εστιατορίων' : isBg ? 'Разгледайте ресторанти' : isSr ? 'Прегледајте ресторане' : isTr ? 'Restoranlara Göz At' : isRo ? 'Răsfoiește Restaurante' : 'Browse Restaurants',
+  myAccount: isEl ? 'Ο Λογαριασμός μου' : isBg ? 'Моят акаунт' : isSr ? 'Мој налог' : isTr ? 'Hesabım' : isRo ? 'Contul Meu' : 'My Account',
+  upcoming: isEl ? 'Επερχόμενες' : isBg ? 'Предстоящи' : isSr ? 'Предстојеће' : isTr ? 'Yaklaşan' : isRo ? 'Viitoare' : 'Upcoming',
+  past: isEl ? 'Παρελθούσες' : isBg ? 'Минали' : isSr ? 'Прошле' : isTr ? 'Geçmiş' : isRo ? 'Trecute' : 'Past',
+  restaurant: isEl ? 'Εστιατόριο' : isBg ? 'Ресторант' : isSr ? 'Ресторан' : isTr ? 'Restoran' : isRo ? 'Restaurant' : 'Restaurant',
+  guest: isEl ? 'επισκέπτ' : isBg ? 'гост' : isSr ? 'гост' : isTr ? 'misafir' : isRo ? 'oaspete' : 'guest',
+  guests: isEl ? 'επισκέπτες' : isBg ? 'гости' : isSr ? 'гостију' : isTr ? 'misafir' : isRo ? 'oaspeți' : 'guests',
+  noReservations: isEl ? 'Δεν υπάρχουν κρατήσεις ακόμα.' : isBg ? 'Все още няма резервации.' : isSr ? 'Још нема резервација.' : isTr ? 'Henüz rezervasyon yok.' : isRo ? 'Nicio rezervare încă.' : 'No reservations yet.',
+};
+
+const session = Astro.locals.session;
+if (!session) return Astro.redirect('/community/join?next=/account/reservations');
+
+const service = getServiceClient();
+const userId = session.user.id;
+const profile = Astro.locals.profile as any;
+
+// Fetch reservations linked to this member OR matching their email/phone
+const { data: reservations } = await service
+  .from('restaurant_reservations')
+  .select('id, date, time_slot, guest_count, status, special_requests, created_at, restaurants(id, name, slug, cover_photo, city)')
+  .or(`member_id.eq.${userId}${profile?.email ? `,guest_email.eq.${profile.email}` : ''}${profile?.phone ? `,guest_phone.eq.${profile.phone}` : ''}`)
+  .order('date', { ascending: false })
+  .limit(50);
+
+const upcoming: any[] = [];
+const past: any[] = [];
+const today = new Date().toISOString().split('T')[0];
+
+for (const r of reservations ?? []) {
+  if (r.date >= today && !['cancelled', 'completed', 'no_show'].includes(r.status)) {
+    upcoming.push(r);
+  } else {
+    past.push(r);
+  }
+}
+
+const statusColors: Record<string, string> = {
+  pending: 'bg-amber-100 text-amber-700',
+  confirmed: 'bg-emerald-100 text-emerald-700',
+  cancelled: 'bg-red-100 text-red-600',
+  completed: 'bg-gray-100 text-gray-600',
+  no_show: 'bg-red-100 text-red-600',
+};
+
+function fmtDate(d: string) {
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+}
+---
+
+<BaseLayout title={t.myReservations} noIndex>
+  <div class="max-w-3xl mx-auto px-4 py-10">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">{t.myReservations}</h1>
+        <p class="text-sm text-gray-500 mt-1">{t.restaurantBookings}</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <a href="/community/restaurants" class="text-sm text-[#c9a96e] hover:underline">{t.browseRestaurants}</a>
+        <a href="/account" class="text-sm text-gray-500 hover:text-gray-700">&larr; {t.myAccount}</a>
+      </div>
+    </div>
+
+    {/* Upcoming */}
+    {upcoming.length > 0 && (
+      <div class="mb-8">
+        <h2 class="text-sm font-semibold text-gray-700 mb-3">{t.upcoming}</h2>
+        <div class="space-y-3">
+          {upcoming.map((r: any) => {
+            const restaurant = r.restaurants;
+            const statusLabel = (r.status || 'pending').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+            return (
+              <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                <div class="flex flex-col sm:flex-row">
+                  <div class="sm:w-28 h-20 sm:h-auto bg-gray-100 shrink-0">
+                    {restaurant?.cover_photo ? (
+                      <img src={restaurant.cover_photo} alt={restaurant.name} class="w-full h-full object-cover" loading="lazy" />
+                    ) : (
+                      <div class="w-full h-full flex items-center justify-center text-gray-300 text-2xl">🍽</div>
+                    )}
+                  </div>
+                  <div class="flex-1 p-4">
+                    <div class="flex items-start justify-between gap-2 mb-1">
+                      <h3 class="font-semibold text-gray-900 text-sm">{restaurant?.name || t.restaurant}</h3>
+                      <span class={`px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${statusColors[r.status] || 'bg-gray-100 text-gray-600'}`}>
+                        {statusLabel}
+                      </span>
+                    </div>
+                    {restaurant?.city && <p class="text-xs text-gray-500">{restaurant.city}</p>}
+                    <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600 mt-2">
+                      <span>{fmtDate(r.date)}</span>
+                      <span>{r.time_slot}</span>
+                      <span>{r.guest_count} {r.guest_count !== 1 ? t.guests : t.guest}</span>
+                    </div>
+                    {r.special_requests && <p class="text-xs text-gray-400 mt-1 line-clamp-1">"{r.special_requests}"</p>}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    )}
+
+    {/* Past */}
+    {past.length > 0 && (
+      <div>
+        <h2 class="text-sm font-semibold text-gray-700 mb-3">{t.past}</h2>
+        <div class="space-y-3">
+          {past.map((r: any) => {
+            const restaurant = r.restaurants;
+            const statusLabel = (r.status || 'pending').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+            return (
+              <div class="bg-white rounded-xl border border-gray-100 p-4 opacity-75">
+                <div class="flex items-start justify-between gap-2 mb-1">
+                  <h3 class="font-semibold text-gray-900 text-sm">{restaurant?.name || t.restaurant}</h3>
+                  <span class={`px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${statusColors[r.status] || 'bg-gray-100 text-gray-600'}`}>
+                    {statusLabel}
+                  </span>
+                </div>
+                <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
+                  <span>{fmtDate(r.date)}</span>
+                  <span>{r.time_slot}</span>
+                  <span>{r.guest_count} {r.guest_count !== 1 ? t.guests : t.guest}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    )}
+
+    {upcoming.length === 0 && past.length === 0 && (
+      <div class="text-center py-16">
+        <p class="text-4xl mb-3">🍽</p>
+        <p class="text-gray-500 mb-4">{t.noReservations}</p>
+        <a href="/community/restaurants" class="inline-block bg-[#1a1a2e] text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">
+          {t.browseRestaurants}
+        </a>
+      </div>
+    )}
+  </div>
+</BaseLayout>

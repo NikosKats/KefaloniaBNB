@@ -1,0 +1,370 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const service = getServiceClient();
+const { data: categories } = await service
+  .from('technician_categories')
+  .select('*')
+  .order('sort_order');
+
+const { data: technicians } = await service
+  .from('technicians')
+  .select('*, technician_categories(slug, name_en, name_el, icon)')
+  .eq('is_active', true)
+  .order('is_verified', { ascending: false })
+  .order('sort_order');
+
+// Fetch approved reviews grouped by technician
+const { data: approvedReviews } = await service
+  .from('technician_reviews')
+  .select('*')
+  .eq('is_approved', true)
+  .order('created_at', { ascending: false });
+
+const reviewsByTech: Record<string, any[]> = {};
+for (const r of approvedReviews ?? []) {
+  if (!reviewsByTech[r.technician_id]) reviewsByTech[r.technician_id] = [];
+  reviewsByTech[r.technician_id].push(r);
+}
+
+// Group by category
+const grouped: Record<string, any[]> = {};
+for (const t of technicians ?? []) {
+  const catSlug = (t as any).technician_categories?.slug ?? 'general';
+  if (!grouped[catSlug]) grouped[catSlug] = [];
+  grouped[catSlug].push(t);
+}
+
+const filterParam = Astro.url.searchParams.get('category');
+---
+
+<BaseLayout
+  title={isEl ? 'Τεχνικοί & Επαγγελματίες — KefaloniaBNB' : isBg ? 'Местни техници & професионалисти — KefaloniaBNB' : isSr ? 'Lokalni tehničari & profesionalci — KefaloniaBNB' : isTr ? 'Yerel Teknisyenler & Profesyoneller — KefaloniaBNB' : isRo ? 'Tehnicieni & Profesioniști Locali — KefaloniaBNB' : 'Local Technicians & Professionals — KefaloniaBNB'}
+  description={isEl ? 'Βρείτε αξιόπιστους τεχνικούς στην περιοχή Κεραμωτής' : isBg ? 'Намерете надеждни техници и професионалисти в района на Керамоти' : isSr ? 'Pronađite pouzdane tehničare i profesionalce u oblasti Keramotija' : isTr ? 'Keramoti bölgesinde güvenilir teknisyenler ve profesyoneller bulun' : isRo ? 'Găsește tehnicieni și profesioniști de încredere în zona Keramoti' : 'Find trusted technicians and professionals in the Keramoti area'}
+>
+  <section class="bg-[#1a1a2e] py-16 sm:py-20">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <h1 class="text-3xl sm:text-4xl font-bold text-white mb-3">{isEl ? 'Τεχνικοί & Επαγγελματίες' : isBg ? 'Местни техници & професионалисти' : isSr ? 'Lokalni tehničari & profesionalci' : isTr ? 'Yerel Teknisyenler & Profesyoneller' : isRo ? 'Tehnicieni & Profesioniști Locali' : 'Local Technicians & Professionals'}</h1>
+      <p class="text-gray-300 max-w-2xl mx-auto">{isEl ? 'Αξιόπιστοι τεχνικοί στην περιοχή Κεραμωτής & Καβάλας' : isBg ? 'Надеждни техници и доставчици на услуги в района на Керамоти & Кавала' : isSr ? 'Pouzdani tehničari i pružaoci usluga u oblasti Keramotija i Kavale' : isTr ? 'Keramoti & Kefalonia bölgesinde güvenilir teknisyenler ve hizmet sağlayıcıları' : isRo ? 'Tehnicieni și furnizori de servicii de încredere în zona Keramoti & Kefalonia' : 'Trusted technicians and service providers in the Keramoti & Kefalonia area'}</p>
+    </div>
+  </section>
+
+  <section class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <!-- Category filters -->
+    <div class="flex flex-wrap gap-2 mb-8">
+      <a href="/community/technicians" class={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${!filterParam ? 'bg-[#1a1a2e] text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+        {isEl ? 'Όλοι' : isBg ? 'Всички' : isSr ? 'Svi' : isTr ? 'Tümü' : isRo ? 'Toți' : 'All'}
+      </a>
+      {(categories ?? []).map((cat: any) => (
+        <a href={`/community/technicians?category=${cat.slug}`}
+          class={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${filterParam === cat.slug ? 'bg-[#1a1a2e] text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}>
+          {cat.icon} {isEl ? cat.name_el : cat.name_en}
+        </a>
+      ))}
+    </div>
+
+    {(!technicians || technicians.length === 0) ? (
+      <div class="text-center py-16 text-gray-400">
+        <div class="text-5xl mb-4">🛠️</div>
+        <p class="text-lg font-medium">{isEl ? 'Δεν υπάρχουν τεχνικοί ακόμα' : isBg ? 'Все още няма регистрирани техници' : isSr ? 'Još nema registrovanih tehničara' : isTr ? 'Henüz kayıtlı teknisyen yok' : isRo ? 'Niciun tehnician înregistrat încă' : 'No technicians listed yet'}</p>
+        <p class="text-sm mt-1">{isEl ? 'Σύντομα κοντά σας!' : isBg ? 'Очаквайте скоро!' : isSr ? 'Uskoro!' : isTr ? 'Yakında!' : isRo ? 'În curând!' : 'Coming soon!'}</p>
+      </div>
+    ) : (
+      <div class="space-y-10">
+        {(categories ?? []).filter((cat: any) => {
+          if (filterParam && cat.slug !== filterParam) return false;
+          return (grouped[cat.slug] ?? []).length > 0;
+        }).map((cat: any) => (
+          <div>
+            <h2 class="text-xl font-bold text-gray-900 mb-4 flex items-center gap-2">
+              <span class="text-2xl">{cat.icon}</span>
+              {isEl ? cat.name_el : cat.name_en}
+              <span class="text-sm font-normal text-gray-400">({(grouped[cat.slug] ?? []).length})</span>
+            </h2>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {(grouped[cat.slug] ?? []).map((tech: any) => {
+                const reviews = reviewsByTech[tech.id] ?? [];
+                const avgRating = tech.avg_rating ?? 0;
+                const reviewCount = tech.review_count ?? 0;
+                const hasPhotos = tech.cover_photo || (tech.photo_urls ?? []).length > 0;
+                return (
+                <div id={`tech-${tech.id}`} class="bg-white rounded-2xl border border-gray-100 overflow-hidden hover:shadow-lg transition-shadow group">
+                  {/* Cover photo */}
+                  {tech.cover_photo ? (
+                    <div class="aspect-[16/10] overflow-hidden">
+                      <img src={tech.cover_photo} alt={tech.name} class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+                    </div>
+                  ) : (
+                    <div class="aspect-[16/10] bg-gradient-to-br from-gray-100 to-gray-50 flex items-center justify-center">
+                      <span class="text-5xl">{cat.icon}</span>
+                    </div>
+                  )}
+
+                  <div class="p-5">
+                    <div class="flex items-start justify-between gap-2">
+                      <div>
+                        <div class="flex items-center gap-1.5">
+                          <h3 class="font-bold text-gray-900 text-lg">{tech.name}</h3>
+                          {tech.is_verified && <span class="text-blue-500 text-sm" title="Verified">✓</span>}
+                        </div>
+                        {/* Star rating */}
+                        {reviewCount > 0 && (
+                          <div class="flex items-center gap-1 mt-0.5">
+                            <span class="text-amber-400 text-sm">{'★'.repeat(Math.round(avgRating))}{'☆'.repeat(5 - Math.round(avgRating))}</span>
+                            <span class="text-xs text-gray-500">{avgRating} ({reviewCount} {reviewCount === 1 ? (isEl ? 'κριτική' : isBg ? 'отзив' : isSr ? 'recenzija' : isTr ? 'yorum' : isRo ? 'recenzie' : 'review') : (isEl ? 'κριτικές' : isBg ? 'отзива' : isSr ? 'recenzije' : isTr ? 'yorum' : isRo ? 'recenzii' : 'reviews')})</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {tech.bio && <p class="text-sm text-gray-500 mt-2 line-clamp-2">{tech.bio}</p>}
+                    {tech.service_areas?.length > 0 && (
+                      <p class="text-xs text-gray-400 mt-2">📍 {tech.service_areas.join(', ')}</p>
+                    )}
+
+                    {/* Photo gallery thumbnails */}
+                    {(tech.photo_urls ?? []).length > 0 && (
+                      <div class="flex gap-1.5 mt-3 overflow-x-auto">
+                        {(tech.photo_urls ?? []).slice(0, 4).map((url: string, idx: number) => (
+                          <img src={url} alt={`${tech.name} photo ${idx + 1}`} class="w-14 h-14 rounded-lg object-cover flex-shrink-0" loading="lazy" />
+                        ))}
+                        {(tech.photo_urls ?? []).length > 4 && (
+                          <div class="w-14 h-14 rounded-lg bg-gray-100 flex items-center justify-center text-xs text-gray-500 flex-shrink-0">+{(tech.photo_urls ?? []).length - 4}</div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Social & business links */}
+                    {(tech.website || tech.google_business_url || tech.facebook_url || tech.instagram_url) && (
+                      <div class="flex flex-wrap items-center gap-2 mt-3">
+                        {tech.website && (
+                          <a href={tech.website} target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-[#1a1a2e] transition-colors" title="Website">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9"/></svg>
+                            Website
+                          </a>
+                        )}
+                        {tech.google_business_url && (
+                          <a href={tech.google_business_url} target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-blue-600 transition-colors" title="Google">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+                            Google
+                          </a>
+                        )}
+                        {tech.facebook_url && (
+                          <a href={tech.facebook_url} target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-blue-700 transition-colors" title="Facebook">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                            Facebook
+                          </a>
+                        )}
+                        {tech.instagram_url && (
+                          <a href={tech.instagram_url} target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-pink-600 transition-colors" title="Instagram">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
+                            Instagram
+                          </a>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Action buttons */}
+                    <div class="flex items-center gap-2 mt-4 pt-3 border-t border-gray-50">
+                      <a href={`tel:${tech.phone}`} class="flex-1 text-center bg-[#1a1a2e] text-white py-2 rounded-lg text-sm font-medium hover:bg-[#2d2d4e] transition-colors">
+                        📞 {isEl ? 'Κλήση' : isBg ? 'Обадете се' : isSr ? 'Pozovi' : isTr ? 'Ara' : isRo ? 'Apelează' : 'Call'}
+                      </a>
+                      {tech.email && (
+                        <a href={`mailto:${tech.email}`} class="flex-1 text-center bg-gray-100 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
+                          ✉️ Email
+                        </a>
+                      )}
+                      {tech.google_maps_url && (
+                        <a href={tech.google_maps_url} target="_blank" rel="noopener" class="flex-1 text-center bg-gray-100 text-gray-700 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 transition-colors">
+                          🗺️ {isEl ? 'Χάρτης' : isBg ? 'Карта' : isSr ? 'Mapa' : isTr ? 'Harita' : isRo ? 'Hartă' : 'Map'}
+                        </a>
+                      )}
+                    </div>
+
+                    {/* Approved reviews */}
+                    {reviews.length > 0 && (
+                      <div class="mt-4 pt-3 border-t border-gray-50">
+                        <p class="text-xs font-semibold text-gray-700 mb-2">{isEl ? 'Κριτικές' : isBg ? 'Отзиви' : isSr ? 'Recenzije' : isTr ? 'Yorumlar' : isRo ? 'Recenzii' : 'Reviews'}</p>
+                        <div class="space-y-2 max-h-40 overflow-y-auto">
+                          {reviews.slice(0, 5).map((r: any) => (
+                            <div class="text-xs bg-gray-50 rounded-lg p-2.5">
+                              <div class="flex items-center justify-between">
+                                <span class="font-medium text-gray-800">{r.reviewer_name}</span>
+                                <span class="text-amber-400">{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</span>
+                              </div>
+                              {r.body && <p class="text-gray-600 mt-1">{r.body}</p>}
+                              <p class="text-gray-400 mt-1">{new Date(r.created_at).toLocaleDateString()}</p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Write review button */}
+                    <button
+                      class="review-toggle-btn mt-3 w-full text-center text-xs text-[#1a1a2e] font-medium py-1.5 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors"
+                      data-tech-id={tech.id}
+                    >
+                      ✍️ {isEl ? 'Γράψε κριτική' : isBg ? 'Напишете отзив' : isSr ? 'Napiši recenziju' : isTr ? 'Yorum Yaz' : isRo ? 'Scrie o Recenzie' : 'Write a Review'}
+                    </button>
+
+                    {/* Review form (hidden) */}
+                    <div class="review-form hidden mt-3 bg-gray-50 rounded-lg p-4" data-tech-id={tech.id}>
+                      <form class="space-y-3 submit-review-form" data-tech-id={tech.id}>
+                        <div>
+                          <label class="block text-xs text-gray-600 mb-1">{isEl ? 'Όνομα' : isBg ? 'Вашето име' : isSr ? 'Vaše ime' : isTr ? 'Adınız' : isRo ? 'Numele tău' : 'Your Name'} *</label>
+                          <input type="text" name="reviewer_name" required class="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-[#1a1a2e]" />
+                        </div>
+                        <div>
+                          <label class="block text-xs text-gray-600 mb-1">Email ({isEl ? 'προαιρετικό' : isBg ? 'незадължително' : isSr ? 'opciono' : isTr ? 'isteğe bağlı' : isRo ? 'opțional' : 'optional'})</label>
+                          <input type="email" name="reviewer_email" class="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-[#1a1a2e]" />
+                        </div>
+                        <div>
+                          <label class="block text-xs text-gray-600 mb-1">{isEl ? 'Βαθμολογία' : isBg ? 'Оценка' : isSr ? 'Ocena' : isTr ? 'Puan' : isRo ? 'Evaluare' : 'Rating'} *</label>
+                          <div class="star-rating flex gap-1" data-value="0">
+                            {[1,2,3,4,5].map(n => (
+                              <button type="button" class="star-btn text-2xl text-gray-300 hover:text-amber-400 transition-colors" data-star={n}>☆</button>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <label class="block text-xs text-gray-600 mb-1">{isEl ? 'Σχόλιο' : isBg ? 'Коментар' : isSr ? 'Komentar' : isTr ? 'Yorum' : isRo ? 'Comentariu' : 'Comment'}</label>
+                          <textarea name="body" rows="2" class="w-full text-sm px-3 py-2 border border-gray-200 rounded-lg outline-none focus:border-[#1a1a2e] resize-y"></textarea>
+                        </div>
+                        <div class="flex gap-2">
+                          <button type="submit" class="bg-[#1a1a2e] text-white px-4 py-2 rounded-lg text-xs font-medium hover:bg-[#2d2d4e]">
+                            {isEl ? 'Υποβολή' : isBg ? 'Изпратете' : isSr ? 'Pošalji' : isTr ? 'Gönder' : isRo ? 'Trimite' : 'Submit'}
+                          </button>
+                          <button type="button" class="review-cancel-btn text-xs text-gray-500 px-4 py-2 hover:text-gray-700" data-tech-id={tech.id}>
+                            {isEl ? 'Ακύρωση' : isBg ? 'Отказ' : isSr ? 'Otkaži' : isTr ? 'İptal' : isRo ? 'Anulare' : 'Cancel'}
+                          </button>
+                        </div>
+                        <p class="review-msg text-xs hidden"></p>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </section>
+</BaseLayout>
+
+<script>
+  // Toggle review form
+  document.querySelectorAll('.review-toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const techId = (btn as HTMLElement).dataset.techId;
+      const form = document.querySelector(`.review-form[data-tech-id="${techId}"]`) as HTMLElement;
+      form?.classList.toggle('hidden');
+    });
+  });
+
+  // Cancel review
+  document.querySelectorAll('.review-cancel-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const techId = (btn as HTMLElement).dataset.techId;
+      const form = document.querySelector(`.review-form[data-tech-id="${techId}"]`) as HTMLElement;
+      form?.classList.add('hidden');
+    });
+  });
+
+  // Star rating interaction
+  document.querySelectorAll('.star-rating').forEach(container => {
+    const stars = container.querySelectorAll('.star-btn');
+    stars.forEach(star => {
+      star.addEventListener('click', () => {
+        const val = parseInt((star as HTMLElement).dataset.star!);
+        (container as HTMLElement).dataset.value = String(val);
+        stars.forEach((s, i) => {
+          s.textContent = i < val ? '★' : '☆';
+          s.classList.toggle('text-amber-400', i < val);
+          s.classList.toggle('text-gray-300', i >= val);
+        });
+      });
+    });
+  });
+
+  // Submit review
+  document.querySelectorAll('.submit-review-form').forEach(form => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = form as HTMLFormElement;
+      const techId = f.dataset.techId;
+      const msg = f.querySelector('.review-msg') as HTMLElement;
+      const starContainer = f.querySelector('.star-rating') as HTMLElement;
+      const rating = parseInt(starContainer.dataset.value!);
+
+      if (!rating || rating < 1) {
+        msg.textContent = 'Please select a rating';
+        msg.className = 'review-msg text-xs text-red-600 mt-1';
+        return;
+      }
+
+      const fd = new FormData(f);
+      const body = {
+        technician_id: techId,
+        reviewer_name: fd.get('reviewer_name'),
+        reviewer_email: fd.get('reviewer_email') || null,
+        rating,
+        body: fd.get('body') || null,
+      };
+
+      try {
+        const res = await fetch('/api/technicians/reviews/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (res.ok) {
+          msg.textContent = data.message || 'Review submitted for approval!';
+          msg.className = 'review-msg text-xs text-green-600 mt-1';
+          f.reset();
+          // Reset stars
+          starContainer.dataset.value = '0';
+          starContainer.querySelectorAll('.star-btn').forEach(s => {
+            s.textContent = '☆';
+            s.classList.remove('text-amber-400');
+            s.classList.add('text-gray-300');
+          });
+        } else {
+          msg.textContent = data.error || 'Failed to submit';
+          msg.className = 'review-msg text-xs text-red-600 mt-1';
+        }
+      } catch {
+        msg.textContent = 'Network error';
+        msg.className = 'review-msg text-xs text-red-600 mt-1';
+      }
+    });
+  });
+
+  // Auto-scroll to technician card and open review form when arriving via QR (#tech-{id})
+  if (window.location.hash.startsWith('#tech-')) {
+    const el = document.querySelector(window.location.hash);
+    if (el) {
+      setTimeout(() => {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        // Highlight the card briefly
+        el.classList.add('ring-2', 'ring-[#c9a96e]', 'ring-offset-2');
+        setTimeout(() => el.classList.remove('ring-2', 'ring-[#c9a96e]', 'ring-offset-2'), 3000);
+        // Auto-open the review form
+        const techId = window.location.hash.replace('#tech-', '');
+        const form = document.querySelector(`.review-form[data-tech-id="${techId}"]`) as HTMLElement;
+        if (form) form.classList.remove('hidden');
+      }, 300);
+    }
+  }
+</script>

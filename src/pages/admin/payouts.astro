@@ -1,0 +1,377 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const session = Astro.locals.session!;
+const profile = Astro.locals.profile!;
+const isOwner = profile.role === 'property_owner';
+const isSuperAdmin = profile.role === 'super_admin';
+const ownerListingIds = Astro.locals.ownerListingIds ?? [];
+
+const service = getServiceClient();
+
+// ── For property owners: their own earnings ──────────────────────────────────
+let myBookings: any[] = [];
+let totalEarned = 0, pendingAmount = 0, transferredAmount = 0;
+
+if (isOwner) {
+  if (ownerListingIds.length > 0) {
+    const { data } = await service
+      .from('bookings')
+      .select('id,check_in,check_out,guest_name,total_price,owner_payout,platform_fee,payout_status,payout_at,payment_status,listings(title)')
+      .in('listing_id', ownerListingIds)
+      .eq('payment_status', 'paid')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    myBookings = data ?? [];
+    totalEarned    = myBookings.reduce((s, b) => s + Number(b.owner_payout ?? 0), 0);
+    pendingAmount  = myBookings.filter(b => b.payout_status === 'pending').reduce((s, b) => s + Number(b.owner_payout ?? 0), 0);
+    transferredAmount = myBookings.filter(b => b.payout_status === 'transferred').reduce((s, b) => s + Number(b.owner_payout ?? 0), 0);
+  }
+}
+
+// ── For super_admin: all owners' payout summaries ────────────────────────────
+let ownerSummaries: any[] = [];
+let allPendingBookings: any[] = [];
+
+if (isSuperAdmin) {
+  const [summaryRes, pendingRes] = await Promise.all([
+    service.from('owner_earnings').select('*').order('pending_payout', { ascending: false }),
+    service
+      .from('bookings')
+      .select('id,guest_name,check_in,total_price,owner_payout,payout_status,listings(title,owner_id,profiles(full_name,company_name))')
+      .eq('payout_status', 'pending')
+      .eq('payment_status', 'paid')
+      .order('created_at', { ascending: false })
+      .limit(50),
+  ]);
+  ownerSummaries    = summaryRes.data ?? [];
+  allPendingBookings = pendingRes.data ?? [];
+}
+
+const payoutBadge: Record<string, string> = {
+  na:          'bg-gray-100 text-gray-400',
+  pending:     'bg-amber-100 text-amber-700',
+  transferred: 'bg-emerald-100 text-emerald-700',
+  manual_paid: 'bg-blue-100 text-blue-700',
+};
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+}
+function fmtEur(v: number) {
+  return `€${Number(v).toLocaleString('en', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+---
+
+<AdminLayout title="Payouts">
+
+  {isOwner && (
+    <div class="max-w-4xl space-y-6">
+
+      <!-- Payout info banner -->
+      <div class="bg-blue-50 border border-blue-100 text-blue-800 rounded-xl px-4 py-3 text-sm flex items-start gap-3">
+        <span class="text-lg mt-0.5">💶</span>
+        <p>Guests pay a deposit to the platform and the remaining amount directly to you. Below you can see the breakdown per booking — your earnings are the total minus the platform commission.</p>
+      </div>
+
+      <!-- Summary cards -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        {[
+          { label: 'Total earned', value: fmtEur(totalEarned), icon: '💶', color: 'text-emerald-600' },
+          { label: 'Transferred to you', value: fmtEur(transferredAmount), icon: '✅', color: 'text-emerald-600' },
+          { label: 'Pending payout', value: fmtEur(pendingAmount), icon: '⏳', color: 'text-amber-600' },
+        ].map((c) => (
+          <div class="bg-white rounded-2xl p-5 border border-gray-100">
+            <div class="text-2xl mb-2">{c.icon}</div>
+            <p class={`text-2xl font-bold ${c.color}`}>{c.value}</p>
+            <p class="text-xs text-gray-400 mt-0.5">{c.label}</p>
+          </div>
+        ))}
+      </div>
+
+      <!-- Bookings earnings — Mobile cards -->
+      <div class="lg:hidden space-y-3">
+        <h2 class="font-semibold text-gray-900">Earnings per booking</h2>
+        {myBookings.length === 0 && (
+          <div class="bg-white rounded-2xl border border-gray-100 p-8 text-center text-gray-400">No paid bookings yet.</div>
+        )}
+        {myBookings.map((b) => (
+          <div class="bg-white rounded-2xl border border-gray-100 p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <div>
+                <p class="font-medium text-gray-900">{b.guest_name}</p>
+                <p class="text-xs text-gray-500">{b.listings?.title ?? '—'}</p>
+              </div>
+              <span class={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${payoutBadge[b.payout_status ?? 'na']}`}>
+                {b.payout_status ?? 'na'}
+              </span>
+            </div>
+            <div class="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <p class="text-xs text-gray-400">Check-in</p>
+                <p class="text-gray-600">{fmtDate(b.check_in)}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400">Booking total</p>
+                <p class="text-gray-700">{fmtEur(b.total_price)}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400">Platform fee</p>
+                <p class="text-gray-400">{fmtEur(b.platform_fee ?? 0)}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400">Your payout</p>
+                <p class="font-semibold text-gray-900">{fmtEur(b.owner_payout ?? 0)}</p>
+              </div>
+            </div>
+            {b.payout_at && <p class="text-xs text-gray-400">Paid on: {fmtDate(b.payout_at)}</p>}
+          </div>
+        ))}
+      </div>
+
+      <!-- Bookings earnings table (desktop) -->
+      <div class="hidden lg:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+          <h2 class="font-semibold text-gray-900">Earnings per booking</h2>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-gray-50 border-b border-gray-100">
+                <th class="px-4 py-3 text-left font-semibold text-gray-600">Guest</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600">Property</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600">Check-in</th>
+                <th class="px-4 py-3 text-right font-semibold text-gray-600">Booking total</th>
+                <th class="px-4 py-3 text-right font-semibold text-gray-600">Platform fee</th>
+                <th class="px-4 py-3 text-right font-semibold text-gray-600">Your payout</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600">Status</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600">Paid on</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+              {myBookings.map((b) => (
+                <tr class="hover:bg-gray-50 transition-colors">
+                  <td class="px-4 py-3 font-medium text-gray-900">{b.guest_name}</td>
+                  <td class="px-4 py-3 text-gray-500">{b.listings?.title ?? '—'}</td>
+                  <td class="px-4 py-3 text-gray-500 whitespace-nowrap">{fmtDate(b.check_in)}</td>
+                  <td class="px-4 py-3 text-right text-gray-700">{fmtEur(b.total_price)}</td>
+                  <td class="px-4 py-3 text-right text-gray-400">{fmtEur(b.platform_fee ?? 0)}</td>
+                  <td class="px-4 py-3 text-right font-semibold text-gray-900">{fmtEur(b.owner_payout ?? 0)}</td>
+                  <td class="px-4 py-3">
+                    <span class={`px-2 py-0.5 rounded-full text-xs font-medium ${payoutBadge[b.payout_status ?? 'na']}`}>
+                      {b.payout_status ?? 'na'}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-gray-400 text-xs">{b.payout_at ? fmtDate(b.payout_at) : '—'}</td>
+                </tr>
+              ))}
+              {myBookings.length === 0 && (
+                <tr>
+                  <td colspan="8" class="text-center py-12 text-gray-400">No paid bookings yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )}
+
+  {isSuperAdmin && (
+    <div class="space-y-8">
+
+      <!-- Owner earnings summary — Mobile cards -->
+      <div class="lg:hidden space-y-3">
+        <h2 class="font-semibold text-gray-900">Owner earnings summary</h2>
+        {ownerSummaries.length === 0 && (
+          <div class="bg-white rounded-2xl border border-gray-100 p-8 text-center text-gray-400">No owner data yet.</div>
+        )}
+        {ownerSummaries.map((o: any) => (
+          <div class="bg-white rounded-2xl border border-gray-100 p-4 space-y-2">
+            <p class="font-medium text-gray-900">{o.owner_name ?? '—'}</p>
+            <p class="text-xs text-gray-400">{o.owner_email}</p>
+            <div class="grid grid-cols-2 gap-2 text-sm">
+              <div>
+                <p class="text-xs text-gray-400">Bookings</p>
+                <p class="text-gray-700">{o.total_bookings}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400">Gross revenue</p>
+                <p class="text-gray-700">{fmtEur(o.gross_revenue ?? 0)}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400">Platform fees</p>
+                <p class="text-purple-600 font-medium">{fmtEur(o.total_fees ?? 0)}</p>
+              </div>
+              <div>
+                <p class="text-xs text-gray-400">Owner payouts</p>
+                <p class="text-gray-700">{fmtEur(o.total_payouts ?? 0)}</p>
+              </div>
+            </div>
+            <div class="pt-1 border-t border-gray-100">
+              <p class="text-xs text-gray-400">Pending</p>
+              <p class="font-bold text-amber-600">{fmtEur(o.pending_payout ?? 0)}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <!-- Platform-wide summary per owner (desktop) -->
+      <div class="hidden lg:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+          <h2 class="font-semibold text-gray-900">Owner earnings summary</h2>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-gray-50 border-b border-gray-100">
+                <th class="px-4 py-3 text-left font-semibold text-gray-600">Owner</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600">Email</th>
+                <th class="px-4 py-3 text-right font-semibold text-gray-600">Bookings</th>
+                <th class="px-4 py-3 text-right font-semibold text-gray-600">Gross revenue</th>
+                <th class="px-4 py-3 text-right font-semibold text-gray-600">Platform fees</th>
+                <th class="px-4 py-3 text-right font-semibold text-gray-600">Owner payouts</th>
+                <th class="px-4 py-3 text-right font-semibold text-gray-600 text-amber-700">Pending</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+              {ownerSummaries.map((o: any) => (
+                <tr class="hover:bg-gray-50 transition-colors">
+                  <td class="px-4 py-3 font-medium text-gray-900">{o.owner_name ?? '—'}</td>
+                  <td class="px-4 py-3 text-gray-400 text-xs">{o.owner_email}</td>
+                  <td class="px-4 py-3 text-right text-gray-700">{o.total_bookings}</td>
+                  <td class="px-4 py-3 text-right text-gray-700">{fmtEur(o.gross_revenue ?? 0)}</td>
+                  <td class="px-4 py-3 text-right text-purple-600 font-medium">{fmtEur(o.total_fees ?? 0)}</td>
+                  <td class="px-4 py-3 text-right text-gray-700">{fmtEur(o.total_payouts ?? 0)}</td>
+                  <td class="px-4 py-3 text-right font-bold text-amber-600">{fmtEur(o.pending_payout ?? 0)}</td>
+                </tr>
+              ))}
+              {ownerSummaries.length === 0 && (
+                <tr>
+                  <td colspan="7" class="text-center py-10 text-gray-400">No owner data yet.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Pending payouts — Mobile cards -->
+      <div class="lg:hidden space-y-3">
+        <div>
+          <h2 class="font-semibold text-gray-900">Pending payouts — need action</h2>
+          <p class="text-xs text-gray-400 mt-0.5">Bookings paid by guests where owner payout hasn't been transferred yet.</p>
+        </div>
+        {allPendingBookings.length === 0 && (
+          <div class="bg-white rounded-2xl border border-gray-100 p-8 text-center text-gray-400">
+            <p class="text-2xl mb-2">✅</p>
+            <p>All payouts are up to date.</p>
+          </div>
+        )}
+        {allPendingBookings.map((b: any) => {
+          const ownerName = b.listings?.profiles?.company_name ?? b.listings?.profiles?.full_name ?? '—';
+          return (
+            <div class="bg-white rounded-2xl border border-gray-100 p-4 space-y-2">
+              <div class="flex items-start justify-between gap-2">
+                <div>
+                  <p class="font-medium text-gray-900">{ownerName}</p>
+                  <p class="text-xs text-gray-500">{b.listings?.title ?? '—'}</p>
+                </div>
+                <p class="font-bold text-amber-600 whitespace-nowrap">{fmtEur(b.owner_payout ?? 0)}</p>
+              </div>
+              <div class="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  <p class="text-xs text-gray-400">Guest</p>
+                  <p class="text-gray-600">{b.guest_name}</p>
+                </div>
+                <div>
+                  <p class="text-xs text-gray-400">Check-in</p>
+                  <p class="text-gray-500">{fmtDate(b.check_in)}</p>
+                </div>
+              </div>
+              <button
+                class="mark-paid-btn min-h-[44px] w-full text-sm text-[#1a1a2e] hover:text-[#c9a96e] font-medium transition-colors border border-gray-200 rounded-xl px-4 py-2.5"
+                data-id={b.id}>
+                Mark paid →
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <!-- All pending payouts (desktop) -->
+      <div class="hidden lg:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div class="px-6 py-4 border-b border-gray-100">
+          <h2 class="font-semibold text-gray-900">Pending payouts — need action</h2>
+          <p class="text-xs text-gray-400 mt-0.5">Bookings paid by guests where owner payout hasn't been transferred yet.</p>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="bg-gray-50 border-b border-gray-100">
+                <th class="px-4 py-3 text-left font-semibold text-gray-600">Owner</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600">Guest</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600">Property</th>
+                <th class="px-4 py-3 text-left font-semibold text-gray-600">Check-in</th>
+                <th class="px-4 py-3 text-right font-semibold text-gray-600">Payout owed</th>
+                <th class="px-4 py-3"></th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-gray-50">
+              {allPendingBookings.map((b: any) => {
+                const ownerName = b.listings?.profiles?.company_name ?? b.listings?.profiles?.full_name ?? '—';
+                return (
+                  <tr class="hover:bg-gray-50 transition-colors">
+                    <td class="px-4 py-3 font-medium text-gray-900">{ownerName}</td>
+                    <td class="px-4 py-3 text-gray-600">{b.guest_name}</td>
+                    <td class="px-4 py-3 text-gray-500">{b.listings?.title ?? '—'}</td>
+                    <td class="px-4 py-3 text-gray-500">{fmtDate(b.check_in)}</td>
+                    <td class="px-4 py-3 text-right font-bold text-amber-600">{fmtEur(b.owner_payout ?? 0)}</td>
+                    <td class="px-4 py-3 text-right">
+                      <button
+                        class="mark-paid-btn text-xs text-[#1a1a2e] hover:text-[#c9a96e] font-medium transition-colors"
+                        data-id={b.id}>
+                        Mark paid →
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+              {allPendingBookings.length === 0 && (
+                <tr>
+                  <td colspan="6" class="text-center py-10 text-gray-400">
+                    <p class="text-2xl mb-2">✅</p>
+                    <p>All payouts are up to date.</p>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )}
+</AdminLayout>
+
+<script>
+  // Super admin: mark a payout as manually paid
+  document.querySelectorAll('.mark-paid-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = (btn as HTMLElement).dataset.id;
+      if (!id) return;
+      if (!confirm('Mark this payout as manually paid?')) return;
+      const res = await fetch(`/api/bookings/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payout_status: 'manual_paid', payout_at: new Date().toISOString() }),
+      });
+      if (res.ok) {
+        (btn.closest('tr') as HTMLElement)?.remove();
+      } else {
+        alert('Failed to update payout status');
+      }
+    });
+  });
+</script>

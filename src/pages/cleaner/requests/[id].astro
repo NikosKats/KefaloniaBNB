@@ -1,0 +1,184 @@
+---
+import CleanerLayout from '../../../layouts/CleanerLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+
+const userId = Astro.locals.session.user.id;
+const { id } = Astro.params;
+const service = getServiceClient();
+
+const { data: profile } = await service
+  .from('cleaner_profiles')
+  .select('id, cleaner_services(*)')
+  .eq('user_id', userId)
+  .single();
+
+if (!profile) return Astro.redirect('/cleaner/dashboard');
+
+const { data: req } = await service
+  .from('cleaning_requests')
+  .select('*, listings(title,city,bedrooms,property_type)')
+  .eq('id', id!)
+  .eq('status', 'open')
+  .single();
+
+if (!req) return Astro.redirect('/cleaner/requests');
+
+// Check if already bid
+const { data: existingBid } = await service
+  .from('cleaning_matches')
+  .select('*')
+  .eq('request_id', id!)
+  .eq('cleaner_id', profile.id)
+  .single();
+
+// Suggest price from matching service
+const matchingService = (profile.cleaner_services ?? []).find((s: any) =>
+  s.property_type === (req as any).listings?.property_type &&
+  s.bedrooms_min <= ((req as any).listings?.bedrooms ?? 0) &&
+  s.bedrooms_max >= ((req as any).listings?.bedrooms ?? 0)
+);
+
+// Fetch market rate hint from recent accepted bids
+const listingCity = (req as any).listings?.city ?? '';
+const listingBedrooms = (req as any).listings?.bedrooms ?? 0;
+let marketRate: { avg: number | null; min: number | null; max: number | null; count: number } = { avg: null, min: null, max: null, count: 0 };
+try {
+  const mrUrl = new URL('/api/cleaning/market-rate', Astro.url.origin);
+  mrUrl.searchParams.set('city', listingCity);
+  mrUrl.searchParams.set('bedrooms', String(listingBedrooms));
+  const mrRes = await fetch(mrUrl.toString());
+  if (mrRes.ok) marketRate = await mrRes.json();
+} catch {
+  // non-critical — silently ignore
+}
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isBg = lang === 'bg';
+const isEl = lang === 'el';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const tBidTitle = isEl ? 'Προσφορά' : isBg ? 'Оферта' : isSr ? 'Ponuda' : isTr ? 'Teklif' : isRo ? 'Ofertă' : 'Bid';
+const tBetween = isEl ? 'μεταξύ' : isBg ? 'между' : isSr ? 'između' : isTr ? 'arasında' : isRo ? 'între' : 'between';
+const tBidSubmitted = isEl ? 'Προσφορά Υποβλήθηκε' : isBg ? 'Офертата е подадена' : isSr ? 'Ponuda poslata' : isTr ? 'Teklif Gönderildi' : isRo ? 'Ofertă Trimisă' : 'Bid Submitted';
+const tYouBid = isEl ? 'Προσφέρατε' : isBg ? 'Вашата оферта' : isSr ? 'Vaša ponuda' : isTr ? 'Teklifiniz' : isRo ? 'Ați ofertat' : 'You bid';
+const tAt = isEl ? 'στις' : isBg ? 'в' : isSr ? 'u' : isTr ? 'saat' : isRo ? 'la' : 'at';
+const tAcceptedCheck = isEl ? 'Αποδεκτή! Ελέγξτε τις εργασίες σας.' : isBg ? 'Приета! Проверете работите си.' : isSr ? 'Prihvaćena! Proverite poslove.' : isTr ? 'Kabul edildi! İşlerinizi kontrol edin.' : isRo ? 'Acceptată! Verificați lucrările dvs.' : 'Accepted! Check your jobs.';
+const tNotSelected = isEl ? 'Δεν επιλέχθηκε για αυτήν την εργασία.' : isBg ? 'Не е избрана за тази работа.' : isSr ? 'Nije izabrana za ovaj posao.' : isTr ? 'Bu iş için seçilmedi.' : isRo ? 'Nu a fost selectată pentru această lucrare.' : 'Not selected for this job.';
+const tWaitingOwner = isEl ? 'Αναμονή για απόφαση ιδιοκτήτη…' : isBg ? 'Изчакване на решение на собственика…' : isSr ? 'Čeka se odluka vlasnika…' : isTr ? 'Mal sahibinin kararı bekleniyor…' : isRo ? 'Așteptare decizia proprietarului…' : 'Waiting for owner decision…';
+const tYourPrice = isEl ? 'Η Τιμή σας (€)' : isBg ? 'Вашата цена (€)' : isSr ? 'Vaša cena (€)' : isTr ? 'Fiyatınız (€)' : isRo ? 'Prețul Dvs. (€)' : 'Your Price (€)';
+const tEnterPrice = isEl ? 'Εισάγετε τιμή…' : isBg ? 'Въведете цена…' : isSr ? 'Unesite cenu…' : isTr ? 'Fiyat girin…' : isRo ? 'Introduceți prețul…' : 'Enter price…';
+const tSuggested = isEl ? 'Προτεινόμενη' : isBg ? 'Предложена' : isSr ? 'Predložena' : isTr ? 'Önerilen' : isRo ? 'Sugerată' : 'Suggested';
+const tBasedOnService = isEl ? 'Βάσει της τιμής υπηρεσίας σας για' : isBg ? 'На база цената ви за услугата за' : isSr ? 'Na osnovu cene vaše usluge za' : isTr ? 'Hizmet fiyatınıza göre' : isRo ? 'Pe baza prețului dvs. de serviciu pentru' : 'Based on your service price for';
+const tMarketRate = isEl ? 'Τιμή αγοράς' : isBg ? 'Пазарна цена' : isSr ? 'Tržišna cena' : isTr ? 'Piyasa fiyatı' : isRo ? 'Tarif de piață' : 'Market rate';
+const tFor = isEl ? 'για' : isBg ? 'за' : isSr ? 'za' : isTr ? 'için' : isRo ? 'pentru' : 'for';
+const tIn = isEl ? 'σε' : isBg ? 'в' : isSr ? 'u' : isTr ? '' : isRo ? 'în' : 'in';
+const tAvg = isEl ? 'μέσος' : isBg ? 'средно' : isSr ? 'prosek' : isTr ? 'ort' : isRo ? 'medie' : 'avg';
+const tBasedOn = isEl ? 'βάσει' : isBg ? 'на база' : isSr ? 'na osnovu' : isTr ? 'dayalı' : isRo ? 'pe baza' : 'based on';
+const tRecentJob = isEl ? 'πρόσφατη εργασία' : isBg ? 'скорошна работа' : isSr ? 'nedavni posao' : isTr ? 'son iş' : isRo ? 'lucrare recentă' : 'recent job';
+const tRecentJobs = isEl ? 'πρόσφατες εργασίες' : isBg ? 'скорошни работи' : isSr ? 'nedavnih poslova' : isTr ? 'son iş' : isRo ? 'lucrări recente' : 'recent jobs';
+const tProposedTime = isEl ? 'Προτεινόμενη Ώρα Έναρξης (προαιρετικά)' : isBg ? 'Предложен начален час (незадължително)' : isSr ? 'Predloženo vreme početka (opciono)' : isTr ? 'Önerilen Başlangıç Saati (isteğe bağlı)' : isRo ? 'Ora de Început Propusă (opțional)' : 'Proposed Start Time (optional)';
+const tMsgToOwner = isEl ? 'Μήνυμα στον Ιδιοκτήτη (προαιρετικά)' : isBg ? 'Съобщение до собственика (незадължително)' : isSr ? 'Poruka vlasniku (opciono)' : isTr ? 'Ev Sahibine Mesaj (isteğe bağlı)' : isRo ? 'Mesaj către Proprietar (opțional)' : 'Message to Owner (optional)';
+const tMsgPlaceholder = isEl ? 'Συστήστε τον εαυτό σας ή προσθέστε σχετικές πληροφορίες…' : isBg ? 'Представете се или добавете полезна информация…' : isSr ? 'Predstavite se ili dodajte relevantne informacije…' : isTr ? 'Kendinizi tanıtın veya ilgili bilgi ekleyin…' : isRo ? 'Prezentați-vă sau adăugați informații relevante…' : 'Introduce yourself or add relevant info…';
+const tSubmitBid = isEl ? 'Υποβολή Προσφοράς' : isBg ? 'Подаване на оферта' : isSr ? 'Pošalji ponudu' : isTr ? 'Teklif Gönder' : isRo ? 'Trimite Oferta' : 'Submit Bid';
+const tBrowseRequests = isEl ? '← Αναζήτηση Αιτημάτων' : isBg ? '← Преглед на заявки' : isSr ? '← Pregledaj zahteve' : isTr ? '← Taleplere Göz At' : isRo ? '← Răsfoire Cereri' : '← Browse Requests';
+const tSubmitting = isEl ? 'Υποβολή…' : isBg ? 'Изпращане…' : isSr ? 'Slanje…' : isTr ? 'Gönderiliyor…' : isRo ? 'Se trimite…' : 'Submitting…';
+const tFailedSubmitBid = isEl ? 'Αποτυχία υποβολής προσφοράς.' : isBg ? 'Неуспешно подаване на оферта.' : isSr ? 'Slanje ponude neuspešno.' : isTr ? 'Teklif gönderilemedi.' : isRo ? 'Trimitere ofertă eșuată.' : 'Failed to submit bid.';
+---
+
+<CleanerLayout title={`${tBidTitle} — ${(req as any).listings?.title}`}>
+  <div class="max-w-lg mx-auto space-y-6">
+    <div>
+      <h1 class="text-xl font-bold text-gray-900">{(req as any).listings?.title}</h1>
+      <p class="text-sm text-gray-500">{(req as any).listings?.city} · {(req as any).listings?.bedrooms} BR · {(req as any).listings?.property_type}</p>
+      <p class="text-sm text-gray-500 mt-1">{req.requested_date} {tBetween} {req.earliest_time} – {req.latest_time}</p>
+      {req.notes && <div class="mt-3 bg-gray-50 rounded-xl p-3 text-sm text-gray-600">{req.notes}</div>}
+    </div>
+
+    {existingBid ? (
+      <div class="bg-blue-50 border border-blue-200 rounded-2xl p-5">
+        <p class="text-sm font-semibold text-blue-800 mb-1">{tBidSubmitted}</p>
+        <p class="text-sm text-gray-600">{tYouBid} <strong>€{existingBid.proposed_price}</strong>{existingBid.proposed_time ? ` ${tAt} ${existingBid.proposed_time}` : ''}.</p>
+        {existingBid.is_accepted === true && <p class="text-sm text-emerald-700 font-medium mt-2">{tAcceptedCheck}</p>}
+        {existingBid.is_accepted === false && <p class="text-sm text-gray-500 mt-2">{tNotSelected}</p>}
+        {existingBid.is_accepted === null && <p class="text-xs text-gray-400 mt-2">{tWaitingOwner}</p>}
+      </div>
+    ) : (
+      <form id="bid-form" class="bg-white rounded-2xl border border-gray-100 p-6 space-y-5">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{tYourPrice}</label>
+          <input type="number" id="price" name="proposed_price" min="10" step="1"
+            value={matchingService?.base_price ?? ''}
+            placeholder={matchingService ? `${tSuggested}: €${matchingService.base_price}` : tEnterPrice}
+            required
+            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none" />
+          {matchingService && (
+            <p class="text-xs text-gray-400 mt-1">{tBasedOnService} {(req as any).listings?.bedrooms} BR {(req as any).listings?.property_type}</p>
+          )}
+          {marketRate.count > 0 && marketRate.avg != null && (
+            <div class="mt-2 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 text-xs text-blue-700">
+              <span class="font-semibold">{tMarketRate}</span> {tFor} {listingBedrooms} BR {tIn} {listingCity}:
+              €{marketRate.min}–€{marketRate.max}
+              {' '}({tAvg} €{marketRate.avg}, {tBasedOn} {marketRate.count} {marketRate.count !== 1 ? tRecentJobs : tRecentJob})
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{tProposedTime}</label>
+          <input type="time" id="proposed-time" name="proposed_time"
+            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none" />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{tMsgToOwner}</label>
+          <textarea id="message" name="message" rows="3" placeholder={tMsgPlaceholder}
+            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none resize-none"></textarea>
+        </div>
+
+        <div id="bid-error" class="hidden text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3"></div>
+
+        <button type="submit" id="submit-btn" class="w-full bg-[#1a1a2e] text-white font-semibold px-6 py-3 rounded-xl hover:bg-[#2d2d4e] transition-colors">
+          {tSubmitBid}
+        </button>
+      </form>
+    )}
+
+    <div class="pt-2">
+      <a href="/cleaner/requests" class="text-sm text-gray-400 hover:text-gray-600">{tBrowseRequests}</a>
+    </div>
+  </div>
+</CleanerLayout>
+
+<script define:vars={{ requestId: req.id, tSubmitting, tSubmitBid, tFailedSubmitBid }}>
+  document.getElementById('bid-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('submit-btn');
+    const errEl = document.getElementById('bid-error');
+    btn.disabled = true;
+    btn.textContent = tSubmitting;
+    errEl.classList.add('hidden');
+
+    const proposed_price = parseFloat(document.getElementById('price').value);
+    const proposed_time = document.getElementById('proposed-time').value || undefined;
+    const message = document.getElementById('message').value || undefined;
+
+    const res = await fetch(`/api/cleaning/requests/${requestId}/bids`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ proposed_price, proposed_time, message }),
+    });
+
+    if (res.ok) {
+      window.location.reload();
+    } else {
+      const d = await res.json();
+      errEl.textContent = typeof d.error === 'string' ? d.error : tFailedSubmitBid;
+      errEl.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = tSubmitBid;
+    }
+  });
+</script>

@@ -1,0 +1,210 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+const isLoggedIn = !!Astro.locals.session;
+const currentUserId = Astro.locals.session?.user?.id ?? null;
+
+// Auto-fill from profile if logged in
+let prefill = { name: '', email: '', phone: '' };
+if (currentUserId) {
+  const service = getServiceClient();
+  const { data: profile } = await service
+    .from('profiles')
+    .select('full_name, email, phone')
+    .eq('id', currentUserId)
+    .single();
+  if (profile) {
+    prefill.name = profile.full_name ?? '';
+    prefill.email = profile.email ?? '';
+    prefill.phone = profile.phone ?? '';
+  }
+}
+---
+
+<BaseLayout
+  title={isEl ? 'Υποβολή Αναφοράς — KefaloniaBNB' : isBg ? 'Подаване на доклад — KefaloniaBNB' : isSr ? 'Pošalji izveštaj — KefaloniaBNB' : isTr ? 'Rapor Gönder — KefaloniaBNB' : isRo ? 'Trimite un Raport — KefaloniaBNB' : 'Submit a Report — KefaloniaBNB'}
+  description={isEl ? 'Αναφέρετε ένα πρόβλημα στην κοινότητα' : isBg ? 'Докладвайте проблем в общността' : isSr ? 'Prijavite problem u zajednici' : isTr ? 'Topluluk sorununu bildirin' : isRo ? 'Raportează o problemă în comunitate' : 'Report a community issue'}
+>
+  <section class="bg-[#1a1a2e] py-12 sm:py-16">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <a href="/community/reports" class="text-gray-400 hover:text-white text-sm mb-4 inline-block">&larr; {isEl ? 'Πίσω στις αναφορές' : isBg ? 'Назад към докладите' : isSr ? 'Nazad na izveštaje' : isTr ? 'Raporlara dön' : isRo ? 'Înapoi la rapoarte' : 'Back to reports'}</a>
+      <h1 class="text-3xl font-bold text-white">{isEl ? 'Αναφορά Προβλήματος' : isBg ? 'Докладване на проблем' : isSr ? 'Prijavi problem' : isTr ? 'Sorun Bildir' : isRo ? 'Raportează o Problemă' : 'Report an Issue'}</h1>
+      <p class="text-gray-300 mt-2">{isEl ? 'Βοηθήστε μας να βελτιώσουμε τη γειτονιά μας' : isBg ? 'Помогнете ни да подобрим квартала' : isSr ? 'Pomozite nam da poboljšamo naš komšiluk' : isTr ? 'Mahallemizi geliştirmemize yardımcı olun' : isRo ? 'Ajută-ne să îmbunătățim cartierul nostru' : 'Help us improve our neighborhood'}</p>
+      {isLoggedIn && (
+        <p class="text-xs text-[#c9a96e] mt-2">{isEl ? 'Συνδεδεμένος — η αναφορά θα συνδεθεί με τον λογαριασμό σου' : isBg ? 'Влезли сте — този доклад ще бъде свързан с вашия акаунт' : isSr ? 'Prijavljeni ste — ovaj izveštaj će biti povezan sa vašim nalogom' : isTr ? 'Giriş yaptınız — bu rapor hesabınıza bağlanacak' : isRo ? 'Autentificat — acest raport va fi asociat contului tău' : 'Logged in — this report will be linked to your account'}</p>
+      )}
+    </div>
+  </section>
+
+  <section class="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+    <form id="report-form" class="space-y-6 bg-white rounded-2xl border border-gray-100 p-6 sm:p-8 shadow-sm">
+      <!-- Title -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">{isEl ? 'Τίτλος' : isBg ? 'Заглавие' : isSr ? 'Naslov' : isTr ? 'Başlık' : isRo ? 'Titlu' : 'Title'} *</label>
+        <input type="text" name="title" required maxlength="200"
+          class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none"
+          placeholder={isEl ? 'π.χ. Σπασμένο πεζοδρόμιο στο λιμάνι' : isBg ? 'напр. Счупен тротоар до пристанището' : isSr ? 'npr. Oštećen trotoar kod luke' : isTr ? 'ör. Liman yakınında kırık kaldırım' : isRo ? 'ex. Trotuar deteriorat lângă port' : 'e.g. Broken sidewalk near the port'} />
+      </div>
+
+      <!-- Category -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">{isEl ? 'Κατηγορία' : isBg ? 'Категория' : isSr ? 'Kategorija' : isTr ? 'Kategori' : isRo ? 'Categorie' : 'Category'} *</label>
+        <select name="category" required class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none bg-white">
+          <option value="">{isEl ? '-- Επιλέξτε --' : isBg ? '-- Изберете --' : isSr ? '-- Izaberite --' : isTr ? '-- Seçin --' : isRo ? '-- Selectează --' : '-- Select --'}</option>
+          <option value="road_damage">{isEl ? '🛣️ Φθορά Οδοστρώματος' : isBg ? '🛣️ Повреда на пътя' : isSr ? '🛣️ Oštećenje puta' : isTr ? '🛣️ Yol Hasarı' : isRo ? '🛣️ Deteriorare drum' : '🛣️ Road Damage'}</option>
+          <option value="water_supply">{isEl ? '💧 Ύδρευση' : isBg ? '💧 Водоснабдяване' : isSr ? '💧 Vodosnabdevanje' : isTr ? '💧 Su Temini' : isRo ? '💧 Alimentare cu apă' : '💧 Water Supply'}</option>
+          <option value="electricity">{isEl ? '⚡ Ηλεκτρικό Ρεύμα' : isBg ? '⚡ Електричество' : isSr ? '⚡ Struja' : isTr ? '⚡ Elektrik' : isRo ? '⚡ Electricitate' : '⚡ Electricity'}</option>
+          <option value="waste">{isEl ? '🗑️ Σκουπίδια / Απόβλητα' : isBg ? '🗑️ Отпадъци / Боклук' : isSr ? '🗑️ Otpad / Smeće' : isTr ? '🗑️ Atık / Çöp' : isRo ? '🗑️ Deșeuri / Gunoi' : '🗑️ Waste / Litter'}</option>
+          <option value="street_lighting">{isEl ? '💡 Δημοτικός Φωτισμός' : isBg ? '💡 Улично осветление' : isSr ? '💡 Ulična rasveta' : isTr ? '💡 Sokak Aydınlatması' : isRo ? '💡 Iluminat stradal' : '💡 Street Lighting'}</option>
+          <option value="stray_animals">{isEl ? '🐕 Αδέσποτα Ζώα' : isBg ? '🐕 Бездомни животни' : isSr ? '🐕 Lutalice' : isTr ? '🐕 Başıboş Hayvanlar' : isRo ? '🐕 Animale fără stăpân' : '🐕 Stray Animals'}</option>
+          <option value="noise">{isEl ? '🔊 Θόρυβος' : isBg ? '🔊 Шум' : isSr ? '🔊 Buka' : isTr ? '🔊 Gürültü' : isRo ? '🔊 Zgomot' : '🔊 Noise'}</option>
+          <option value="flooding">{isEl ? '🌊 Πλημμύρα' : isBg ? '🌊 Наводнение' : isSr ? '🌊 Poplava' : isTr ? '🌊 Sel' : isRo ? '🌊 Inundație' : '🌊 Flooding'}</option>
+          <option value="other">{isEl ? '📋 Άλλο' : isBg ? '📋 Друго' : isSr ? '📋 Ostalo' : isTr ? '📋 Diğer' : isRo ? '📋 Altele' : '📋 Other'}</option>
+        </select>
+      </div>
+
+      <!-- Description -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">{isEl ? 'Περιγραφή' : isBg ? 'Описание' : isSr ? 'Opis' : isTr ? 'Açıklama' : isRo ? 'Descriere' : 'Description'} *</label>
+        <textarea name="description" required rows="4" maxlength="2000"
+          class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none resize-y"
+          placeholder={isEl ? 'Περιγράψτε το πρόβλημα λεπτομερώς...' : isBg ? 'Опишете проблема подробно...' : isSr ? 'Opišite problem detaljno...' : isTr ? 'Sorunu ayrıntılı olarak açıklayın...' : isRo ? 'Descrie problema în detaliu...' : 'Describe the issue in detail...'}></textarea>
+      </div>
+
+      <!-- Severity -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">{isEl ? 'Σοβαρότητα' : isBg ? 'Сериозност' : isSr ? 'Ozbiljnost' : isTr ? 'Ciddiyet' : isRo ? 'Gravitate' : 'Severity'}</label>
+        <div class="flex gap-2">
+          {[
+            { value: 'low', label: isEl ? 'Χαμηλή' : isBg ? 'Ниска' : isSr ? 'Niska' : isTr ? 'Düşük' : isRo ? 'Scăzută' : 'Low', color: 'border-gray-300 hover:bg-gray-50' },
+            { value: 'medium', label: isEl ? 'Μεσαία' : isBg ? 'Средна' : isSr ? 'Srednja' : isTr ? 'Orta' : isRo ? 'Medie' : 'Medium', color: 'border-amber-300 hover:bg-amber-50' },
+            { value: 'high', label: isEl ? 'Υψηλή' : isBg ? 'Висока' : isSr ? 'Visoka' : isTr ? 'Yüksek' : isRo ? 'Ridicată' : 'High', color: 'border-orange-300 hover:bg-orange-50' },
+            { value: 'critical', label: isEl ? 'Κρίσιμη' : isBg ? 'Критична' : isSr ? 'Kritična' : isTr ? 'Kritik' : isRo ? 'Critică' : 'Critical', color: 'border-red-300 hover:bg-red-50' },
+          ].map(s => (
+            <label class={`flex-1 text-center cursor-pointer border-2 rounded-xl py-2 text-sm font-medium transition-colors ${s.color}`}>
+              <input type="radio" name="severity" value={s.value} class="sr-only severity-radio" />
+              <span>{s.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <!-- Location -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1.5">{isEl ? 'Τοποθεσία' : isBg ? 'Местоположение' : isSr ? 'Lokacija' : isTr ? 'Konum' : isRo ? 'Locație' : 'Location'}</label>
+        <input type="text" name="location" maxlength="200"
+          class="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none"
+          placeholder={isEl ? 'π.χ. Κοντά στο λιμάνι, Κεραμωτή' : isBg ? 'напр. До пристанището, Керамоти' : isSr ? 'npr. Kod luke, Keramoti' : isTr ? 'ör. Liman yakını, Keramoti' : isRo ? 'ex. Lângă port, Keramoti' : 'e.g. Near the port, Keramoti'} />
+      </div>
+
+      <!-- Contact (optional - pre-filled for logged-in users) -->
+      <div class="border-t border-gray-100 pt-6">
+        <p class="text-sm text-gray-500 mb-4">
+          {isLoggedIn
+            ? (isEl ? 'Τα στοιχεία σου συμπληρώθηκαν αυτόματα' : isBg ? 'Вашите данни бяха попълнени автоматично' : isSr ? 'Vaši podaci su automatski popunjeni' : isTr ? 'Bilgileriniz otomatik dolduruldu' : isRo ? 'Datele tale au fost completate automat' : 'Your details have been auto-filled')
+            : (isEl ? 'Προαιρετικά στοιχεία επικοινωνίας (για ενημέρωση)' : isBg ? 'Незадължителна информация за контакт (за актуализации)' : isSr ? 'Opcione kontakt informacije (za ažuriranja)' : isTr ? 'İsteğe bağlı iletişim bilgileri (güncellemeler için)' : isRo ? 'Informații de contact opționale (pentru actualizări)' : 'Optional contact info (for updates)')}
+        </p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">{isEl ? 'Όνομα' : isBg ? 'Име' : isSr ? 'Ime' : isTr ? 'Ad' : isRo ? 'Nume' : 'Name'}</label>
+            <input type="text" name="reporter_name" maxlength="100" value={prefill.name}
+              class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">Email</label>
+            <input type="email" name="reporter_email" maxlength="200" value={prefill.email}
+              class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-500 mb-1">{isEl ? 'Τηλέφωνο' : isBg ? 'Телефон' : isSr ? 'Telefon' : isTr ? 'Telefon' : isRo ? 'Telefon' : 'Phone'}</label>
+            <input type="tel" name="reporter_phone" maxlength="20" value={prefill.phone}
+              class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Submit -->
+      <div id="form-error" class="hidden text-red-600 text-sm bg-red-50 p-3 rounded-lg"></div>
+      <div id="form-success" class="hidden text-green-700 text-sm bg-green-50 p-4 rounded-lg"></div>
+
+      <button type="submit" id="submit-btn"
+        class="w-full bg-[#1a1a2e] text-white py-3 rounded-xl font-semibold hover:bg-[#2d2d4e] transition-colors">
+        {isEl ? 'Υποβολή Αναφοράς' : isBg ? 'Изпратете доклад' : isSr ? 'Pošalji izveštaj' : isTr ? 'Rapor Gönder' : isRo ? 'Trimite Raport' : 'Submit Report'}
+      </button>
+    </form>
+  </section>
+</BaseLayout>
+
+<script>
+  // Severity radio toggle
+  document.querySelectorAll('.severity-radio').forEach(radio => {
+    radio.addEventListener('change', () => {
+      document.querySelectorAll('.severity-radio').forEach(r => {
+        const label = (r as HTMLElement).closest('label')!;
+        label.classList.remove('ring-2', 'ring-[#c9a96e]', 'bg-gray-50', 'bg-amber-50', 'bg-orange-50', 'bg-red-50');
+      });
+      const label = (radio as HTMLElement).closest('label')!;
+      label.classList.add('ring-2', 'ring-[#c9a96e]');
+    });
+  });
+  // Default to medium
+  const mediumRadio = document.querySelector('input[value="medium"]') as HTMLInputElement;
+  if (mediumRadio) { mediumRadio.checked = true; mediumRadio.closest('label')?.classList.add('ring-2', 'ring-[#c9a96e]'); }
+
+  const form = document.getElementById('report-form') as HTMLFormElement;
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('submit-btn') as HTMLButtonElement;
+    const errEl = document.getElementById('form-error')!;
+    const okEl = document.getElementById('form-success')!;
+    errEl.classList.add('hidden');
+    okEl.classList.add('hidden');
+    btn.disabled = true;
+    const _l = document.documentElement.lang;
+    btn.textContent = _l === 'el' ? 'Υποβολή...' : _l === 'bg' ? 'Изпращане...' : _l === 'sr' ? 'Slanje...' : _l === 'tr' ? 'Gönderiliyor...' : _l === 'ro' ? 'Se trimite...' : 'Submitting...';
+
+    const fd = new FormData(form);
+    try {
+      const res = await fetch('/api/reports/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: fd.get('title'),
+          description: fd.get('description'),
+          category: fd.get('category'),
+          severity: fd.get('severity') || 'medium',
+          location: fd.get('location'),
+          reporter_name: fd.get('reporter_name'),
+          reporter_email: fd.get('reporter_email'),
+          reporter_phone: fd.get('reporter_phone'),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      const _lang = document.documentElement.lang;
+      okEl.textContent = _lang === 'el'
+        ? 'Η αναφορά σας υποβλήθηκε! Ευχαριστούμε.'
+        : _lang === 'bg' ? 'Вашият доклад е изпратен! Благодарим.'
+        : _lang === 'sr' ? 'Vaš izveštaj je poslat! Hvala.'
+        : _lang === 'tr' ? 'Raporunuz gönderildi! Teşekkürler.'
+        : _lang === 'ro' ? 'Raportul tău a fost trimis! Mulțumim.'
+        : 'Your report has been submitted! Thank you.';
+      okEl.classList.remove('hidden');
+      form.reset();
+      setTimeout(() => { window.location.href = '/community/reports'; }, 2000);
+    } catch (err: any) {
+      errEl.textContent = err.message;
+      errEl.classList.remove('hidden');
+      btn.disabled = false;
+      const _l2 = document.documentElement.lang;
+      btn.textContent = _l2 === 'el' ? 'Υποβολή Αναφοράς' : _l2 === 'bg' ? 'Изпратете доклад' : _l2 === 'sr' ? 'Pošalji izveštaj' : _l2 === 'tr' ? 'Rapor Gönder' : _l2 === 'ro' ? 'Trimite Raport' : 'Submit Report';
+    }
+  });
+</script>

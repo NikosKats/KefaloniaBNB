@@ -1,0 +1,15 @@
+name: Hourly Cron Jobs
+
+on:
+  schedule:
+    - cron: '0 * * * *'   # top of every hour
+  workflow_dispatch:        # allow manual trigger
+
+jobs:
+  cron:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Telegram arrival reminders (1h before check-in / check-out)
+        run: |
+          curl -sf -X GET "${{ secrets.SITE_URL }}/api/cron/telegram-reminders" \
+            -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"

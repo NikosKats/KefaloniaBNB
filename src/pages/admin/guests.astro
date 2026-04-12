@@ -1,0 +1,463 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const isSuperAdmin = Astro.locals.profile?.role === 'super_admin';
+const isAdmin = Astro.locals.profile?.role === 'admin';
+
+if (!isSuperAdmin && !isAdmin) {
+  return Astro.redirect('/admin');
+}
+
+const service = getServiceClient();
+
+// Fetch listings for property filter dropdown + name lookup
+const { data: listings } = await service
+  .from('listings')
+  .select('id, title')
+  .order('title');
+
+const listingMap = new Map((listings ?? []).map((l: any) => [l.id, l.title]));
+
+// Read query params
+const url = Astro.url;
+const search     = url.searchParams.get('search') ?? '';
+const tier       = url.searchParams.get('tier') ?? '';
+const propertyId = url.searchParams.get('property_id') ?? '';
+const sortBy     = url.searchParams.get('sort_by') ?? 'total_spent';
+const order      = url.searchParams.get('order') ?? 'desc';
+const page       = Math.max(1, parseInt(url.searchParams.get('page') ?? '1') || 1);
+const PAGE_SIZE  = 25;
+
+// Fetch bookings with dates & listing info
+let bkQuery = service
+  .from('bookings')
+  .select('guest_email, guest_name, guest_phone, guest_country, total_price, status, listing_id, check_in, check_out, nights, created_at')
+  .not('guest_email', 'is', null)
+  .neq('guest_email', '');
+
+if (propertyId) bkQuery = bkQuery.eq('listing_id', propertyId);
+
+const { data: bookings } = await bkQuery;
+
+interface BookingDetail {
+  listing_id: string;
+  listing_title: string;
+  check_in: string;
+  check_out: string;
+  nights: number;
+  total_price: number;
+  status: string;
+  created_at: string;
+}
+
+interface GuestEntry {
+  guest_email: string;
+  guest_name: string;
+  guest_phone: string | null;
+  guest_country: string | null;
+  total_spent: number;
+  bookings_count: number;
+  total_nights: number;
+  last_booking_date: string | null;
+  latest_created: string;
+  bookings_list: BookingDetail[];
+}
+
+// Aggregate by guest_email
+const map = new Map<string, GuestEntry>();
+
+for (const b of bookings ?? []) {
+  const isValid = b.status === 'confirmed' || b.status === 'completed';
+  let entry = map.get(b.guest_email);
+  if (!entry) {
+    entry = {
+      guest_email: b.guest_email, guest_name: b.guest_name,
+      guest_phone: b.guest_phone, guest_country: b.guest_country,
+      total_spent: 0, bookings_count: 0, total_nights: 0,
+      last_booking_date: null, latest_created: b.created_at,
+      bookings_list: [],
+    };
+    map.set(b.guest_email, entry);
+  }
+  if (b.created_at > entry.latest_created) {
+    entry.guest_name = b.guest_name;
+    entry.guest_phone = b.guest_phone;
+    entry.guest_country = b.guest_country;
+    entry.latest_created = b.created_at;
+  }
+  if (isValid) {
+    entry.total_spent += b.total_price;
+    entry.bookings_count++;
+    entry.total_nights += b.nights ?? 0;
+    if (!entry.last_booking_date || b.created_at > entry.last_booking_date) {
+      entry.last_booking_date = b.created_at;
+    }
+    entry.bookings_list.push({
+      listing_id: b.listing_id,
+      listing_title: listingMap.get(b.listing_id) ?? 'Unknown',
+      check_in: b.check_in,
+      check_out: b.check_out,
+      nights: b.nights ?? 0,
+      total_price: b.total_price,
+      status: b.status,
+      created_at: b.created_at,
+    });
+  }
+}
+
+// Sort each guest's bookings by date descending
+for (const entry of map.values()) {
+  entry.bookings_list.sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+function computeTier(spent: number): string {
+  if (spent >= 1000) return 'High';
+  if (spent >= 201) return 'Mid';
+  if (spent >= 1) return 'Low';
+  return 'None';
+}
+
+let guests = Array.from(map.values()).map(g => ({
+  ...g,
+  tier: computeTier(g.total_spent),
+}));
+
+// Filter
+if (search) {
+  const s = search.toLowerCase();
+  guests = guests.filter(g =>
+    g.guest_name?.toLowerCase().includes(s) ||
+    g.guest_email.toLowerCase().includes(s) ||
+    g.guest_phone?.toLowerCase().includes(s)
+  );
+}
+if (tier) guests = guests.filter(g => g.tier === tier);
+
+// Stats
+const totalGuests = guests.length;
+const highCount = guests.filter(g => g.tier === 'High').length;
+const midCount = guests.filter(g => g.tier === 'Mid').length;
+const lowCount = guests.filter(g => g.tier === 'Low').length;
+const totalRevenue = guests.reduce((s, g) => s + g.total_spent, 0);
+const totalNightsAll = guests.reduce((s, g) => s + g.total_nights, 0);
+
+// Sort
+const dir = order === 'asc' ? 1 : -1;
+guests.sort((a, b) => {
+  const key = sortBy as keyof typeof a;
+  const av = (a as any)[key] ?? 0;
+  const bv = (b as any)[key] ?? 0;
+  return av > bv ? dir : av < bv ? -dir : 0;
+});
+
+// Paginate
+const totalPages = Math.ceil(totalGuests / PAGE_SIZE);
+const paged = guests.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
+
+function fmtDate(d: string | null) {
+  if (!d) return '—';
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+function fmtShort(d: string) {
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+
+function buildUrl(overrides: Record<string, string>) {
+  const p = new URLSearchParams();
+  const vals: Record<string, string> = { search, tier, property_id: propertyId, sort_by: sortBy, order, page: String(page), ...overrides };
+  for (const [k, v] of Object.entries(vals)) {
+    if (v && v !== 'all' && v !== '0') p.set(k, v);
+  }
+  return `/admin/guests?${p.toString()}`;
+}
+
+function sortUrl(col: string) {
+  const newOrder = sortBy === col && order === 'desc' ? 'asc' : 'desc';
+  return buildUrl({ sort_by: col, order: newOrder, page: '1' });
+}
+
+function sortIcon(col: string) {
+  if (sortBy !== col) return '↕';
+  return order === 'desc' ? '↓' : '↑';
+}
+
+const tierBadge: Record<string, string> = {
+  High: 'bg-emerald-100 text-emerald-800',
+  Mid:  'bg-blue-100 text-blue-800',
+  Low:  'bg-gray-100 text-gray-600',
+  None: 'bg-gray-50 text-gray-400',
+};
+
+const statusBadge: Record<string, string> = {
+  confirmed: 'bg-emerald-900/30 text-emerald-400',
+  completed: 'bg-blue-900/30 text-blue-400',
+};
+
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+
+<AdminLayout title="Guest Segmentation">
+  <div class="space-y-6">
+
+    <!-- Header -->
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-bold text-white">Guests</h1>
+        <p class="text-sm text-gray-400 mt-0.5">{totalGuests} unique guests &middot; &euro;{totalRevenue.toLocaleString('en', { minimumFractionDigits: 0 })} revenue &middot; {totalNightsAll} nights booked</p>
+      </div>
+    </div>
+
+    <!-- KPI cards -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div class="bg-white/5 rounded-xl border border-white/10 p-4 text-center">
+        <div class="text-2xl font-bold text-white">{totalGuests}</div>
+        <div class="text-xs text-gray-400 mt-1">Total Guests</div>
+      </div>
+      <div class="bg-emerald-500/10 rounded-xl border border-emerald-500/20 p-4 text-center">
+        <div class="text-2xl font-bold text-emerald-400">{highCount}</div>
+        <div class="text-xs text-emerald-300/70 mt-1">High Tier (&ge;&euro;1000)</div>
+      </div>
+      <div class="bg-blue-500/10 rounded-xl border border-blue-500/20 p-4 text-center">
+        <div class="text-2xl font-bold text-blue-400">{midCount}</div>
+        <div class="text-xs text-blue-300/70 mt-1">Mid Tier (&euro;201–999)</div>
+      </div>
+      <div class="bg-white/5 rounded-xl border border-white/10 p-4 text-center">
+        <div class="text-2xl font-bold text-gray-300">{lowCount}</div>
+        <div class="text-xs text-gray-400 mt-1">Low Tier (&euro;1–200)</div>
+      </div>
+    </div>
+
+    <!-- Filters -->
+    <div class="bg-white/5 rounded-xl border border-white/10 p-4">
+      <form method="get" action="/admin/guests" class="flex flex-wrap items-end gap-3">
+        <div class="flex-1 min-w-[200px]">
+          <label class="block text-xs text-gray-400 mb-1">Search</label>
+          <input type="text" name="search" value={search} placeholder="Name, email or phone..."
+            class="w-full bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e] placeholder-gray-500" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Tier</label>
+          <select name="tier" class="bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e]">
+            <option value="" class="text-black" selected={!tier}>All tiers</option>
+            <option value="High" class="text-black" selected={tier === 'High'}>High (&ge;&euro;1000)</option>
+            <option value="Mid" class="text-black" selected={tier === 'Mid'}>Mid (&euro;201–999)</option>
+            <option value="Low" class="text-black" selected={tier === 'Low'}>Low (&euro;1–200)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Property</label>
+          <select name="property_id" class="bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e] max-w-[200px]">
+            <option value="" class="text-black" selected={!propertyId}>All properties</option>
+            {(listings ?? []).map((l: any) => (
+              <option value={l.id} class="text-black" selected={propertyId === l.id}>{l.title}</option>
+            ))}
+          </select>
+        </div>
+        <input type="hidden" name="sort_by" value={sortBy} />
+        <input type="hidden" name="order" value={order} />
+        <button type="submit" class="min-h-[44px] bg-[#c9a96e] text-white px-5 py-2 rounded-lg text-sm font-semibold hover:bg-[#b89556] transition-colors">Filter</button>
+        {(search || tier || propertyId) && (
+          <a href="/admin/guests" class="min-h-[44px] inline-flex items-center text-xs text-gray-400 hover:text-white py-2 px-2">Clear</a>
+        )}
+      </form>
+    </div>
+
+    <!-- Mobile card view -->
+    <div class="lg:hidden space-y-3">
+      {paged.length === 0 && (
+        <div class="bg-white/5 rounded-2xl border border-white/10 p-8 text-center text-gray-500">
+          <div class="text-4xl mb-2">👥</div>
+          <p>No guests found</p>
+        </div>
+      )}
+      {paged.map((g, idx) => (
+        <div class="bg-white/5 rounded-2xl border border-white/10 p-4 space-y-3">
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <p class="font-medium text-white">{g.guest_name}</p>
+              <p class="text-xs text-gray-500">{g.guest_email}</p>
+              {g.guest_phone && <p class="text-xs text-gray-600">{g.guest_phone}</p>}
+            </div>
+            <span class={`px-2.5 py-1 rounded-full text-xs font-semibold whitespace-nowrap ${tierBadge[g.tier] ?? tierBadge.None}`}>
+              {g.tier}
+            </span>
+          </div>
+          <div class="grid grid-cols-2 gap-2 text-sm">
+            <div>
+              <p class="text-xs text-gray-500">Country</p>
+              <p class="text-gray-300">{g.guest_country ?? '—'}</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500">Total Spent</p>
+              <p class="font-semibold text-white">&euro;{g.total_spent.toLocaleString('en', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500">Bookings</p>
+              <p class="text-gray-300">{g.bookings_count}</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-500">Nights</p>
+              <p class="text-gray-300">{g.total_nights}</p>
+            </div>
+          </div>
+          <div class="text-xs text-gray-500">Last booking: {fmtDate(g.last_booking_date)}</div>
+          {g.bookings_list.length > 0 && (
+            <details class="text-xs">
+              <summary class="min-h-[44px] flex items-center text-[#c9a96e] cursor-pointer font-medium">View booking history ({g.bookings_list.length})</summary>
+              <div class="mt-2 space-y-2">
+                {g.bookings_list.map((bk) => (
+                  <div class="bg-white/5 rounded-lg p-3 space-y-1">
+                    <p class="font-medium text-white truncate" title={bk.listing_title}>🏡 {bk.listing_title}</p>
+                    <p class="text-gray-300">📅 {fmtShort(bk.check_in)} → {fmtShort(bk.check_out)} · {bk.nights} night{bk.nights !== 1 ? 's' : ''}</p>
+                    <div class="flex items-center justify-between">
+                      <span class="font-medium text-white">&euro;{bk.total_price.toLocaleString('en', { minimumFractionDigits: 0 })}</span>
+                      <span class={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge[bk.status] ?? 'bg-gray-800 text-gray-400'}`}>{bk.status}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </details>
+          )}
+        </div>
+      ))}
+    </div>
+
+    <!-- Table (desktop) -->
+    <div class="hidden lg:block bg-white/5 rounded-2xl border border-white/10 overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-white/10">
+              <th class="px-4 py-3 text-left font-semibold text-gray-400 w-8"></th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-400">Guest</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-400">Country</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-400">
+                <a href={sortUrl('total_spent')} class="hover:text-white transition-colors">
+                  Total Spent {sortIcon('total_spent')}
+                </a>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-400">Tier</th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-400">
+                <a href={sortUrl('bookings_count')} class="hover:text-white transition-colors">
+                  Bookings {sortIcon('bookings_count')}
+                </a>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-400">
+                <a href={sortUrl('total_nights')} class="hover:text-white transition-colors">
+                  Nights {sortIcon('total_nights')}
+                </a>
+              </th>
+              <th class="px-4 py-3 text-left font-semibold text-gray-400">
+                <a href={sortUrl('last_booking_date')} class="hover:text-white transition-colors">
+                  Last Booking {sortIcon('last_booking_date')}
+                </a>
+              </th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-white/5">
+            {paged.length === 0 && (
+              <tr>
+                <td colspan="8" class="px-4 py-16 text-center text-gray-500">
+                  <div class="text-4xl mb-2">👥</div>
+                  <p>No guests found</p>
+                </td>
+              </tr>
+            )}
+            {paged.map((g, idx) => (
+              <>
+                {/* Main guest row */}
+                <tr class="hover:bg-white/5 transition-colors cursor-pointer guest-row" data-idx={idx}>
+                  <td class="px-4 py-3 text-gray-500">
+                    <span class="expand-icon text-xs transition-transform inline-block">&#9654;</span>
+                  </td>
+                  <td class="px-4 py-3">
+                    <p class="font-medium text-white">{g.guest_name}</p>
+                    <p class="text-xs text-gray-500">{g.guest_email}</p>
+                    {g.guest_phone && <p class="text-xs text-gray-600">{g.guest_phone}</p>}
+                  </td>
+                  <td class="px-4 py-3 text-gray-400 text-xs">{g.guest_country ?? '—'}</td>
+                  <td class="px-4 py-3 font-semibold text-white">&euro;{g.total_spent.toLocaleString('en', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}</td>
+                  <td class="px-4 py-3">
+                    <span class={`px-2.5 py-1 rounded-full text-xs font-semibold ${tierBadge[g.tier] ?? tierBadge.None}`}>
+                      {g.tier}
+                    </span>
+                  </td>
+                  <td class="px-4 py-3 text-gray-300">{g.bookings_count}</td>
+                  <td class="px-4 py-3 text-gray-300">{g.total_nights}</td>
+                  <td class="px-4 py-3 text-gray-400 text-xs whitespace-nowrap">{fmtDate(g.last_booking_date)}</td>
+                </tr>
+
+                {/* Expandable booking details */}
+                <tr class="booking-details hidden" data-idx={idx}>
+                  <td colspan="8" class="px-0 py-0">
+                    <div class="bg-white/[0.03] border-t border-b border-white/5 px-6 py-3">
+                      <p class="text-xs font-semibold text-gray-400 mb-2 uppercase tracking-wider">Booking History</p>
+                      <div class="space-y-2">
+                        {g.bookings_list.map((bk) => (
+                          <div class="flex items-center gap-4 text-xs bg-white/5 rounded-lg px-4 py-2.5">
+                            <span class="font-medium text-white min-w-[140px] truncate" title={bk.listing_title}>
+                              🏡 {bk.listing_title}
+                            </span>
+                            <span class="text-gray-300 whitespace-nowrap">
+                              📅 {fmtShort(bk.check_in)} → {fmtShort(bk.check_out)}
+                            </span>
+                            <span class="text-gray-400 whitespace-nowrap">
+                              {bk.nights} night{bk.nights !== 1 ? 's' : ''}
+                            </span>
+                            <span class="font-medium text-white">
+                              &euro;{bk.total_price.toLocaleString('en', { minimumFractionDigits: 0 })}
+                            </span>
+                            <span class={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge[bk.status] ?? 'bg-gray-800 text-gray-400'}`}>
+                              {bk.status}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              </>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Pagination -->
+    {totalPages > 1 && (
+      <div class="flex items-center justify-between text-sm text-gray-400">
+        <span>{totalGuests} guests &middot; Page {page} of {totalPages}</span>
+        <div class="flex gap-2">
+          {page > 1 && (
+            <a href={buildUrl({ page: String(page - 1) })} class="min-h-[44px] inline-flex items-center px-3 py-1.5 bg-white/10 rounded-lg hover:bg-white/20 transition-colors">&larr; Prev</a>
+          )}
+          {page < totalPages && (
+            <a href={buildUrl({ page: String(page + 1) })} class="min-h-[44px] inline-flex items-center px-3 py-1.5 bg-white/10 rounded-lg hover:bg-white/20 transition-colors">Next &rarr;</a>
+          )}
+        </div>
+      </div>
+    )}
+
+  </div>
+</AdminLayout>
+
+<script>
+  document.querySelectorAll('.guest-row').forEach(row => {
+    row.addEventListener('click', () => {
+      const idx = (row as HTMLElement).dataset.idx;
+      const details = document.querySelector(`.booking-details[data-idx="${idx}"]`) as HTMLElement;
+      const icon = row.querySelector('.expand-icon') as HTMLElement;
+      if (!details) return;
+      const isHidden = details.classList.contains('hidden');
+      // Collapse all others
+      document.querySelectorAll('.booking-details').forEach(d => d.classList.add('hidden'));
+      document.querySelectorAll('.expand-icon').forEach(i => { (i as HTMLElement).style.transform = ''; });
+      if (isHidden) {
+        details.classList.remove('hidden');
+        icon.style.transform = 'rotate(90deg)';
+      }
+    });
+  });
+</script>

@@ -1,0 +1,312 @@
+---
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../../lib/supabase';
+
+const role = Astro.locals.profile?.role ?? '';
+if (!['admin', 'super_admin'].includes(role)) {
+  return Astro.redirect('/admin');
+}
+
+const { id } = Astro.params;
+const service = getServiceClient();
+
+// Handle activate/deactivate POST
+if (Astro.request.method === 'POST') {
+  const formData = await Astro.request.formData();
+  const action = formData.get('action') as string;
+
+  if (action === 'toggle_active') {
+    const { data: cp } = await service.from('cleaner_profiles').select('is_active').eq('id', id).single();
+    if (cp) {
+      await service.from('cleaner_profiles').update({ is_active: !cp.is_active }).eq('id', id);
+    }
+  }
+
+  return Astro.redirect(`/admin/cleaning/cleaners/${id}?updated=1`);
+}
+
+const updated = Astro.url.searchParams.get('updated') === '1';
+
+const { data: rawCleaner, error } = await service
+  .from('cleaner_profiles')
+  .select(`
+    *,
+    services:cleaner_services(id, property_type, base_price, bedrooms),
+    areas:cleaner_service_areas(id, region, city),
+    availability:cleaner_availability(date, is_available)
+  `)
+  .eq('id', id)
+  .single();
+
+if (error || !rawCleaner) {
+  return Astro.redirect('/admin/cleaning/cleaners');
+}
+
+// Fetch profile separately (FK is to auth.users, not public.profiles)
+const { data: cpProfile } = rawCleaner.user_id
+  ? await service.from('profiles').select('id, full_name, email, created_at').eq('id', rawCleaner.user_id).single()
+  : { data: null };
+const cleaner = { ...rawCleaner, profiles: cpProfile ?? null };
+
+const { data: jobs } = await service
+  .from('cleaning_jobs')
+  .select('*, listings(title, city)')
+  .eq('cleaner_id', id)
+  .order('scheduled_date', { ascending: false })
+  .limit(20);
+
+const { data: reviews } = await service
+  .from('cleaning_reviews')
+  .select('*, listings(title)')
+  .eq('cleaner_id', id)
+  .order('created_at', { ascending: false })
+  .limit(10);
+
+const totalEarned = (jobs ?? [])
+  .filter((j: any) => j.status === 'approved')
+  .reduce((sum: number, j: any) => sum + (j.cleaner_payout ?? 0), 0);
+
+const statusColors: Record<string, string> = {
+  scheduled: 'bg-blue-100 text-blue-800',
+  started:   'bg-yellow-100 text-yellow-800',
+  completed: 'bg-purple-100 text-purple-800',
+  approved:  'bg-emerald-100 text-emerald-800',
+  disputed:  'bg-red-100 text-red-800',
+  cancelled: 'bg-gray-100 text-gray-600',
+};
+
+---
+
+<AdminLayout title={`Cleaner: ${cleaner.profiles?.full_name ?? 'Unknown'}`}>
+  <div class="mb-4">
+    <a href="/admin/cleaning/cleaners" class="min-h-[44px] inline-flex items-center text-sm text-gray-500 hover:text-gray-700">← All Cleaners</a>
+  </div>
+
+  {updated && (
+    <div class="mb-5 bg-green-50 border border-green-200 text-green-800 text-sm rounded-xl px-4 py-3">
+      ✓ Cleaner updated successfully.
+    </div>
+  )}
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Left column: Profile -->
+    <div class="space-y-5">
+
+      <!-- Identity card -->
+      <div class="bg-white rounded-2xl border border-gray-100 p-5">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <h2 class="font-bold text-gray-900 text-lg">{cleaner.profiles?.full_name ?? '—'}</h2>
+            <p class="text-sm text-gray-500">{cleaner.profiles?.email}</p>
+          </div>
+          <span class={`px-2 py-1 rounded-full text-xs font-semibold ${cleaner.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+            {cleaner.is_active ? 'Active' : 'Inactive'}
+          </span>
+        </div>
+
+        {cleaner.bio && (
+          <p class="text-sm text-gray-600 mb-4 leading-relaxed">{cleaner.bio}</p>
+        )}
+
+        <div class="space-y-2 text-sm">
+          <div class="flex justify-between">
+            <span class="text-gray-500">Rating</span>
+            <span class="font-medium">{cleaner.rating ? `★ ${Number(cleaner.rating).toFixed(1)}` : 'No ratings yet'}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-500">Total earned</span>
+            <span class="font-medium text-gray-900">€{totalEarned.toFixed(0)}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-500">Jobs completed</span>
+            <span class="font-medium">{(jobs ?? []).filter((j: any) => j.status === 'approved').length}</span>
+          </div>
+          <div class="flex justify-between">
+            <span class="text-gray-500">Stripe</span>
+            <span class={`font-medium ${cleaner.stripe_onboarded ? 'text-green-700' : 'text-yellow-700'}`}>
+              {cleaner.stripe_onboarded ? 'Connected' : 'Pending setup'}
+            </span>
+          </div>
+          {cleaner.stripe_account_id && (
+            <div class="flex justify-between">
+              <span class="text-gray-500">Stripe ID</span>
+              <code class="text-xs text-gray-600">{cleaner.stripe_account_id}</code>
+            </div>
+          )}
+          {cleaner.languages && cleaner.languages.length > 0 && (
+            <div class="flex justify-between">
+              <span class="text-gray-500">Languages</span>
+              <span class="font-medium">{cleaner.languages.join(', ')}</span>
+            </div>
+          )}
+        </div>
+
+        <!-- Toggle active/inactive -->
+        <form method="POST" class="mt-5">
+          <input type="hidden" name="action" value="toggle_active" />
+          <button
+            type="submit"
+            class={`w-full text-sm font-semibold py-2.5 min-h-[44px] rounded-xl transition-colors ${
+              cleaner.is_active
+                ? 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
+                : 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
+            }`}
+          >
+            {cleaner.is_active ? 'Deactivate Cleaner' : 'Activate Cleaner'}
+          </button>
+        </form>
+      </div>
+
+      <!-- Service areas -->
+      <div class="bg-white rounded-2xl border border-gray-100 p-5">
+        <h3 class="text-sm font-semibold text-gray-700 mb-3">Service Areas</h3>
+        {cleaner.areas?.length > 0
+          ? <div class="flex flex-wrap gap-2">
+              {cleaner.areas.map((a: any) => (
+                <span class="bg-gray-100 text-gray-700 text-xs px-3 py-1 rounded-full">{a.city ?? a.region}</span>
+              ))}
+            </div>
+          : <p class="text-sm text-gray-400">No areas set.</p>
+        }
+      </div>
+
+      <!-- Services / pricing -->
+      {cleaner.services?.length > 0 && (
+        <div class="bg-white rounded-2xl border border-gray-100 p-5">
+          <h3 class="text-sm font-semibold text-gray-700 mb-3">Services & Pricing</h3>
+          <div class="space-y-2">
+            {cleaner.services.map((s: any) => (
+              <div class="flex items-center justify-between text-sm">
+                <span class="text-gray-600">{s.property_type} · {s.bedrooms} BR</span>
+                <span class="font-medium text-gray-900">€{s.base_price}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <!-- Availability -->
+      {cleaner.availability?.length > 0 && (
+        <div class="bg-white rounded-2xl border border-gray-100 p-5">
+          <h3 class="text-sm font-semibold text-gray-700 mb-3">Availability (next 7 days)</h3>
+          <div class="space-y-1.5">
+            {[...cleaner.availability]
+              .sort((a: any, b: any) => a.date < b.date ? -1 : 1)
+              .slice(0, 7)
+              .map((av: any) => {
+                const d = new Date(av.date);
+                const label = d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+                return (
+                  <div class="flex items-center justify-between text-sm">
+                    <span class={av.is_available ? 'text-gray-700' : 'text-gray-300'}>{label}</span>
+                    <span class={`text-xs font-medium ${av.is_available ? 'text-green-700' : 'text-gray-300'}`}>
+                      {av.is_available ? 'Available' : 'Unavailable'}
+                    </span>
+                  </div>
+                );
+              })
+            }
+          </div>
+        </div>
+      )}
+    </div>
+
+    <!-- Right column: Jobs & reviews -->
+    <div class="lg:col-span-2 space-y-6">
+
+      <!-- Jobs -->
+      <div>
+        <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Jobs</h3>
+
+        <!-- Mobile card view -->
+        <div class="lg:hidden space-y-3">
+          {(jobs ?? []).map((job: any) => (
+            <div class="bg-white rounded-xl border border-gray-100 p-4">
+              <div class="flex items-start justify-between mb-2">
+                <div class="min-w-0 flex-1">
+                  <p class="font-medium text-gray-900">{job.listings?.title}</p>
+                  <p class="text-xs text-gray-400">{job.listings?.city}</p>
+                </div>
+                <span class={`px-2 py-1 rounded-full text-xs font-medium shrink-0 ml-2 ${statusColors[job.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                  {job.status}
+                </span>
+              </div>
+              <div class="grid grid-cols-2 gap-2 text-sm mb-3">
+                <div>
+                  <p class="text-xs text-gray-400">Date</p>
+                  <p class="font-medium text-gray-600">{job.scheduled_date}</p>
+                </div>
+                <div>
+                  <p class="text-xs text-gray-400">Payout</p>
+                  <p class="font-medium text-gray-900">€{job.cleaner_payout}</p>
+                </div>
+              </div>
+              <a href={`/admin/cleaning/jobs/${job.id}`} class="min-h-[44px] px-4 py-2.5 inline-flex items-center text-xs text-[#c9a96e] hover:opacity-80">View →</a>
+            </div>
+          ))}
+          {(jobs ?? []).length === 0 && (
+            <div class="bg-white rounded-xl border border-gray-100 p-6 text-center text-gray-400 text-sm">No jobs yet.</div>
+          )}
+        </div>
+
+        <!-- Desktop table view -->
+        <div class="hidden lg:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="border-b border-gray-100 bg-gray-50">
+                <th class="text-left p-3 text-xs font-medium text-gray-500">Property</th>
+                <th class="text-left p-3 text-xs font-medium text-gray-500">Date</th>
+                <th class="text-left p-3 text-xs font-medium text-gray-500">Payout</th>
+                <th class="text-left p-3 text-xs font-medium text-gray-500">Status</th>
+                <th class="p-3"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {(jobs ?? []).map((job: any) => (
+                <tr class="border-b border-gray-50 hover:bg-gray-50">
+                  <td class="p-3">
+                    <p class="font-medium text-gray-900">{job.listings?.title}</p>
+                    <p class="text-xs text-gray-400">{job.listings?.city}</p>
+                  </td>
+                  <td class="p-3 text-gray-600 text-xs">{job.scheduled_date}</td>
+                  <td class="p-3 font-medium text-gray-900">€{job.cleaner_payout}</td>
+                  <td class="p-3">
+                    <span class={`px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[job.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                      {job.status}
+                    </span>
+                  </td>
+                  <td class="p-3">
+                    <a href={`/admin/cleaning/jobs/${job.id}`} class="text-xs text-[#c9a96e] hover:opacity-80">View →</a>
+                  </td>
+                </tr>
+              ))}
+              {(jobs ?? []).length === 0 && (
+                <tr><td colspan="5" class="p-6 text-center text-gray-400 text-sm">No jobs yet.</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Reviews -->
+      {(reviews ?? []).length > 0 && (
+        <div>
+          <h3 class="text-sm font-semibold text-gray-700 uppercase tracking-wide mb-3">Reviews Received</h3>
+          <div class="space-y-3">
+            {(reviews ?? []).map((r: any) => (
+              <div class="bg-white rounded-2xl border border-gray-100 p-4">
+                <div class="flex items-center justify-between mb-2">
+                  <span class="text-yellow-500 font-medium">{'★'.repeat(r.rating)}{'☆'.repeat(5 - r.rating)}</span>
+                  <span class="text-xs text-gray-400">{r.listings?.title}</span>
+                </div>
+                {r.body && <p class="text-sm text-gray-600">{r.body}</p>}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+    </div>
+  </div>
+</AdminLayout>

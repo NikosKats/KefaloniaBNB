@@ -1,0 +1,349 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getServiceClient } from '../lib/supabase.ts';
+
+const session = Astro.locals.session;
+const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+const fbAppId = import.meta.env.PUBLIC_FACEBOOK_APP_ID ?? '';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isBg = lang === 'bg';
+const isEl = lang === 'el';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const tMyBookings = isEl ? 'Οι Κρατήσεις μου' : isBg ? 'Моите резервации' : isSr ? 'Моје резервације' : isTr ? 'Rezervasyonlarım' : isRo ? 'Rezervările Mele' : 'My Bookings';
+const tLoginSubtitle = isEl ? 'Συνδεθείτε για να δείτε και να διαχειριστείτε τις κρατήσεις σας.' : isBg ? 'Влезте, за да видите и управлявате резервациите си.' : isSr ? 'Пријавите се да видите и управљате резервацијама.' : isTr ? 'Rezervasyonlarınızı görüntülemek ve yönetmek için giriş yapın.' : isRo ? 'Autentificați-vă pentru a vizualiza și gestiona toate rezervările dvs.' : 'Log in to view and manage all your bookings.';
+const tLogIn = isEl ? 'Σύνδεση' : isBg ? 'Вход' : isSr ? 'Пријава' : isTr ? 'Giriş Yap' : isRo ? 'Autentificare' : 'Log In';
+const tSignUp = isEl ? 'Εγγραφή' : isBg ? 'Регистрация' : isSr ? 'Регистрација' : isTr ? 'Kayıt Ol' : isRo ? 'Înregistrare' : 'Sign Up';
+const tEmail = isEl ? 'Email' : isBg ? 'Имейл' : isSr ? 'Имејл' : isTr ? 'E-posta' : isRo ? 'Email' : 'Email';
+const tPassword = isEl ? 'Κωδικός' : isBg ? 'Парола' : isSr ? 'Лозинка' : isTr ? 'Şifre' : isRo ? 'Parolă' : 'Password';
+const tFullName = isEl ? 'Ονοματεπώνυμο' : isBg ? 'Пълно име' : isSr ? 'Пуно име' : isTr ? 'Ad Soyad' : isRo ? 'Nume complet' : 'Full Name';
+const tPasswordMin = isEl ? 'Κωδικός (τουλ. 6 χαρακτήρες)' : isBg ? 'Парола (мин. 6 символа)' : isSr ? 'Лозинка (мин. 6 карактера)' : isTr ? 'Şifre (en az 6 karakter)' : isRo ? 'Parolă (min. 6 caractere)' : 'Password (min 6 characters)';
+const tCreateAccount = isEl ? 'Δημιουργία λογαριασμού' : isBg ? 'Създаване на акаунт' : isSr ? 'Креирај налог' : isTr ? 'Hesap Oluştur' : isRo ? 'Creare Cont' : 'Create Account';
+const tOr = isEl ? 'ή' : isBg ? 'или' : isSr ? 'или' : isTr ? 'veya' : isRo ? 'sau' : 'or';
+const tLoggingIn = isEl ? 'Σύνδεση…' : isBg ? 'Влизане…' : isSr ? 'Пријављивање…' : isTr ? 'Giriş yapılıyor…' : isRo ? 'Autentificare…' : 'Logging in…';
+const tCreatingAccount = isEl ? 'Δημιουργία…' : isBg ? 'Създаване…' : isSr ? 'Креирање…' : isTr ? 'Oluşturuluyor…' : isRo ? 'Creare cont…' : 'Creating account…';
+const tLoginFailed = isEl ? 'Η σύνδεση απέτυχε' : isBg ? 'Входът не бе успешен' : isSr ? 'Пријава неуспешна' : isTr ? 'Giriş başarısız' : isRo ? 'Autentificare eșuată' : 'Login failed';
+const tSignupFailed = isEl ? 'Η εγγραφή απέτυχε' : isBg ? 'Регистрацията не бе успешна' : isSr ? 'Регистрација неуспешна' : isTr ? 'Kayıt başarısız' : isRo ? 'Înregistrare eșuată' : 'Signup failed';
+const tLogout = isEl ? 'Αποσύνδεση' : isBg ? 'Изход' : isSr ? 'Одјава' : isTr ? 'Çıkış' : isRo ? 'Deconectare' : 'Log out';
+const tNoBookings = isEl ? 'Δεν υπάρχουν κρατήσεις.' : isBg ? 'Все още няма резервации.' : isSr ? 'Нема резервација.' : isTr ? 'Henüz rezervasyon yok.' : isRo ? 'Nicio rezervare încă.' : 'No bookings yet.';
+const tBrowse = isEl ? 'Δείτε καταλύματα' : isBg ? 'Разгледайте имоти' : isSr ? 'Прегледајте смештаје' : isTr ? 'Mülklere Göz Atın' : isRo ? 'Răsfoiește Proprietăți' : 'Browse Properties';
+const tBooking = isEl ? 'κράτηση' : isBg ? 'резервация' : isSr ? 'резервација' : isTr ? 'rezervasyon' : isRo ? 'rezervare' : 'booking';
+const tBookings = isEl ? 'κρατήσεις' : isBg ? 'резервации' : isSr ? 'резервације' : isTr ? 'rezervasyon' : isRo ? 'rezervări' : 'bookings';
+const tProperty = isEl ? 'Κατάλυμα' : isBg ? 'Имот' : isSr ? 'Смештај' : isTr ? 'Mülk' : isRo ? 'Proprietate' : 'Property';
+const tEmailPending = isEl ? 'Αναμονή επαλήθευσης email' : isBg ? 'Очаква се потвърждение на имейл' : isSr ? 'Чека се верификација имејла' : isTr ? 'E-posta doğrulaması bekleniyor' : isRo ? 'Verificare email în așteptare' : 'Email verification pending';
+
+const statusLabels: Record<string, string> = isBg ? {
+  pending: 'Изчакваща', confirmed: 'Потвърдена', awaiting_payment: 'Очаква плащане',
+  cancelled: 'Отменена', completed: 'Завършена', checked_in: 'Настанен',
+  checked_out: 'Напуснал', no_show: 'Не се явил',
+} : isEl ? {
+  pending: 'Εκκρεμεί', confirmed: 'Επιβεβαιωμένη', awaiting_payment: 'Αναμονή πληρωμής',
+  cancelled: 'Ακυρωμένη', completed: 'Ολοκληρωμένη', checked_in: 'Check-in',
+  checked_out: 'Check-out', no_show: 'Δεν εμφανίστηκε',
+} : isSr ? {
+  pending: 'На чекању', confirmed: 'Потврђена', awaiting_payment: 'Чека се плаћање',
+  cancelled: 'Отказана', completed: 'Завршена', checked_in: 'Пријављен',
+  checked_out: 'Одјављен', no_show: 'Није се појавио',
+} : isTr ? {
+  pending: 'Beklemede', confirmed: 'Onaylandı', awaiting_payment: 'Ödeme bekleniyor',
+  cancelled: 'İptal edildi', completed: 'Tamamlandı', checked_in: 'Giriş yapıldı',
+  checked_out: 'Çıkış yapıldı', no_show: 'Gelmedi',
+} : isRo ? {
+  pending: 'În așteptare', confirmed: 'Confirmată', awaiting_payment: 'Așteptare plată',
+  cancelled: 'Anulată', completed: 'Finalizată', checked_in: 'Check-in',
+  checked_out: 'Check-out', no_show: 'Neprezentare',
+} : {};
+
+let bookings: any[] = [];
+let userProfile: any = null;
+
+if (session) {
+  const service = getServiceClient();
+  const { data: profile } = await service
+    .from('profiles')
+    .select('full_name, email, phone, avatar_url')
+    .eq('id', session.user.id)
+    .single();
+  userProfile = profile;
+
+  // Fetch bookings linked to this user OR matching their email
+  const { data } = await service
+    .from('bookings')
+    .select('id, status, payment_status, payment_method, check_in, check_out, total_price, currency, guest_name, guest_token, email_verified, created_at, listings(id, title, slug, city, listing_images(url, is_cover))')
+    .or(`guest_user_id.eq.${session.user.id},guest_email.eq.${profile?.email}`)
+    .order('created_at', { ascending: false });
+  bookings = data ?? [];
+}
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+const statusColors: Record<string, string> = {
+  pending: 'bg-amber-100 text-amber-700',
+  confirmed: 'bg-emerald-100 text-emerald-700',
+  awaiting_payment: 'bg-blue-100 text-blue-700',
+  cancelled: 'bg-red-100 text-red-600',
+  completed: 'bg-gray-100 text-gray-600',
+  checked_in: 'bg-blue-100 text-blue-700',
+  checked_out: 'bg-gray-100 text-gray-600',
+  no_show: 'bg-red-100 text-red-600',
+};
+---
+
+<BaseLayout title={tMyBookings} noIndex>
+  <div class="max-w-3xl mx-auto px-4 py-12">
+
+    {!session ? (
+      <!-- Not logged in: show login options -->
+      <div class="text-center">
+        <h1 class="text-2xl font-bold text-gray-900 mb-2">{tMyBookings}</h1>
+        <p class="text-gray-500 mb-8">{tLoginSubtitle}</p>
+
+        <div class="max-w-sm mx-auto space-y-4">
+          <!-- Login / Signup tabs -->
+          <div class="flex border-b border-gray-200 mb-1">
+            <button id="tab-login" class="flex-1 py-2.5 text-sm font-semibold text-[#1a1a2e] border-b-2 border-[#1a1a2e]">{tLogIn}</button>
+            <button id="tab-signup" class="flex-1 py-2.5 text-sm font-medium text-gray-400 border-b-2 border-transparent hover:text-gray-600">{tSignUp}</button>
+          </div>
+
+          <!-- Login form -->
+          <div id="form-login" class="bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+            <input id="login-email" type="email" placeholder={tEmail} class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40" />
+            <input id="login-password" type="password" placeholder={tPassword} class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40" />
+            <button id="login-btn" class="w-full bg-[#1a1a2e] text-white font-medium py-2.5 rounded-lg text-sm hover:bg-[#2d2d4e] transition-colors">{tLogIn}</button>
+            <p id="login-status" class="hidden text-xs"></p>
+          </div>
+
+          <!-- Signup form -->
+          <div id="form-signup" class="hidden bg-white rounded-xl border border-gray-200 p-5 space-y-3">
+            <input id="signup-name" type="text" placeholder={tFullName} class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40" />
+            <input id="signup-email" type="email" placeholder={tEmail} class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40" />
+            <input id="signup-password" type="password" placeholder={tPasswordMin} class="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40" />
+            <button id="signup-btn" class="w-full bg-[#1a1a2e] text-white font-medium py-2.5 rounded-lg text-sm hover:bg-[#2d2d4e] transition-colors">{tCreateAccount}</button>
+            <p id="signup-status" class="hidden text-xs"></p>
+          </div>
+
+          <div class="flex items-center gap-3">
+            <div class="flex-1 h-px bg-gray-200"></div>
+            <span class="text-xs text-gray-400">{tOr}</span>
+            <div class="flex-1 h-px bg-gray-200"></div>
+          </div>
+
+          <!-- Social login -->
+          <div class="flex gap-3 justify-center">
+            <button id="google-login-btn" class="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-700 font-medium px-5 py-2.5 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+              <svg class="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+              Google
+            </button>
+            {fbAppId && (
+              <button id="fb-login-btn" class="inline-flex items-center gap-2 bg-[#1877F2] text-white font-medium px-5 py-2.5 rounded-lg text-sm hover:bg-[#166fe5] transition-colors">
+                <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                Facebook
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    ) : (
+      <!-- Logged in: show bookings -->
+      <div>
+        <div class="flex items-center justify-between mb-8">
+          <div>
+            <h1 class="text-2xl font-bold text-gray-900">{tMyBookings}</h1>
+            <p class="text-sm text-gray-500 mt-1">{bookings.length} {bookings.length !== 1 ? tBookings : tBooking}</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <span class="text-sm text-gray-600">{userProfile?.full_name || userProfile?.email}</span>
+            <button id="logout-btn" class="text-xs text-gray-400 hover:text-gray-600 transition-colors">{tLogout}</button>
+          </div>
+        </div>
+
+        {bookings.length === 0 ? (
+          <div class="text-center py-16">
+            <p class="text-4xl mb-3">🏡</p>
+            <p class="text-gray-500 mb-4">{tNoBookings}</p>
+            <a href="/rentals" class="inline-block bg-[#1a1a2e] text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">
+              {tBrowse}
+            </a>
+          </div>
+        ) : (
+          <div class="space-y-4">
+            {bookings.map((b: any) => {
+              const listing = b.listings;
+              const cover = listing?.listing_images?.find((i: any) => i.is_cover) ?? listing?.listing_images?.[0];
+              const statusLabel = (Object.keys(statusLabels).length > 0 && statusLabels[b.status]) ? statusLabels[b.status] : (b.status || 'pending').replace(/_/g, ' ').replace(/\b\w/g, (c: string) => c.toUpperCase());
+              return (
+                <a href={`/my-booking?token=${b.guest_token}`} class="block bg-white rounded-2xl border border-gray-100 hover:border-[#c9a96e] hover:shadow-md transition-all overflow-hidden">
+                  <div class="flex flex-col sm:flex-row">
+                    <div class="sm:w-40 h-32 sm:h-auto bg-gray-100 shrink-0">
+                      {cover ? (
+                        <img src={cover.url} alt={listing?.title} class="w-full h-full object-cover" loading="lazy" />
+                      ) : (
+                        <div class="w-full h-full flex items-center justify-center text-gray-300 text-3xl">🏡</div>
+                      )}
+                    </div>
+                    <div class="flex-1 p-4">
+                      <div class="flex items-start justify-between gap-2 mb-2">
+                        <h3 class="font-semibold text-gray-900 text-sm line-clamp-1">{listing?.title || tProperty}</h3>
+                        <span class={`px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${statusColors[b.status] || 'bg-gray-100 text-gray-600'}`}>
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <p class="text-xs text-gray-500 mb-2">{listing?.city}</p>
+                      <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-gray-600">
+                        <span>{fmtDate(b.check_in)} → {fmtDate(b.check_out)}</span>
+                        <span class="font-semibold">€{b.total_price}</span>
+                      </div>
+                      {!b.email_verified && (
+                        <p class="text-xs text-amber-600 font-medium mt-2">{tEmailPending}</p>
+                      )}
+                    </div>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    )}
+  </div>
+</BaseLayout>
+
+<script is:inline define:vars={{ supabaseUrl, supabaseAnonKey, fbAppId, tLogIn, tSignUp, tLoggingIn, tCreatingAccount, tCreateAccount, tLoginFailed, tSignupFailed }}>
+  // Tab switching
+  var tabLogin = document.getElementById('tab-login');
+  var tabSignup = document.getElementById('tab-signup');
+  var formLogin = document.getElementById('form-login');
+  var formSignup = document.getElementById('form-signup');
+
+  if (tabLogin && tabSignup) {
+    tabLogin.addEventListener('click', function() {
+      formLogin?.classList.remove('hidden'); formSignup?.classList.add('hidden');
+      tabLogin.className = 'flex-1 py-2.5 text-sm font-semibold text-[#1a1a2e] border-b-2 border-[#1a1a2e]';
+      tabSignup.className = 'flex-1 py-2.5 text-sm font-medium text-gray-400 border-b-2 border-transparent hover:text-gray-600';
+    });
+    tabSignup.addEventListener('click', function() {
+      formSignup?.classList.remove('hidden'); formLogin?.classList.add('hidden');
+      tabSignup.className = 'flex-1 py-2.5 text-sm font-semibold text-[#1a1a2e] border-b-2 border-[#1a1a2e]';
+      tabLogin.className = 'flex-1 py-2.5 text-sm font-medium text-gray-400 border-b-2 border-transparent hover:text-gray-600';
+    });
+  }
+
+  // Login
+  var loginBtn = document.getElementById('login-btn');
+  if (loginBtn) {
+    loginBtn.addEventListener('click', async function() {
+      var email = document.getElementById('login-email')?.value?.trim();
+      var password = document.getElementById('login-password')?.value;
+      var status = document.getElementById('login-status');
+      if (!email || !password) return;
+      loginBtn.disabled = true; loginBtn.textContent = tLoggingIn;
+      if (status) status.classList.add('hidden');
+      try {
+        var res = await fetch('/api/auth/community-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email, password: password }),
+        });
+        var json = await res.json();
+        if (!res.ok) throw new Error(json.error || tLoginFailed);
+        window.location.reload();
+      } catch (err) {
+        if (status) { status.textContent = err.message; status.className = 'text-xs text-red-600'; status.classList.remove('hidden'); }
+        loginBtn.disabled = false; loginBtn.textContent = tLogIn;
+      }
+    });
+  }
+
+  // Signup
+  var signupBtn = document.getElementById('signup-btn');
+  if (signupBtn) {
+    signupBtn.addEventListener('click', async function() {
+      var name = document.getElementById('signup-name')?.value?.trim();
+      var email = document.getElementById('signup-email')?.value?.trim();
+      var password = document.getElementById('signup-password')?.value;
+      var status = document.getElementById('signup-status');
+      if (!name || !email || !password) return;
+      signupBtn.disabled = true; signupBtn.textContent = tCreatingAccount;
+      if (status) status.classList.add('hidden');
+      try {
+        var res = await fetch('/api/auth/community-signup', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ full_name: name, email: email, password: password }),
+        });
+        var json = await res.json();
+        if (!res.ok) throw new Error(json.error || tSignupFailed);
+        // Auto-login after signup
+        await fetch('/api/auth/community-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: email, password: password }),
+        });
+        window.location.reload();
+      } catch (err) {
+        if (status) { status.textContent = err.message; status.className = 'text-xs text-red-600'; status.classList.remove('hidden'); }
+        signupBtn.disabled = false; signupBtn.textContent = tCreateAccount;
+      }
+    });
+  }
+
+  // Google login
+  var googleBtn = document.getElementById('google-login-btn');
+  if (googleBtn) {
+    googleBtn.addEventListener('click', async function() {
+      var mod = await import('https://esm.sh/@supabase/supabase-js@2');
+      var supabase = mod.createClient(supabaseUrl, supabaseAnonKey);
+      await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: { redirectTo: window.location.href },
+      });
+    });
+  }
+
+  // Facebook login
+  if (fbAppId) {
+    window.fbAsyncInit = function() {
+      FB.init({ appId: fbAppId, cookie: true, xfbml: false, version: 'v19.0' });
+    };
+    (function(d, s, id) {
+      var js, fjs = d.getElementsByTagName(s)[0];
+      if (d.getElementById(id)) return;
+      js = d.createElement(s); js.id = id;
+      js.src = 'https://connect.facebook.net/en_US/sdk.js';
+      fjs.parentNode.insertBefore(js, fjs);
+    }(document, 'script', 'facebook-jssdk'));
+
+    var fbBtn = document.getElementById('fb-login-btn');
+    if (fbBtn) {
+      fbBtn.addEventListener('click', function() {
+        if (typeof FB === 'undefined') return alert('Facebook SDK not loaded');
+        FB.login(async function(response) {
+          if (response.authResponse && response.authResponse.accessToken) {
+            var res = await fetch('/api/auth/facebook-token', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ access_token: response.authResponse.accessToken }),
+            });
+            if (res.ok) window.location.reload();
+            else alert('Facebook login failed');
+          }
+        }, { scope: 'public_profile,email' });
+      });
+    }
+  }
+
+  // Logout
+  var logoutBtn = document.getElementById('logout-btn');
+  if (logoutBtn) {
+    logoutBtn.addEventListener('click', async function() {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      window.location.reload();
+    });
+  }
+</script>

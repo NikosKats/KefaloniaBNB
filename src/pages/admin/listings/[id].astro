@@ -1,0 +1,1018 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+const { id } = Astro.params;
+const isNew = id === 'new';
+const role = Astro.locals.profile?.role ?? '';
+const isOwner = role === 'property_owner';
+const isSuperAdmin = role === 'super_admin';
+const ownerListingIds: string[] = Astro.locals.ownerListingIds ?? [];
+const service = getServiceClient();
+
+// Owners can only edit their own listings
+if (isOwner && !isNew && !ownerListingIds.includes(id!)) {
+  return Astro.redirect('/admin/listings');
+}
+
+let listing: any = null;
+let images: any[] = [];
+let listingAmenities: string[] = [];
+let blocks: any[] = [];
+let bookings: any[] = [];
+
+if (!isNew) {
+  const [listingRes, imagesRes, amenitiesRes, blockedRes, bookingsRes] = await Promise.all([
+    service.from('listings').select('*').eq('id', id).single(),
+    service.from('listing_images').select('*').eq('listing_id', id).order('sort_order'),
+    service.from('listing_amenities').select('amenity_id').eq('listing_id', id),
+    service.from('blocked_dates').select('id,start_date,end_date,reason').eq('listing_id', id!).order('start_date'),
+    service.from('bookings').select('id,check_in,check_out,guest_name,status').eq('listing_id', id!).in('status', ['pending','confirmed']).order('check_in'),
+  ]);
+  listing = listingRes.data;
+  images = imagesRes.data ?? [];
+  listingAmenities = (amenitiesRes.data ?? []).map((a: any) => a.amenity_id);
+  blocks = blockedRes.data ?? [];
+  bookings = bookingsRes.data ?? [];
+  if (!listing) return Astro.redirect('/admin/listings');
+}
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+const [{ data: allAmenities }, { data: telegramChannels }] = await Promise.all([
+  service.from('amenities').select('*').order('category').order('label'),
+  service.from('telegram_channels').select('id, label, chat_id').eq('is_active', true).order('label'),
+]);
+
+// Super admins can always access host messaging; owners need explicit permission on their profile
+const allowHostMessaging = isSuperAdmin || ((Astro.locals.profile as any)?.allow_host_messaging === true);
+---
+
+<AdminLayout title={isNew ? 'New Listing' : `Edit: ${listing?.title}`}>
+  <div class="max-w-4xl">
+    <div class="flex items-center gap-4 mb-6">
+      <a href="/admin/listings" class="text-gray-400 hover:text-gray-600 transition-colors text-sm">← All listings</a>
+      {!isNew && (
+        <a href={`/rentals/${listing.slug}`} target="_blank" class="text-xs text-[#c9a96e] hover:text-[#b8934a] font-medium transition-colors">View live ↗</a>
+      )}
+    </div>
+
+    <form id="listing-form" class="space-y-8" novalidate>
+      <!-- Basic info -->
+      <div class="bg-white rounded-2xl border border-gray-100 p-6 space-y-5">
+        <h2 class="font-semibold text-gray-900">Basic Information</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Slug *</label>
+            <input type="text" name="slug" required value={listing?.slug ?? ''} class="input-field" placeholder="villa-keramoti-garden" title="Lowercase letters, numbers and hyphens only" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Property type</label>
+            <select name="property_type" class="input-field">
+              {['villa','cottage','apartment','house','studio'].map((t) => (
+                <option value={t} selected={listing?.property_type === t}>{t}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <!-- Language tabs for content fields -->
+        <div>
+          <div class="flex gap-1 mb-4 border-b border-gray-200">
+            {[
+              { code: 'en', flag: '🇬🇧', label: 'English' },
+              { code: 'el', flag: '🇬🇷', label: 'Ελληνικά' },
+              { code: 'bg', flag: '🇧🇬', label: 'Български' },
+              { code: 'ro', flag: '🇷🇴', label: 'Română' },
+              { code: 'tr', flag: '🇹🇷', label: 'Türkçe' },
+            ].map((lng) => (
+              <button
+                type="button"
+                class="lang-tab px-3 py-2 text-sm font-medium rounded-t-lg transition-colors"
+                data-lang={lng.code}
+                style={lng.code === 'en' ? 'border-bottom:2px solid #c9a96e;color:#c9a96e;font-weight:600' : 'color:#6b7280'}
+              >{lng.flag} {lng.label}</button>
+            ))}
+          </div>
+
+          {[
+            { code: 'en', flag: '🇬🇧' },
+            { code: 'el', flag: '🇬🇷' },
+            { code: 'bg', flag: '🇧🇬' },
+            { code: 'ro', flag: '🇷🇴' },
+            { code: 'tr', flag: '🇹🇷' },
+          ].map((lng) => {
+            const isEn = lng.code === 'en';
+            const titleVal    = isEn ? (listing?.title ?? '')       : (listing?.title_i18n?.[lng.code] ?? '');
+            const taglineVal  = isEn ? (listing?.tagline ?? '')     : (listing?.tagline_i18n?.[lng.code] ?? '');
+            const descVal     = isEn ? (listing?.description ?? '') : (listing?.description_i18n?.[lng.code] ?? '');
+            const rulesVal    = isEn ? (listing?.house_rules ?? '') : (listing?.house_rules_i18n?.[lng.code] ?? '');
+            return (
+              <div class="lang-panel space-y-4" data-lang={lng.code} style={isEn ? '' : 'display:none'}>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Title {isEn && <span class="text-red-500">*</span>}
+                  </label>
+                  <input
+                    type="text"
+                    name={isEn ? 'title' : `title_i18n_${lng.code}`}
+                    required={isEn}
+                    value={titleVal}
+                    class="input-field"
+                    placeholder={isEn ? 'Property title' : `Title in ${lng.flag}`}
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Tagline</label>
+                  <input
+                    type="text"
+                    name={isEn ? 'tagline' : `tagline_i18n_${lng.code}`}
+                    value={taglineVal}
+                    class="input-field"
+                    placeholder={isEn ? 'One-line hero subtitle' : `Tagline in ${lng.flag}`}
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <textarea
+                    name={isEn ? 'description' : `description_i18n_${lng.code}`}
+                    rows="8"
+                    class="input-field resize-none"
+                    placeholder={isEn ? '' : `Description in ${lng.flag}`}
+                  >{descVal}</textarea>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">House rules</label>
+                  <textarea
+                    name={isEn ? 'house_rules' : `house_rules_i18n_${lng.code}`}
+                    rows="4"
+                    class="input-field resize-none"
+                    placeholder={isEn ? '' : `House rules in ${lng.flag}`}
+                  >{rulesVal}</textarea>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <!-- Notifications (admin only) -->
+      {!isOwner && (
+        <div class="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">
+          <div>
+            <h2 class="font-semibold text-gray-900">Notifications</h2>
+            <p class="text-xs text-gray-400 mt-0.5">Booking alerts for this listing will be sent to the selected Telegram channel.</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Telegram channel</label>
+            <select name="telegram_channel_id" class="input-field">
+              <option value="">— None (use global channels) —</option>
+              {(telegramChannels ?? []).map((ch: any) => (
+                <option value={ch.id} selected={listing?.telegram_channel_id === ch.id}>
+                  {ch.label} ({ch.chat_id})
+                </option>
+              ))}
+            </select>
+            {(!telegramChannels || telegramChannels.length === 0) && (
+              <p class="text-xs text-amber-600 mt-1">
+                No Telegram channels configured yet. <a href="/admin/telegram" class="underline">Add one →</a>
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+
+      <!-- Location -->
+      <div class="bg-white rounded-2xl border border-gray-100 p-6 space-y-5">
+        <div>
+          <h2 class="font-semibold text-gray-900">Location</h2>
+          <p class="text-xs text-gray-400 mt-0.5">Used for SEO pages, search filters, and destination categorization.</p>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
+          <div class="sm:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Address</label>
+            <input type="text" name="address" value={listing?.address ?? ''} class="input-field" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">City</label>
+            <input type="text" name="city" value={listing?.city ?? ''} class="input-field" placeholder="e.g. Keramoti, Potos, Limenas" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Country</label>
+            <input type="text" name="country" value={listing?.country ?? 'Greece'} class="input-field" />
+          </div>
+          <!-- Region + Area: SEO / filter categorization -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Region
+              <span class="ml-1 font-normal text-gray-400 text-xs">— for destination filters</span>
+            </label>
+            <select name="region" class="input-field">
+              <option value="">— Select region —</option>
+              <option value="Kefalonia" selected={listing?.region === 'Kefalonia'}>🏖 Kefalonia Region (mainland)</option>
+              <option value="Thassos" selected={listing?.region === 'Thassos'}>🏝 Thassos Island</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Area / Sub-district
+              <span class="ml-1 font-normal text-gray-400 text-xs">— optional, e.g. Panagia, Golden Beach</span>
+            </label>
+            <input type="text" name="area" value={listing?.area ?? ''} class="input-field" placeholder="e.g. Panagia, Golden Beach, Batis" />
+          </div>
+          <!-- Location tags -->
+          <div class="sm:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              Location tags
+              <span class="ml-1 font-normal text-gray-400 text-xs">— used in search filters and SEO</span>
+            </label>
+            <div class="flex flex-wrap gap-2" id="location-tags-wrap">
+              {([
+                'beachfront','sea-view','near-ferry','near-airport',
+                'luxury','family-friendly','budget','long-stay',
+                'historic','quiet','golden-beach','island',
+                'hiking','mountain-village','agrotourism','near-motorway',
+              ] as string[]).map((tag) => {
+                const checked = (listing?.location_tags ?? []).includes(tag);
+                return (
+                  <label class={`flex items-center gap-1.5 cursor-pointer border rounded-full px-3 py-1 text-xs font-medium transition-colors tag-checkbox-label ${checked ? 'bg-[#1a1a2e] text-white border-[#1a1a2e]' : 'border-gray-200 text-gray-600 hover:border-[#c9a96e]'}`}>
+                    <input type="checkbox" name="location_tags" value={tag} checked={checked} class="sr-only tag-checkbox" />
+                    {tag}
+                  </label>
+                );
+              })}
+            </div>
+            <p class="text-xs text-gray-400 mt-1.5">Tags are also auto-set by the backfill migration and can be manually overridden here.</p>
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Google Maps link</label>
+            <input
+              type="url"
+              id="gmaps-url"
+              class="input-field"
+              placeholder="Paste a Google Maps link to auto-fill coordinates"
+            />
+            <p id="gmaps-status" class="text-xs mt-1 hidden"></p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Latitude</label>
+            <input type="number" step="any" name="latitude" id="lat-input" value={listing?.latitude ?? ''} class="input-field" placeholder="Auto-filled from map link" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Longitude</label>
+            <input type="number" step="any" name="longitude" id="lng-input" value={listing?.longitude ?? ''} class="input-field" placeholder="Auto-filled from map link" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Capacity & pricing -->
+      <div class="bg-white rounded-2xl border border-gray-100 p-6 space-y-5">
+        <h2 class="font-semibold text-gray-900">Capacity & Pricing</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-5">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Max guests</label>
+            <input type="number" name="max_guests" min="1" value={listing?.max_guests ?? 2} class="input-field" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Bedrooms</label>
+            <input type="number" name="bedrooms" min="0" value={listing?.bedrooms ?? 1} class="input-field" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Beds</label>
+            <input type="number" name="beds" min="1" value={listing?.beds ?? 1} class="input-field" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Baths</label>
+            <input type="number" step="0.5" name="bathrooms" min="0.5" value={listing?.bathrooms ?? 1} class="input-field" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Base price/night (€)</label>
+            <input type="number" step="0.01" name="base_price" min="1" value={listing?.base_price ?? ''} class="input-field" required />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Cleaning fee (€)</label>
+            <input type="number" step="0.01" name="cleaning_fee" min="0" value={listing?.cleaning_fee ?? 0} class="input-field" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Min nights</label>
+            <input type="number" name="min_nights" min="1" value={listing?.min_nights ?? 1} class="input-field" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Max nights</label>
+            <input type="number" name="max_nights" min="1" value={listing?.max_nights ?? ''} class="input-field" placeholder="No limit" />
+          </div>
+        </div>
+
+        <!-- Payment Options — super admin only -->
+        {(() => {
+          const currentPct     = (listing as any)?.deposit_percent ?? 0;
+          const depositEnabled = currentPct > 0;
+          const offerFull      = isNew ? false : ((listing as any)?.offer_full_payment !== false);
+          const commissionRate = (listing as any)?.commission_rate ?? 0;
+          const minDeposit     = 5;
+          const defaultDeposit = Math.max(30, minDeposit);
+
+          if (isSuperAdmin) {
+            return (
+              <div class="border border-gray-200 rounded-xl p-4 space-y-4">
+                <p class="text-sm font-semibold text-gray-700">Payment Options</p>
+                <p class="text-xs text-gray-400 -mt-2">Choose which payment methods guests can use at checkout.</p>
+
+                {/* Full payment toggle */}
+                <div class="flex items-center justify-between">
+                  <div>
+                    <p class="text-sm font-medium text-gray-700">Full payment in advance</p>
+                    <p class="text-xs text-gray-400 mt-0.5">Guest pays the total amount upfront via bank transfer</p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="full-payment-toggle" name="offer_full_payment" value="true" class="sr-only peer" checked={offerFull} />
+                    <div class="w-10 h-6 bg-gray-200 peer-checked:bg-[#1a1a2e] rounded-full transition-colors peer-focus:ring-2 peer-focus:ring-offset-1 peer-focus:ring-[#1a1a2e]"></div>
+                    <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
+                  </label>
+                </div>
+
+                {/* Deposit toggle */}
+                <div class="flex items-center justify-between" id="deposit-block">
+                  <div>
+                    <p class="text-sm font-medium text-gray-700">Deposit (partial payment)</p>
+                    <p class="text-xs text-gray-400 mt-0.5">Guest pays a deposit now and the rest on arrival</p>
+                  </div>
+                  <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="deposit-toggle" class="sr-only peer" checked={depositEnabled} />
+                    <div class="w-10 h-6 bg-gray-200 peer-checked:bg-[#1a1a2e] rounded-full transition-colors peer-focus:ring-2 peer-focus:ring-offset-1 peer-focus:ring-[#1a1a2e]"></div>
+                    <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
+                  </label>
+                </div>
+                <div id="deposit-pct-row" class={`flex items-center gap-3 pl-1 ${!depositEnabled ? 'hidden' : ''}`}>
+                  <label class="text-sm text-gray-600 shrink-0">Deposit percentage</label>
+                  <div class="relative flex-1 max-w-[120px]">
+                    <input
+                      type="number"
+                      name="deposit_percent"
+                      id="deposit-pct-input"
+                      min={minDeposit}
+                      max="99"
+                      value={depositEnabled ? currentPct : defaultDeposit}
+                      class="input-field pr-8"
+                    />
+                    <span class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">%</span>
+                  </div>
+                  <p class="text-xs text-gray-400">min {minDeposit}% (platform fee)</p>
+                </div>
+                <p id="payment-option-warning" class="hidden text-xs text-red-600">⚠ At least one payment option must be enabled.</p>
+              </div>
+            );
+          }
+
+          // Non-super-admin: read-only summary + hidden inputs to preserve values
+          return (
+            <div class="border border-gray-100 rounded-xl p-4 bg-gray-50 space-y-2">
+              <p class="text-sm font-semibold text-gray-500">Payment Options</p>
+              <p class="text-xs text-gray-400">Managed by platform admin.</p>
+              <ul class="text-xs text-gray-600 space-y-1 pt-1">
+                <li>Full payment: <span class="font-medium">{offerFull ? 'Enabled' : 'Disabled'}</span></li>
+                <li>Deposit: <span class="font-medium">{depositEnabled ? `Enabled (${currentPct}%)` : 'Disabled'}</span></li>
+              </ul>
+              {/* Preserve current values on save */}
+              {offerFull && <input type="hidden" name="offer_full_payment" value="true" />}
+              <input type="hidden" name="deposit_percent" value={currentPct} />
+            </div>
+          );
+        })()}
+
+        <!-- Payment Methods — super admin only -->
+        {isSuperAdmin ? (
+          <div>
+            <p class="text-sm font-semibold text-gray-500 mb-2">Guest Payment Methods</p>
+            <div class="flex flex-wrap items-center gap-4">
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="instant_booking" value="true" checked={listing?.instant_booking} class="rounded" />
+                <span class="text-sm font-medium text-gray-700">Stripe payment</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="offer_bank_transfer" value="true" checked={listing?.offer_bank_transfer ?? false} class="rounded" />
+                <span class="text-sm font-medium text-gray-700">Bank deposit</span>
+              </label>
+              <label class="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" name="allow_telegram_direct" value="true" checked={listing?.allow_telegram_direct ?? isNew} class="rounded" />
+                <span class="text-sm font-medium text-gray-700">Telegram Direct booking</span>
+              </label>
+            </div>
+          </div>
+        ) : (
+          <div class="flex items-center gap-4 text-xs text-gray-400">
+            <span>Stripe: <span class="font-medium text-gray-600">{listing?.instant_booking ? 'On' : 'Off'}</span></span>
+            <span>Bank: <span class="font-medium text-gray-600">{listing?.offer_bank_transfer ? 'On' : 'Off'}</span></span>
+            <span>TD: <span class="font-medium text-gray-600">{listing?.allow_telegram_direct ? 'On' : 'Off'}</span></span>
+            <span>Status: <span class={`font-medium ${listing?.is_active ? 'text-emerald-600' : 'text-gray-400'}`}>{listing?.is_active ? 'Active' : 'Inactive'}</span></span>
+            {/* Preserve values on save */}
+            <input type="hidden" name="instant_booking" value={listing?.instant_booking ? 'true' : ''} />
+            <input type="hidden" name="offer_bank_transfer" value={(listing?.offer_bank_transfer ?? false) ? 'true' : ''} />
+            <input type="hidden" name="is_active" value={(listing?.is_active ?? false) ? 'true' : ''} />
+            <input type="hidden" name="allow_telegram_direct" value={(listing?.allow_telegram_direct ?? isNew) ? 'true' : ''} />
+          </div>
+        )}
+
+        <!-- Listing Status — super admin only -->
+        {isSuperAdmin && (
+          <div class="mt-4 pt-4 border-t border-gray-100">
+            <p class="text-sm font-semibold text-gray-500 mb-2">Listing Status</p>
+            <label class="inline-flex items-center gap-3 cursor-pointer">
+              <input type="checkbox" name="is_active" value="true" checked={listing?.is_active ?? false} class="rounded w-5 h-5 text-emerald-600 focus:ring-emerald-500" />
+              <span class="text-sm font-medium text-gray-700">Active — published on site</span>
+            </label>
+            <p class="text-xs text-gray-400 mt-1 ml-8">When active, the listing appears on the public website. Payment methods above control which booking options guests see.</p>
+          </div>
+        )}
+      </div>
+
+      <!-- Amenities -->
+      <div class="bg-white rounded-2xl border border-gray-100 p-6">
+        <h2 class="font-semibold text-gray-900 mb-4">Amenities</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+          {(allAmenities ?? []).map((a: any) => (
+            <label class="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" name="amenities" value={a.id} checked={listingAmenities.includes(a.id)} class="rounded" />
+              <span class="text-sm text-gray-700">{a.icon} {a.label}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <!-- Rules & Policy -->
+      <div class="bg-white rounded-2xl border border-gray-100 p-6 space-y-5">
+        <h2 class="font-semibold text-gray-900">Rules & Policy</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-5">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Check-in time</label>
+            <input type="text" name="check_in_time" value={listing?.check_in_time ?? '15:00'} class="input-field" placeholder="HH:MM" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Check-out time</label>
+            <input type="text" name="check_out_time" value={listing?.check_out_time ?? '11:00'} class="input-field" placeholder="HH:MM" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Cancellation policy</label>
+            <select name="cancellation_policy" class="input-field">
+              {['flexible','moderate','strict'].map((p) => (
+                <option value={p} selected={listing?.cancellation_policy === p}>{p}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">
+            Check-in instructions
+            <span class="ml-1 font-normal text-gray-400 text-xs">— sent automatically 48 h before arrival</span>
+          </label>
+          <textarea
+            name="checkin_instructions"
+            rows="6"
+            class="input-field resize-none"
+            placeholder={"Key lockbox is on the front gate — code: 1234\nWi-Fi: KefaloniaVilla · Password: welcome2024\nParking: private driveway, gate code 5678\nPool heating: press the blue button in the utility room"}
+          >{listing?.checkin_instructions ?? ''}</textarea>
+          <p class="text-xs text-gray-400 mt-1">Plain text. Shown as-is in the email sent 48 h before check-in.</p>
+        </div>
+        <p class="text-xs text-gray-400">House rules are edited in the language tabs above.</p>
+      </div>
+
+      <!-- Host Messaging — super admin only -->
+      {isSuperAdmin && (
+        allowHostMessaging ? (
+          <div class="bg-white rounded-2xl border border-gray-100 p-6 space-y-5">
+            <div>
+              <h2 class="font-semibold text-gray-900">Host Messaging</h2>
+              <p class="text-xs text-gray-400 mt-0.5">Let guests contact the host directly via WhatsApp, Viber, or Telegram. A floating widget will appear on the listing page.</p>
+            </div>
+
+            <div class="flex items-center justify-between">
+              <div>
+                <p class="text-sm font-medium text-gray-700">Show messaging widget on listing page</p>
+                <p class="text-xs text-gray-400 mt-0.5">When enabled, guests see a floating "Message Host" button</p>
+              </div>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" name="host_messaging_visible" value="true" class="sr-only peer" checked={listing?.host_messaging_visible ?? false} />
+                <div class="w-10 h-6 bg-gray-200 peer-checked:bg-[#1a1a2e] rounded-full transition-colors peer-focus:ring-2 peer-focus:ring-offset-1 peer-focus:ring-[#1a1a2e]"></div>
+                <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
+              </label>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">Host phone number</label>
+              <input type="tel" name="host_phone" value={listing?.host_phone ?? ''} class="input-field max-w-xs" placeholder="+30 697 123 4567" />
+              <p class="text-xs text-gray-400 mt-1">International format with country code. Used for all messaging channels below.</p>
+            </div>
+
+            <div class="space-y-3">
+              <p class="text-sm font-medium text-gray-700">Enable channels</p>
+              <div class="flex flex-wrap gap-4">
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" name="host_whatsapp" value="true" checked={listing?.host_whatsapp ?? false} class="rounded" />
+                  <span class="text-sm text-gray-700">WhatsApp</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" name="host_viber" value="true" checked={listing?.host_viber ?? false} class="rounded" />
+                  <span class="text-sm text-gray-700">Viber</span>
+                </label>
+                <label class="flex items-center gap-2 cursor-pointer">
+                  <input type="checkbox" name="host_telegram" value="true" checked={listing?.host_telegram ?? false} class="rounded" />
+                  <span class="text-sm text-gray-700">Telegram</span>
+                </label>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div class="bg-gray-50 rounded-2xl border border-gray-200 p-6 flex items-center gap-4">
+            <span class="text-2xl">💬</span>
+            <div>
+              <p class="font-medium text-gray-500">Host Messaging is disabled platform-wide</p>
+              <p class="text-xs text-gray-400 mt-0.5">Enable it in <a href="/admin/platform" class="underline">Platform Settings</a> to configure it per listing.</p>
+            </div>
+          </div>
+        )
+      )}
+
+      <div id="form-error" class="hidden bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700"></div>
+
+      {isOwner && isNew && (
+        <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+          Your listing will be submitted for review. An admin will activate it once approved.
+        </div>
+      )}
+
+      <div class="flex items-center gap-4">
+        <button type="submit" id="save-btn" class="bg-[#1a1a2e] text-white font-semibold px-8 py-3 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors cursor-pointer">
+          {isNew ? (isOwner ? 'Submit Listing' : 'Create Listing') : 'Save Changes'}
+        </button>
+        {!isNew && !isOwner && (
+          <button type="button" id="delete-btn" class="border border-red-300 text-red-600 hover:bg-red-50 font-medium px-6 py-3 rounded-xl text-sm transition-colors cursor-pointer">
+            Delete Listing
+          </button>
+        )}
+      </div>
+    </form>
+
+    <!-- Availability section (only for existing listings) -->
+    {!isNew && (
+      <div class="mt-8 bg-white rounded-2xl border border-gray-100 p-6">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="font-semibold text-gray-900">Availability</h2>
+            <p class="text-xs text-gray-400 mt-0.5">
+              {blocks.length} blocked period{blocks.length !== 1 ? 's' : ''} ·
+              {bookings.length} active booking{bookings.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+          <div class="flex gap-2 flex-wrap">
+            <a
+              href={`/admin/listings/${id}/seasons`}
+              class="border border-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-xl text-sm hover:bg-gray-50 transition-colors"
+            >
+              Seasons & Pricing →
+            </a>
+            <a
+              href={`/admin/listings/${id}/availability`}
+              class="bg-[#1a1a2e] text-white font-semibold px-4 py-2 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors"
+            >
+              Manage Availability →
+            </a>
+          </div>
+        </div>
+
+        {(blocks.length > 0 || bookings.length > 0) ? (
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {blocks.length > 0 && (
+              <div>
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Blocked periods</p>
+                <div class="space-y-1">
+                  {blocks.slice(0, 5).map((b) => (
+                    <div class="flex items-center gap-2 text-xs text-gray-700">
+                      <span class="w-2 h-2 rounded-full bg-red-400 shrink-0"></span>
+                      {fmtDate(b.start_date)} → {fmtDate(b.end_date)}
+                      {b.reason && <span class="text-gray-400 truncate">· {b.reason}</span>}
+                    </div>
+                  ))}
+                  {blocks.length > 5 && <p class="text-xs text-gray-400">+{blocks.length - 5} more</p>}
+                </div>
+              </div>
+            )}
+            {bookings.length > 0 && (
+              <div>
+                <p class="text-xs font-medium text-gray-500 uppercase tracking-wide mb-2">Upcoming bookings</p>
+                <div class="space-y-1">
+                  {bookings.slice(0, 5).map((b) => (
+                    <div class="flex items-center gap-2 text-xs text-gray-700">
+                      <span class={`w-2 h-2 rounded-full shrink-0 ${b.status === 'confirmed' ? 'bg-emerald-400' : 'bg-amber-400'}`}></span>
+                      {fmtDate(b.check_in)} → {fmtDate(b.check_out)}
+                      <span class="text-gray-400 truncate">· {b.guest_name}</span>
+                    </div>
+                  ))}
+                  {bookings.length > 5 && <p class="text-xs text-gray-400">+{bookings.length - 5} more</p>}
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <p class="text-sm text-gray-400">No blocked dates or active bookings yet.</p>
+        )}
+      </div>
+    )}
+
+    <!-- Images section (only for existing listings) -->
+    {!isNew && (
+      <div class="mt-8 bg-white rounded-2xl border border-gray-100 p-6">
+        <h2 class="font-semibold text-gray-900 mb-4">Photos</h2>
+        <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4" id="images-grid">
+          {images.map((img) => (
+            <div class="relative group aspect-video rounded-xl overflow-hidden bg-gray-100" data-img-id={img.id}>
+              <img src={img.url} alt={img.alt_text ?? ''} class="w-full h-full object-cover" loading="lazy" />
+              <!-- Delete button -->
+              <button
+                class="delete-image absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer z-10"
+                data-img-id={img.id}
+                type="button"
+                title="Delete photo"
+              >×</button>
+              <!-- Cover badge / set-cover button -->
+              {img.is_cover
+                ? <span class="absolute bottom-1 left-1 bg-[#1a1a2e] text-white text-xs px-1.5 py-0.5 rounded pointer-events-none">Cover</span>
+                : <button
+                    class="set-cover absolute bottom-1 left-1 bg-white/80 text-gray-700 text-xs px-1.5 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer hover:bg-white"
+                    data-img-id={img.id}
+                    type="button"
+                    title="Set as cover photo"
+                  >Set cover</button>
+              }
+            </div>
+          ))}
+        </div>
+        <div class="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center">
+          <input type="file" id="image-upload" accept="image/jpeg,image/png,image/webp,image/avif" multiple class="hidden" />
+          <button type="button" onclick="document.getElementById('image-upload').click()" class="text-sm font-medium text-[#c9a96e] hover:text-[#b8934a] transition-colors cursor-pointer">
+            + Upload photos
+          </button>
+          <p class="text-xs text-gray-400 mt-1">JPEG, PNG, WebP · Max 5MB per image</p>
+          <div id="upload-progress" class="hidden mt-2 text-xs text-gray-500"></div>
+        </div>
+      </div>
+    )}
+  </div>
+</AdminLayout>
+
+<script is:inline define:vars={{ listingId: id, isNew }}>
+  // ── Toast ─────────────────────────────────────────────────────────────────
+  function showToast(msg, type) {
+    var existing = document.getElementById('listing-toast');
+    if (existing) existing.remove();
+    var t = document.createElement('div');
+    t.id = 'listing-toast';
+    var bg = type === 'error' ? '#ef4444' : type === 'info' ? '#6b7280' : '#10b981';
+    t.style.cssText = 'position:fixed;bottom:24px;right:24px;z-index:9999;background:' + bg + ';color:#fff;padding:12px 20px;border-radius:12px;font-size:14px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,0.18);transition:opacity 0.3s;max-width:320px;line-height:1.4;';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(function() { t.style.opacity = '0'; setTimeout(function() { t.remove(); }, 300); }, 3000);
+  }
+
+  const form = document.getElementById('listing-form');
+  const saveBtn = document.getElementById('save-btn');
+  const errDiv = document.getElementById('form-error');
+
+  // ── Save listing ─────────────────────────────────────────────────────────
+  form?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+    if (errDiv) errDiv.classList.add('hidden');
+
+    const fd = new FormData(form);
+    const amenities = fd.getAll('amenities');
+    const data = {
+      title:               fd.get('title'),
+      slug:                fd.get('slug'),
+      tagline:             fd.get('tagline') || null,
+      description:         fd.get('description') || null,
+      property_type:       fd.get('property_type'),
+      address:             fd.get('address') || null,
+      city:                fd.get('city') || null,
+      region:              fd.get('region') || null,
+      area:                fd.get('area') || null,
+      country:             fd.get('country') || 'Greece',
+      location_tags:       fd.getAll('location_tags').map(String).filter(Boolean),
+      latitude:            parseFloat(fd.get('latitude')) || null,
+      longitude:           parseFloat(fd.get('longitude')) || null,
+      max_guests:          parseInt(fd.get('max_guests')),
+      bedrooms:            parseInt(fd.get('bedrooms')),
+      beds:                parseInt(fd.get('beds')),
+      bathrooms:           parseFloat(fd.get('bathrooms')),
+      base_price:          parseFloat(fd.get('base_price')),
+      cleaning_fee:        parseFloat(fd.get('cleaning_fee')) || 0,
+      min_nights:          parseInt(fd.get('min_nights')) || 1,
+      max_nights:          parseInt(fd.get('max_nights')) || null,
+      deposit_percent:     parseInt(fd.get('deposit_percent')) || 0,
+      offer_full_payment:  fd.get('offer_full_payment') === 'true',
+      instant_booking:        fd.get('instant_booking') === 'true',
+      is_active:              fd.get('is_active') === 'true',
+      offer_bank_transfer:    fd.get('offer_bank_transfer') === 'true',
+      allow_telegram_direct:  fd.get('allow_telegram_direct') === 'true',
+      check_in_time:       fd.get('check_in_time'),
+      check_out_time:      fd.get('check_out_time'),
+      cancellation_policy:  fd.get('cancellation_policy'),
+      house_rules:          fd.get('house_rules') || null,
+      checkin_instructions: fd.get('checkin_instructions') || null,
+      amenity_ids:          amenities,
+      telegram_channel_id: fd.get('telegram_channel_id') || null,
+      host_phone:          fd.get('host_phone') || null,
+      host_whatsapp:       fd.get('host_whatsapp') === 'true',
+      host_viber:          fd.get('host_viber') === 'true',
+      host_telegram:       fd.get('host_telegram') === 'true',
+      host_messaging_visible: fd.get('host_messaging_visible') === 'true',
+      title_i18n: {
+        el: fd.get('title_i18n_el') || null,
+        bg: fd.get('title_i18n_bg') || null,
+        ro: fd.get('title_i18n_ro') || null,
+        tr: fd.get('title_i18n_tr') || null,
+      },
+      tagline_i18n: {
+        el: fd.get('tagline_i18n_el') || null,
+        bg: fd.get('tagline_i18n_bg') || null,
+        ro: fd.get('tagline_i18n_ro') || null,
+        tr: fd.get('tagline_i18n_tr') || null,
+      },
+      description_i18n: {
+        el: fd.get('description_i18n_el') || null,
+        bg: fd.get('description_i18n_bg') || null,
+        ro: fd.get('description_i18n_ro') || null,
+        tr: fd.get('description_i18n_tr') || null,
+      },
+      house_rules_i18n: {
+        el: fd.get('house_rules_i18n_el') || null,
+        bg: fd.get('house_rules_i18n_bg') || null,
+        ro: fd.get('house_rules_i18n_ro') || null,
+        tr: fd.get('house_rules_i18n_tr') || null,
+      },
+    };
+
+    // Strip null scalar values — Zod .optional() rejects null
+    // Keep objects (i18n maps) and explicit nullable FKs as-is
+    const payload = {};
+    for (const [k, v] of Object.entries(data)) {
+      if (v !== null) payload[k] = v;
+    }
+    payload.telegram_channel_id = data.telegram_channel_id;
+    payload.location_tags = data.location_tags;
+    payload.title_i18n = data.title_i18n;
+    payload.tagline_i18n = data.tagline_i18n;
+    payload.description_i18n = data.description_i18n;
+    payload.house_rules_i18n = data.house_rules_i18n;
+
+    const url = isNew ? '/api/listings' : '/api/listings/' + listingId;
+    const method = isNew ? 'POST' : 'PUT';
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+    const result = await res.json();
+
+    if (!res.ok) {
+      let msg = result.error || 'Save failed';
+      if (result.details?.fieldErrors) {
+        const fieldErrs = Object.entries(result.details.fieldErrors).map(([k, v]) => k + ': ' + v).join('; ');
+        msg += ' — ' + fieldErrs;
+      }
+      if (errDiv) { errDiv.textContent = msg; errDiv.classList.remove('hidden'); }
+      saveBtn.disabled = false;
+      saveBtn.textContent = isNew ? 'Create Listing' : 'Save Changes';
+      showToast('❌ ' + msg, 'error');
+    } else {
+      if (isNew) window.location.href = '/admin/listings/' + result.listing.id;
+      else {
+        saveBtn.textContent = '✓ Saved';
+        setTimeout(function() { saveBtn.disabled = false; saveBtn.textContent = 'Save Changes'; }, 2000);
+        showToast('✅ Listing saved successfully', 'success');
+      }
+    }
+  });
+
+  // ── Delete listing ───────────────────────────────────────────────────────
+  document.getElementById('delete-btn')?.addEventListener('click', async () => {
+    if (!confirm('Delete this listing? This cannot be undone.')) return;
+    const res = await fetch('/api/listings/' + listingId, { method: 'DELETE' });
+    if (res.ok || res.status === 204) window.location.href = '/admin/listings';
+    else alert('Delete failed.');
+  });
+
+  // ── Image upload ─────────────────────────────────────────────────────────
+  document.getElementById('image-upload')?.addEventListener('change', async (e) => {
+    const files = e.target.files;
+    if (!files || !files.length) return;
+    const progress = document.getElementById('upload-progress');
+    const total = files.length;
+    let done = 0;
+
+    function showProgress(msg) {
+      if (progress) { progress.textContent = msg; progress.classList.remove('hidden'); }
+    }
+
+    for (const file of Array.from(files)) {
+      showProgress('Uploading ' + (done + 1) + ' / ' + total + ': ' + file.name + '…');
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('listing_id', listingId);
+      const res = await fetch('/api/upload/image', { method: 'POST', body: fd });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: 'Upload failed' }));
+        showProgress('Error: ' + (err.error || 'Upload failed') + ' — ' + file.name);
+        await new Promise(function(r) { setTimeout(r, 2500); });
+      }
+      done++;
+    }
+    if (progress) progress.classList.add('hidden');
+    window.location.reload();
+  });
+
+  // ── Delete image ─────────────────────────────────────────────────────────
+  document.getElementById('images-grid')?.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.delete-image');
+    if (!btn) return;
+    const imgId = btn.dataset.imgId;
+    if (!imgId || !confirm('Delete this photo?')) return;
+
+    btn.disabled = true;
+    btn.textContent = '…';
+    const res = await fetch('/api/listings/images/' + imgId, { method: 'DELETE' });
+    if (res.ok || res.status === 204) {
+      btn.closest('[data-img-id]').remove();
+    } else {
+      btn.textContent = '×';
+      btn.disabled = false;
+      alert('Delete failed. Please try again.');
+    }
+  });
+
+  // ── Google Maps URL parser ────────────────────────────────────────────────
+  function parseGoogleMapsUrl(url) {
+    // Use the LAST !3d{lat}!4d{lng} match — URLs can contain multiple pairs
+    // (e.g. a waypoint + the actual destination); the last one is the destination.
+    const pins = [...url.matchAll(/!3d(-?\d+\.\d+)!4d(-?\d+\.\d+)/g)];
+    if (pins.length) {
+      const last = pins[pins.length - 1];
+      return { lat: parseFloat(last[1]), lng: parseFloat(last[2]) };
+    }
+    // Fallback: map centre from @lat,lng,zoom in the path
+    const atMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+),/);
+    if (atMatch) return { lat: parseFloat(atMatch[1]), lng: parseFloat(atMatch[2]) };
+    return null;
+  }
+
+  document.getElementById('gmaps-url')?.addEventListener('input', function() {
+    const status = document.getElementById('gmaps-status');
+    const latInput = document.getElementById('lat-input');
+    const lngInput = document.getElementById('lng-input');
+    const val = this.value.trim();
+    if (!val) { status.className = 'text-xs mt-1 hidden'; return; }
+    const coords = parseGoogleMapsUrl(val);
+    if (coords) {
+      latInput.value = coords.lat;
+      lngInput.value = coords.lng;
+      status.textContent = '✓ Coordinates extracted: ' + coords.lat + ', ' + coords.lng;
+      status.className = 'text-xs mt-1 text-green-600';
+    } else {
+      status.textContent = '✗ Could not extract coordinates — check the link or enter manually.';
+      status.className = 'text-xs mt-1 text-red-500';
+    }
+  });
+
+  // ── Language tabs ─────────────────────────────────────────────────────────
+  function activateLangTab(lang) {
+    document.querySelectorAll('.lang-tab').forEach(function(btn) {
+      var active = btn.dataset.lang === lang;
+      btn.style.borderBottom = active ? '2px solid #c9a96e' : '2px solid transparent';
+      btn.style.color = active ? '#c9a96e' : '#6b7280';
+      btn.style.fontWeight = active ? '600' : '500';
+    });
+    document.querySelectorAll('.lang-panel').forEach(function(panel) {
+      panel.style.display = panel.dataset.lang === lang ? '' : 'none';
+    });
+  }
+  document.querySelectorAll('.lang-tab').forEach(function(btn) {
+    btn.addEventListener('click', function() { activateLangTab(btn.dataset.lang); });
+  });
+  activateLangTab('en');
+
+  // ── Set cover image ───────────────────────────────────────────────────────
+  document.getElementById('images-grid')?.addEventListener('click', async (e) => {
+    const btn = e.target.closest('.set-cover');
+    if (!btn) return;
+    const imgId = btn.dataset.imgId;
+    if (!imgId) return;
+
+    btn.textContent = '…';
+    btn.disabled = true;
+    const res = await fetch('/api/listings/images/' + imgId, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ is_cover: true }),
+    });
+    if (res.ok) {
+      window.location.reload();
+    } else {
+      btn.textContent = 'Set cover';
+      btn.disabled = false;
+    }
+  });
+
+  // ── Flexible deposit toggle ───────────────────────────────────────────────
+  var depositToggle    = document.getElementById('deposit-toggle');
+  var fullToggle       = document.getElementById('full-payment-toggle');
+  var depositPctRow    = document.getElementById('deposit-pct-row');
+  var depositPctInput  = document.getElementById('deposit-pct-input');
+  var paymentWarning   = document.getElementById('payment-option-warning');
+  var telegramDirectChk = document.querySelector('input[name="allow_telegram_direct"]');
+
+  function syncPaymentOptions() {
+    var depositOn       = !!depositToggle?.checked;
+    var fullOn          = !!fullToggle?.checked;
+    var telegramDirect  = !!telegramDirectChk?.checked;
+
+    // Show/hide deposit % row
+    if (depositPctRow) depositPctRow.classList.toggle('hidden', !depositOn);
+    if (depositPctInput) {
+      var minVal = parseInt(depositPctInput.min) || 5;
+      if (!depositOn) {
+        depositPctInput.dataset.savedValue = depositPctInput.value || String(Math.max(30, minVal));
+        depositPctInput.value = '0';
+      } else {
+        var restored = parseInt(depositPctInput.dataset.savedValue || '0') || Math.max(30, minVal);
+        depositPctInput.value = String(Math.max(restored, minVal));
+      }
+    }
+
+    // Warn only if no payment option at all — Telegram Direct counts as a valid option
+    if (paymentWarning) paymentWarning.classList.toggle('hidden', depositOn || fullOn || telegramDirect);
+  }
+
+  // Re-sync warning when Telegram Direct toggle changes
+  telegramDirectChk && telegramDirectChk.addEventListener('change', syncPaymentOptions);
+
+  depositToggle && depositToggle.addEventListener('change', function() {
+    syncPaymentOptions();
+    showToast(depositToggle.checked ? '💰 Deposit payment: ON' : '💰 Deposit payment: OFF', 'info');
+  });
+  fullToggle && fullToggle.addEventListener('change', function() {
+    syncPaymentOptions();
+    showToast(fullToggle.checked ? '✅ Full payment in advance: ON' : '✅ Full payment in advance: OFF', 'info');
+  });
+
+  var hostMsgToggle = document.querySelector('input[name="host_messaging_visible"]');
+  hostMsgToggle && hostMsgToggle.addEventListener('change', function() {
+    showToast(hostMsgToggle.checked ? '💬 Messaging widget: ON' : '💬 Messaging widget: OFF', 'info');
+  });
+
+  // ── Checkbox toasts (save to apply) ─────────────────────────────────────
+  [
+    { name: 'instant_booking',       on: '⚡ Instant booking: ON',       off: '⚡ Instant booking: OFF'        },
+    { name: 'is_active',             on: '✅ Listing: Active',            off: '⏸ Listing: Inactive'           },
+    { name: 'allow_telegram_direct', on: '📲 Telegram Direct: enabled',  off: '📲 Telegram Direct: disabled'  },
+    { name: 'host_whatsapp',   on: '💬 WhatsApp: enabled',        off: '💬 WhatsApp: disabled'     },
+    { name: 'host_viber',      on: '💬 Viber: enabled',           off: '💬 Viber: disabled'        },
+    { name: 'host_telegram',   on: '💬 Telegram: enabled',        off: '💬 Telegram: disabled'     },
+  ].forEach(function(cfg) {
+    var cb = document.querySelector('input[name="' + cfg.name + '"]');
+    cb && cb.addEventListener('change', function() {
+      showToast((cb.checked ? cfg.on : cfg.off) + ' (save to apply)', 'info');
+    });
+  });
+
+  // Amenity checkboxes
+  document.querySelectorAll('input[name="amenities"]').forEach(function(cb) {
+    cb.addEventListener('change', function() {
+      var label = cb.closest('label');
+      var name = label ? label.textContent.trim() : 'Amenity';
+      showToast((cb.checked ? '✅ ' + name + ': added' : '➖ ' + name + ': removed') + ' (save to apply)', 'info');
+    });
+  });
+
+  depositPctInput && depositPctInput.addEventListener('change', function() {
+    var minVal = parseInt(depositPctInput.min) || 5;
+    var val = parseInt(depositPctInput.value) || 0;
+    if (val < minVal) depositPctInput.value = String(minVal);
+  });
+
+  // ── Location tag pill toggle ──────────────────────────────────────────────
+  document.querySelectorAll('.tag-checkbox-label').forEach(function(label) {
+    label.addEventListener('click', function() {
+      var cb = label.querySelector('.tag-checkbox');
+      // Flip checked state (click fires before default, so we invert after a tick)
+      setTimeout(function() {
+        var isChecked = cb && cb.checked;
+        if (isChecked) {
+          label.classList.add('bg-[#1a1a2e]', 'text-white', 'border-[#1a1a2e]');
+          label.classList.remove('border-gray-200', 'text-gray-600');
+        } else {
+          label.classList.remove('bg-[#1a1a2e]', 'text-white', 'border-[#1a1a2e]');
+          label.classList.add('border-gray-200', 'text-gray-600');
+        }
+      }, 0);
+    });
+  });
+
+</script>

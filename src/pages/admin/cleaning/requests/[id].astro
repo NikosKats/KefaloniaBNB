@@ -1,0 +1,158 @@
+---
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../../lib/supabase';
+
+const role = Astro.locals.profile?.role ?? '';
+if (!['admin', 'super_admin'].includes(role)) {
+  return Astro.redirect('/admin');
+}
+
+const { id } = Astro.params;
+const service = getServiceClient();
+
+const { data: req, error } = await service
+  .from('cleaning_requests')
+  .select('*, listings(title, city, bedrooms, property_type)')
+  .eq('id', id!)
+  .single();
+
+if (error || !req) return Astro.redirect('/admin/cleaning');
+
+const { data: rawMatches } = await service
+  .from('cleaning_matches')
+  .select('*, cleaner_profiles(id, bio, rating, review_count, languages, user_id, cleaner_service_areas(city, region))')
+  .eq('request_id', id!)
+  .order('proposed_price');
+
+// Fetch cleaner names separately for each match
+const cleanerUserIds = [...new Set((rawMatches ?? []).map((m: any) => m.cleaner_profiles?.user_id).filter(Boolean))];
+const { data: cleanerProfiles } = cleanerUserIds.length > 0
+  ? await service.from('profiles').select('id, full_name, email').in('id', cleanerUserIds)
+  : { data: [] };
+const profileByUserId = Object.fromEntries((cleanerProfiles ?? []).map((p: any) => [p.id, p]));
+
+const matches = (rawMatches ?? []).map((m: any) => ({
+  ...m,
+  cleaner_profiles: {
+    ...m.cleaner_profiles,
+    profile: m.cleaner_profiles?.user_id ? profileByUserId[m.cleaner_profiles.user_id] ?? null : null,
+  },
+}));
+
+// Fetch owner name
+const { data: ownerProfile } = req.owner_id
+  ? await service.from('profiles').select('full_name, email').eq('id', req.owner_id).single()
+  : { data: null };
+---
+
+<AdminLayout title={`Request — ${(req as any).listings?.title}`}>
+  <div class="max-w-2xl mx-auto space-y-6">
+    <div class="mb-2">
+      <a href="/admin/cleaning" class="text-sm text-gray-400 hover:text-gray-600">← Cleaning</a>
+    </div>
+
+    <!-- Header -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <div class="flex items-start justify-between mb-3">
+        <div>
+          <h1 class="text-xl font-bold text-gray-900">{(req as any).listings?.title}</h1>
+          <p class="text-sm text-gray-500">{(req as any).listings?.city} · {(req as any).listings?.bedrooms} BR {(req as any).listings?.property_type}</p>
+        </div>
+        <span class={`px-3 py-1 rounded-full text-sm font-medium ${
+          req.status === 'open' ? 'bg-blue-100 text-blue-800' :
+          req.status === 'confirmed' ? 'bg-emerald-100 text-emerald-800' :
+          'bg-gray-100 text-gray-600'
+        }`}>{req.status}</span>
+      </div>
+      <div class="grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <span class="text-gray-500">Date:</span> <span class="font-medium">{req.requested_date}</span>
+        </div>
+        <div>
+          <span class="text-gray-500">Time window:</span> <span class="font-medium">{req.earliest_time} – {req.latest_time}</span>
+        </div>
+        <div>
+          <span class="text-gray-500">Owner:</span> <span class="font-medium">{ownerProfile?.full_name ?? '—'}</span>
+        </div>
+        <div>
+          <span class="text-gray-500">Bids:</span> <span class="font-medium">{matches.length}</span>
+        </div>
+      </div>
+      {req.notes && (
+        <div class="mt-3 bg-gray-50 rounded-xl p-3 text-sm text-gray-600">{req.notes}</div>
+      )}
+    </div>
+
+    <!-- Bids -->
+    {matches.length === 0 ? (
+      <div class="bg-blue-50 border border-blue-200 rounded-2xl p-8 text-center">
+        <p class="text-sm text-blue-700">No bids yet — cleaners haven't responded.</p>
+      </div>
+    ) : (
+      <div class="space-y-4">
+        <h2 class="text-sm font-semibold text-gray-700 uppercase tracking-wide">Bids ({matches.length})</h2>
+        {matches.map((m: any) => {
+          const cp = m.cleaner_profiles;
+          const cleanerName = cp?.profile?.full_name ?? '—';
+          const areas = (cp?.cleaner_service_areas ?? []).map((a: any) => a.city ?? a.region).join(', ');
+          return (
+            <div class={`bg-white border rounded-2xl p-5 ${
+              m.is_accepted === true ? 'border-emerald-300 bg-emerald-50/30' :
+              m.is_accepted === false ? 'border-gray-100 opacity-60' :
+              'border-gray-200'
+            }`}>
+              <div class="flex items-start justify-between">
+                <div class="flex-1">
+                  <div class="flex items-center gap-2 mb-1">
+                    <p class="font-medium text-gray-900">{cleanerName}</p>
+                    {cp?.rating && <span class="text-xs text-[#c9a96e]">★ {Number(cp.rating).toFixed(1)} ({cp.review_count})</span>}
+                    {m.is_accepted === true && <span class="text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full font-medium">Accepted</span>}
+                    {m.is_accepted === false && <span class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">Declined</span>}
+                  </div>
+                  {areas && <p class="text-xs text-gray-400 mb-1">Areas: {areas}</p>}
+                  {cp?.bio && <p class="text-sm text-gray-600 mb-2">{cp.bio?.slice(0, 120)}</p>}
+                  {m.proposed_time && <p class="text-xs text-gray-500">Proposed time: {m.proposed_time}</p>}
+                  {m.message && <p class="text-sm text-gray-500 italic mt-1">"{m.message}"</p>}
+                </div>
+                <div class="text-right ml-4 shrink-0">
+                  <p class="text-2xl font-bold text-gray-900">€{m.proposed_price}</p>
+                  {req.status === 'open' && m.is_accepted === null && (
+                    <button
+                      class="accept-bid-btn mt-2 bg-[#1a1a2e] text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-[#2d2d4e] transition-colors"
+                      data-match-id={m.id}
+                    >
+                      Accept Bid
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </div>
+</AdminLayout>
+
+<script define:vars={{ requestId: req.id }}>
+  document.querySelectorAll('.accept-bid-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const matchId = btn.dataset.matchId;
+      btn.disabled = true;
+      btn.textContent = '…';
+      const res = await fetch(`/api/cleaning/requests/${requestId}/accept`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ match_id: matchId }),
+      });
+      if (res.ok) {
+        window.location.href = '/admin/cleaning';
+      } else {
+        const d = await res.json().catch(() => ({}));
+        alert(d.error ?? 'Failed to accept bid');
+        btn.disabled = false;
+        btn.textContent = 'Accept Bid';
+      }
+    });
+  });
+</script>

@@ -1,0 +1,68 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ListingCard from '../../components/listing/ListingCard.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+import type { ListingWithDetails } from '../../types/index.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isBg = lang === 'bg';
+const isEl = lang === 'el';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const t = {
+  myFavorites: isEl ? 'Τα Αγαπημένα μου' : isBg ? 'Моите любими' : isSr ? 'Моји омиљени' : isTr ? 'Favorilerim' : isRo ? 'Favoritele Mele' : 'My Favorites',
+  myAccount: isEl ? 'Ο Λογαριασμός μου' : isBg ? 'Моят акаунт' : isSr ? 'Мој налог' : isTr ? 'Hesabım' : isRo ? 'Contul Meu' : 'My Account',
+  savedCount: (n: number) => isEl ? `${n} αποθηκευμέν${n !== 1 ? 'α ακίνητα' : 'ο ακίνητο'}` : isBg ? `${n} запазен${n !== 1 ? 'и имоти' : ' имот'}` : isSr ? `${n} сачуван${n !== 1 ? 'е некретнине' : 'а некретнина'}` : isTr ? `${n} kayıtlı mülk` : isRo ? `${n} proprietăț${n !== 1 ? 'i salvate' : 'e salvată'}` : `${n} saved propert${n !== 1 ? 'ies' : 'y'}`,
+  noFavorites: isEl ? 'Δεν έχετε αγαπημένα ακόμα. Περιηγηθείτε στα ακίνητα και πατήστε την καρδιά για να τα αποθηκεύσετε.' : isBg ? 'Все още нямате любими. Разгледайте имотите и натиснете сърцето, за да ги запазите.' : isSr ? 'Још немате омиљене. Прегледајте некретнине и притисните срце да их сачувате.' : isTr ? 'Henüz favoriniz yok. Mülklere göz atın ve kaydetmek için kalbe dokunun.' : isRo ? 'Niciun favorit încă. Răsfoiți proprietățile și apăsați inima pentru a le salva.' : 'No favorites yet. Browse properties and tap the heart to save them.',
+  browseProperties: isEl ? 'Περιήγηση Ακινήτων' : isBg ? 'Разгледайте имоти' : isSr ? 'Прегледајте некретнине' : isTr ? 'Mülklere Göz At' : isRo ? 'Răsfoiește Proprietăți' : 'Browse Properties',
+};
+
+const session = Astro.locals.session;
+if (!session) return Astro.redirect('/community/join?next=/account/favorites');
+
+const service = getServiceClient();
+const { data: favs } = await service
+  .from('favorites')
+  .select('listing_id, listings(*, listing_images(*), listing_amenities(amenities(*)))')
+  .eq('user_id', session.user.id)
+  .order('created_at', { ascending: false });
+
+const listings: ListingWithDetails[] = (favs ?? [])
+  .map((f: any) => f.listings)
+  .filter(Boolean)
+  .map((l: any) => ({
+    ...l,
+    listing_images: l.listing_images ?? [],
+    amenities: (l.listing_amenities ?? []).map((la: any) => la.amenities).filter(Boolean),
+  }));
+---
+
+<BaseLayout title={t.myFavorites} noIndex>
+  <div class="max-w-6xl mx-auto px-4 py-10">
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">{t.myFavorites}</h1>
+        <p class="text-sm text-gray-500 mt-1">{t.savedCount(listings.length)}</p>
+      </div>
+      <a href="/account" class="text-sm text-gray-500 hover:text-gray-700">&larr; {t.myAccount}</a>
+    </div>
+
+    {listings.length === 0 ? (
+      <div class="text-center py-16">
+        <p class="text-4xl mb-3">&#x2764;</p>
+        <p class="text-gray-500 mb-4">{t.noFavorites}</p>
+        <a href="/rentals" class="inline-block bg-[#1a1a2e] text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">
+          {t.browseProperties}
+        </a>
+      </div>
+    ) : (
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {listings.map((listing) => (
+          <ListingCard listing={listing} showFavorite isFavorited />
+        ))}
+      </div>
+    )}
+  </div>
+</BaseLayout>

@@ -1,0 +1,444 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+if (!Astro.locals.session) return Astro.redirect('/admin/login');
+
+const session = Astro.locals.session!;
+const ownerListingIds: string[] = Astro.locals.ownerListingIds ?? [];
+const service = getServiceClient();
+const userId = session.user.id;
+
+const { data: listings } = ownerListingIds.length > 0
+  ? await service.from('listings').select('id, title, city, bedrooms, property_type').in('id', ownerListingIds).eq('is_active', true)
+  : { data: [] };
+
+const { data: bookings } = ownerListingIds.length > 0
+  ? await service
+      .from('bookings')
+      .select('id, listing_id, check_out, guest_name, listings(title)')
+      .in('listing_id', ownerListingIds)
+      .gte('check_out', new Date().toISOString().slice(0, 10))
+      .in('status', ['confirmed', 'completed'])
+      .order('check_out')
+  : { data: [] };
+
+// Fetch checklist templates with items
+const { data: templates } = ownerListingIds.length > 0
+  ? await service
+      .from('property_cleaning_checklist_templates')
+      .select('id, name, listing_id, property_cleaning_checklist_template_items(label, sort_order)')
+      .eq('owner_id', userId)
+      .order('created_at', { ascending: false })
+  : { data: [] };
+---
+
+<AdminLayout title="New Cleaning Request">
+  <div class="max-w-2xl mx-auto">
+
+    <!-- Templates data (hidden, used by JS) -->
+    <div id="templates-data" class="hidden"
+      data-templates={JSON.stringify((templates ?? []).map((t: any) => ({
+        id: t.id,
+        name: t.name,
+        listing_id: t.listing_id,
+        items: (t.property_cleaning_checklist_template_items ?? [])
+          .sort((a: any, b: any) => a.sort_order - b.sort_order)
+          .map((i: any) => i.label),
+      })))}
+      aria-hidden="true"
+    ></div>
+
+    <form id="cleaning-form" class="space-y-6">
+
+      <!-- Property -->
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Property <span class="text-red-500">*</span></label>
+        <select id="listing-id" name="listing_id" required
+          class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none bg-white">
+          <option value="">Select property…</option>
+          {(listings ?? []).map((l: any) => (
+            <option value={l.id}
+              data-bedrooms={l.bedrooms ?? 0}
+              data-type={l.property_type ?? ''}>{l.title} — {l.city}</option>
+          ))}
+        </select>
+      </div>
+
+      <!-- Link to booking -->
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Link to booking <span class="text-xs font-normal text-gray-400">(optional — auto-fills date)</span></label>
+        <select id="booking-id" name="booking_id"
+          class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none bg-white">
+          <option value="">— None —</option>
+          {(bookings ?? []).map((b: any) => (
+            <option value={b.id} data-listing={b.listing_id} data-date={b.check_out}>
+              {(b.listings as any)?.title} — checkout {b.check_out} ({b.guest_name})
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <!-- Cleaning Type -->
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2">Cleaning Type <span class="text-red-500">*</span></label>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2" id="cleaning-type-group">
+          {[
+            { value: 'turnover',    icon: '🔄', label: 'Turnover',    hint: 'Guest changeover' },
+            { value: 'deep_clean',  icon: '🧹', label: 'Deep Clean',  hint: 'Full top-to-bottom' },
+            { value: 'linen_change',icon: '🛏️', label: 'Linen Change',hint: 'Sheets & towels only' },
+            { value: 'inspection',  icon: '🔍', label: 'Inspection',  hint: 'Check condition' },
+          ].map(t => (
+            <label class={`cleaning-type-card cursor-pointer flex flex-col items-center gap-1 rounded-xl border-2 px-3 py-3 text-center transition-all ${t.value === 'turnover' ? 'border-[#c9a96e] bg-amber-50' : 'border-gray-200 hover:border-gray-300'}`}
+              data-value={t.value}>
+              <input type="radio" name="cleaning_type" value={t.value} class="sr-only" checked={t.value === 'turnover'} />
+              <span class="text-xl">{t.icon}</span>
+              <span class="text-xs font-semibold text-gray-900">{t.label}</span>
+              <span class="text-[10px] text-gray-400 leading-tight">{t.hint}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <!-- Urgency -->
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-2">Urgency</label>
+        <div class="flex gap-2" id="urgency-group">
+          <label class="urgency-card flex-1 cursor-pointer flex items-center gap-2.5 rounded-xl border-2 border-[#c9a96e] bg-amber-50 px-4 py-3 transition-all" data-value="normal">
+            <input type="radio" name="urgency" value="normal" class="sr-only" checked />
+            <span class="text-lg">🕐</span>
+            <div>
+              <p class="text-sm font-semibold text-gray-900">Normal</p>
+              <p class="text-xs text-gray-400">Standard rate</p>
+            </div>
+          </label>
+          <label class="urgency-card flex-1 cursor-pointer flex items-center gap-2.5 rounded-xl border-2 border-gray-200 hover:border-gray-300 px-4 py-3 transition-all" data-value="urgent">
+            <input type="radio" name="urgency" value="urgent" class="sr-only" />
+            <span class="text-lg">⚡</span>
+            <div>
+              <p class="text-sm font-semibold text-gray-900">Urgent</p>
+              <p class="text-xs text-gray-400">May cost more</p>
+            </div>
+          </label>
+        </div>
+      </div>
+
+      <!-- Date + Property Size -->
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1.5">Cleaning Date <span class="text-red-500">*</span></label>
+          <input type="date" id="requested-date" name="requested_date" required min={new Date().toISOString().slice(0,10)}
+            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none" />
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1.5">Property Size <span class="text-xs font-normal text-gray-400">(m², optional)</span></label>
+          <input type="number" id="property-size" name="property_size" min="1" max="9999" placeholder="e.g. 85"
+            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none" />
+        </div>
+      </div>
+
+      <!-- Time Window -->
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1.5">Earliest Start</label>
+          <input type="time" id="earliest-time" name="earliest_time" value="10:00"
+            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none" />
+        </div>
+        <div>
+          <label class="block text-sm font-semibold text-gray-700 mb-1.5">Latest Start</label>
+          <input type="time" id="latest-time" name="latest_time" value="16:00"
+            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none" />
+        </div>
+      </div>
+
+      <!-- Checklist -->
+      <div>
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-sm font-semibold text-gray-700">Cleaning Checklist</label>
+          <div class="flex gap-2">
+            <!-- Template loader shown when a listing is selected and has a template -->
+            <select id="template-loader" class="hidden text-xs border border-gray-200 rounded-lg px-2 py-1 focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none bg-white">
+              <option value="">Load template…</option>
+            </select>
+            <button type="button" id="paste-toggle-btn"
+              class="text-xs text-[#1a1a2e] border border-gray-200 rounded-lg px-3 py-1 hover:bg-gray-50 transition-colors">
+              Paste list
+            </button>
+          </div>
+        </div>
+
+        <!-- Current checklist items -->
+        <ul id="checklist-items" class="space-y-1.5 mb-3 min-h-[2px]"></ul>
+
+        <!-- Single item add -->
+        <div class="flex gap-2" id="add-item-row">
+          <input type="text" id="checklist-input" placeholder="Add checklist item…" maxlength="200"
+            class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none" />
+          <button type="button" id="add-item-btn"
+            class="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-xl transition-colors">
+            Add
+          </button>
+        </div>
+
+        <!-- Paste area (hidden by default) -->
+        <div id="paste-area" class="hidden mt-2 space-y-2">
+          <textarea id="paste-input" rows="5" placeholder="Paste your list here — one item per line…"
+            class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none resize-none"></textarea>
+          <div class="flex gap-2">
+            <button type="button" id="paste-import-btn"
+              class="px-4 py-2 bg-[#1a1a2e] text-white text-sm font-medium rounded-xl hover:bg-[#2d2d4e] transition-colors">
+              Import lines
+            </button>
+            <button type="button" id="paste-cancel-btn"
+              class="px-4 py-2 bg-gray-100 text-gray-600 text-sm font-medium rounded-xl hover:bg-gray-200 transition-colors">
+              Cancel
+            </button>
+          </div>
+        </div>
+
+        <!-- Save as template -->
+        <div class="mt-3 pt-3 border-t border-gray-100">
+          <label class="flex items-center gap-2 cursor-pointer select-none">
+            <input type="checkbox" id="save-as-template" class="rounded border-gray-300 text-[#c9a96e] focus:ring-[#c9a96e]" />
+            <span class="text-sm text-gray-600">Save this checklist as a template for reuse</span>
+          </label>
+          <div id="template-name-row" class="hidden mt-2">
+            <input type="text" id="template-name" placeholder="Template name (e.g. Apartment Standard)" maxlength="100"
+              class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Notes -->
+      <div>
+        <label class="block text-sm font-semibold text-gray-700 mb-1.5">Notes <span class="text-xs font-normal text-gray-400">(optional)</span></label>
+        <textarea id="notes" name="notes" rows="3" placeholder="Access instructions, key location, special requirements…"
+          class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none resize-none"></textarea>
+      </div>
+
+      <div id="form-error" class="hidden text-sm text-red-600 bg-red-50 rounded-xl px-4 py-3"></div>
+
+      <button type="submit" id="submit-btn"
+        class="w-full bg-[#1a1a2e] text-white font-semibold px-6 py-3 rounded-xl hover:bg-[#2d2d4e] transition-colors">
+        Submit Request
+      </button>
+    </form>
+  </div>
+</AdminLayout>
+
+<script>
+  // ── Checklist state ──────────────────────────────────────────────────────
+  let checklistItems: string[] = [];
+
+  function renderChecklist() {
+    const ul = document.getElementById('checklist-items') as HTMLUListElement;
+    ul.innerHTML = '';
+    if (checklistItems.length === 0) {
+      ul.innerHTML = '<li class="text-xs text-gray-400 italic py-1">No items yet — add below or paste a list.</li>';
+      return;
+    }
+    checklistItems.forEach((item, idx) => {
+      const li = document.createElement('li');
+      li.className = 'flex items-center gap-2 bg-gray-50 rounded-xl px-3 py-2';
+      li.innerHTML = `
+        <span class="text-gray-400 text-xs w-5 flex-shrink-0 text-right">${idx + 1}.</span>
+        <span class="flex-1 text-sm text-gray-800">${item.replace(/</g, '&lt;')}</span>
+        <button type="button" data-idx="${idx}" class="remove-item-btn text-gray-300 hover:text-red-400 transition-colors text-lg leading-none flex-shrink-0">×</button>
+      `;
+      ul.appendChild(li);
+    });
+    ul.querySelectorAll('.remove-item-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const i = Number((btn as HTMLElement).dataset.idx);
+        checklistItems.splice(i, 1);
+        renderChecklist();
+      });
+    });
+  }
+  renderChecklist();
+
+  // Add single item
+  const checklistInput = document.getElementById('checklist-input') as HTMLInputElement;
+  document.getElementById('add-item-btn')?.addEventListener('click', () => {
+    const val = checklistInput.value.trim();
+    if (!val) return;
+    checklistItems.push(val);
+    checklistInput.value = '';
+    renderChecklist();
+    checklistInput.focus();
+  });
+  checklistInput?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      const val = checklistInput.value.trim();
+      if (!val) return;
+      checklistItems.push(val);
+      checklistInput.value = '';
+      renderChecklist();
+    }
+  });
+
+  // Paste area toggle
+  const pasteArea = document.getElementById('paste-area') as HTMLElement;
+  const addItemRow = document.getElementById('add-item-row') as HTMLElement;
+  document.getElementById('paste-toggle-btn')?.addEventListener('click', () => {
+    pasteArea.classList.toggle('hidden');
+    addItemRow.classList.toggle('hidden');
+  });
+  document.getElementById('paste-cancel-btn')?.addEventListener('click', () => {
+    pasteArea.classList.add('hidden');
+    addItemRow.classList.remove('hidden');
+    (document.getElementById('paste-input') as HTMLTextAreaElement).value = '';
+  });
+  document.getElementById('paste-import-btn')?.addEventListener('click', () => {
+    const raw = (document.getElementById('paste-input') as HTMLTextAreaElement).value;
+    const lines = raw.split('\n').map(l => l.trim()).filter(l => l.length > 0 && l.length <= 200);
+    checklistItems.push(...lines);
+    renderChecklist();
+    (document.getElementById('paste-input') as HTMLTextAreaElement).value = '';
+    pasteArea.classList.add('hidden');
+    addItemRow.classList.remove('hidden');
+  });
+
+  // ── Template loader ──────────────────────────────────────────────────────
+  const templatesRaw = (document.getElementById('templates-data') as HTMLElement)?.dataset.templates ?? '[]';
+  const allTemplates: Array<{ id: string; name: string; listing_id: string | null; items: string[] }> = JSON.parse(templatesRaw);
+
+  const templateLoader = document.getElementById('template-loader') as HTMLSelectElement;
+  templateLoader?.addEventListener('change', () => {
+    const tplId = templateLoader.value;
+    if (!tplId) return;
+    const tpl = allTemplates.find(t => t.id === tplId);
+    if (!tpl) return;
+    if (checklistItems.length > 0 && !confirm(`Replace current checklist with "${tpl.name}"?`)) {
+      templateLoader.value = '';
+      return;
+    }
+    checklistItems = [...tpl.items];
+    renderChecklist();
+    templateLoader.value = '';
+  });
+
+  function updateTemplateLoader(listingId: string) {
+    const matches = allTemplates.filter(t => t.listing_id === listingId || t.listing_id === null);
+    templateLoader.innerHTML = '<option value="">Load template…</option>';
+    if (matches.length > 0) {
+      matches.forEach(t => {
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = t.name;
+        templateLoader.appendChild(opt);
+      });
+      templateLoader.classList.remove('hidden');
+    } else {
+      templateLoader.classList.add('hidden');
+    }
+  }
+
+  // ── Booking auto-fill ─────────────────────────────────────────────────────
+  const bookingSelect = document.getElementById('booking-id') as HTMLSelectElement;
+  const dateInput = document.getElementById('requested-date') as HTMLInputElement;
+  const listingSelect = document.getElementById('listing-id') as HTMLSelectElement;
+
+  bookingSelect?.addEventListener('change', () => {
+    const opt = bookingSelect.options[bookingSelect.selectedIndex];
+    const date = opt.dataset.date;
+    const listing = opt.dataset.listing;
+    if (date) dateInput.value = date;
+    if (listing) {
+      listingSelect.value = listing;
+      updateTemplateLoader(listing);
+    }
+  });
+
+  listingSelect?.addEventListener('change', () => {
+    if (listingSelect.value) updateTemplateLoader(listingSelect.value);
+    else templateLoader.classList.add('hidden');
+  });
+
+  // ── Cleaning type cards ───────────────────────────────────────────────────
+  document.querySelectorAll<HTMLElement>('.cleaning-type-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll<HTMLElement>('.cleaning-type-card').forEach(c => {
+        c.classList.remove('border-[#c9a96e]', 'bg-amber-50');
+        c.classList.add('border-gray-200');
+        (c.querySelector('input[type=radio]') as HTMLInputElement).checked = false;
+      });
+      card.classList.add('border-[#c9a96e]', 'bg-amber-50');
+      card.classList.remove('border-gray-200');
+      (card.querySelector('input[type=radio]') as HTMLInputElement).checked = true;
+    });
+  });
+
+  // ── Urgency cards ─────────────────────────────────────────────────────────
+  document.querySelectorAll<HTMLElement>('.urgency-card').forEach(card => {
+    card.addEventListener('click', () => {
+      document.querySelectorAll<HTMLElement>('.urgency-card').forEach(c => {
+        c.classList.remove('border-[#c9a96e]', 'bg-amber-50');
+        c.classList.add('border-gray-200');
+        (c.querySelector('input[type=radio]') as HTMLInputElement).checked = false;
+      });
+      card.classList.add('border-[#c9a96e]', 'bg-amber-50');
+      card.classList.remove('border-gray-200');
+      (card.querySelector('input[type=radio]') as HTMLInputElement).checked = true;
+    });
+  });
+
+  // ── Save as template toggle ───────────────────────────────────────────────
+  document.getElementById('save-as-template')?.addEventListener('change', (e) => {
+    const checked = (e.target as HTMLInputElement).checked;
+    const row = document.getElementById('template-name-row') as HTMLElement;
+    row.classList.toggle('hidden', !checked);
+    if (checked) (document.getElementById('template-name') as HTMLInputElement).focus();
+  });
+
+  // ── Form submit ───────────────────────────────────────────────────────────
+  document.getElementById('cleaning-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('submit-btn') as HTMLButtonElement;
+    const errEl = document.getElementById('form-error') as HTMLElement;
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+    errEl.classList.add('hidden');
+
+    const listing_id = listingSelect.value;
+    const booking_id = bookingSelect.value || undefined;
+    const requested_date = dateInput.value;
+    const earliest_time = (document.getElementById('earliest-time') as HTMLInputElement).value;
+    const latest_time = (document.getElementById('latest-time') as HTMLInputElement).value;
+    const notes = (document.getElementById('notes') as HTMLTextAreaElement).value || undefined;
+    const cleaning_type = (document.querySelector('input[name=cleaning_type]:checked') as HTMLInputElement)?.value || 'turnover';
+    const urgency = (document.querySelector('input[name=urgency]:checked') as HTMLInputElement)?.value || 'normal';
+    const propertySizeRaw = (document.getElementById('property-size') as HTMLInputElement).value;
+    const property_size = propertySizeRaw ? Number(propertySizeRaw) : undefined;
+    const save_as_template = (document.getElementById('save-as-template') as HTMLInputElement).checked;
+    const template_name = (document.getElementById('template-name') as HTMLInputElement).value.trim() || undefined;
+
+    const payload: Record<string, any> = {
+      listing_id, booking_id, requested_date, earliest_time, latest_time,
+      notes, cleaning_type, urgency,
+      checklist_items: checklistItems.length > 0 ? checklistItems : undefined,
+    };
+    if (property_size) payload.property_size = property_size;
+    if (save_as_template) {
+      payload.save_as_template = true;
+      if (template_name) payload.template_name = template_name;
+    }
+
+    const res = await fetch('/api/cleaning/requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (res.ok) {
+      window.location.href = '/owner/cleaning';
+    } else {
+      const d = await res.json();
+      errEl.textContent = typeof d.error === 'string' ? d.error : 'Failed to submit request.';
+      errEl.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = 'Submit Request';
+    }
+  });
+</script>

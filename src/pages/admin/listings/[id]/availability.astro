@@ -1,0 +1,441 @@
+---
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../../lib/supabase.ts';
+
+const { id } = Astro.params;
+const profile = Astro.locals.profile!;
+const isOwner = profile.role === 'property_owner';
+const ownerListingIds = Astro.locals.ownerListingIds ?? [];
+
+const service = getServiceClient();
+
+// Fetch listing — owners may only access their own
+const { data: listing } = await service
+  .from('listings')
+  .select('id,title,slug,min_nights,ical_url,ical_last_synced')
+  .eq('id', id!)
+  .single();
+
+if (!listing) return Astro.redirect('/admin/listings');
+if (isOwner && !ownerListingIds.includes(listing.id)) return Astro.redirect('/admin/listings');
+
+// Fetch existing blocked dates + active bookings
+const [blockedRes, bookingsRes] = await Promise.all([
+  service
+    .from('blocked_dates')
+    .select('id,start_date,end_date,reason')
+    .eq('listing_id', id!)
+    .order('start_date'),
+  service
+    .from('bookings')
+    .select('id,check_in,check_out,guest_name,status')
+    .eq('listing_id', id!)
+    .in('status', ['pending', 'confirmed'])
+    .order('check_in'),
+]);
+
+const blocks = blockedRes.data ?? [];
+const bookings = bookingsRes.data ?? [];
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+---
+
+<AdminLayout title={`Availability — ${listing.title}`}>
+  <div class="flex items-center gap-3 mb-6">
+    <a href="/admin/listings" class="text-gray-400 hover:text-gray-600 text-sm transition-colors">← All listings</a>
+    <span class="text-gray-300">/</span>
+    <a href={`/admin/listings/${listing.id}`} class="text-gray-400 hover:text-gray-600 text-sm transition-colors">{listing.title}</a>
+    <span class="text-gray-300">/</span>
+    <span class="text-sm text-gray-700 font-medium">Availability</span>
+  </div>
+
+  <!-- Legend -->
+  <div class="flex flex-wrap gap-4 text-xs text-gray-500">
+    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-white border border-gray-300 inline-block"></span> Available</span>
+    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-red-100 inline-block"></span> Blocked by you</span>
+    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-amber-100 inline-block"></span> Booking (pending/confirmed)</span>
+    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-emerald-500 inline-block"></span> Selected</span>
+    <span class="flex items-center gap-1.5"><span class="w-3 h-3 rounded-sm bg-emerald-200 inline-block"></span> In range</span>
+  </div>
+
+  <!-- Calendar (12 months) -->
+  <div
+    id="avail-calendar"
+    data-blocks={JSON.stringify(blocks.map(b => ({ id: b.id, start: b.start_date, end: b.end_date })))}
+    data-bookings={JSON.stringify(bookings.map(b => ({ start: b.check_in, end: b.check_out })))}
+    class="bg-white rounded-2xl border border-gray-200 p-6" style="color-scheme:light"
+  >
+    <div id="avail-months" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8"></div>
+  </div>
+
+  <!-- Block form + sidebar -->
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+    <!-- Block form (shown after selection) -->
+    <div class="lg:col-span-2">
+      <div id="block-form-wrap" class="hidden bg-white rounded-2xl border border-gray-100 p-5">
+        <h3 class="font-semibold text-gray-900 mb-3 text-sm">Block selected dates</h3>
+        <form id="block-form" class="flex flex-col sm:flex-row gap-3 items-end">
+          <div class="flex-1">
+            <label class="block text-xs font-medium text-gray-600 mb-1">From</label>
+            <input id="bf-start" type="date" readonly class="input-field text-sm bg-gray-50" />
+          </div>
+          <div class="flex-1">
+            <label class="block text-xs font-medium text-gray-600 mb-1">To (inclusive)</label>
+            <input id="bf-end" type="date" readonly class="input-field text-sm bg-gray-50" />
+          </div>
+          <div class="flex-1">
+            <label class="block text-xs font-medium text-gray-600 mb-1">Reason (optional)</label>
+            <input id="bf-reason" type="text" placeholder="Maintenance, personal stay…" class="input-field text-sm" />
+          </div>
+          <div class="flex gap-2 shrink-0">
+            <button type="button" id="block-cancel-btn"
+              class="px-4 py-2 text-sm border border-gray-200 rounded-xl text-gray-500 hover:bg-gray-50 transition-colors">
+              Cancel
+            </button>
+            <button type="submit" id="block-submit-btn"
+              class="px-4 py-2 text-sm bg-red-500 hover:bg-red-600 text-white font-semibold rounded-xl transition-colors">
+              Block dates
+            </button>
+          </div>
+        </form>
+        <div id="block-msg" class="hidden mt-2 text-xs font-medium"></div>
+      </div>
+    </div>
+
+    <!-- Right: existing blocks + bookings list -->
+    <div class="space-y-6">
+
+      <!-- Active blocks -->
+      <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-50">
+          <h3 class="font-semibold text-gray-900 text-sm">Blocked periods</h3>
+        </div>
+        <div id="blocks-list" class="divide-y divide-gray-50">
+          {blocks.length === 0 ? (
+            <p class="px-4 py-6 text-xs text-gray-400 text-center">No dates blocked yet.<br />Click dates on the calendar to block them.</p>
+          ) : blocks.map((b) => (
+            <div class="px-4 py-3 flex items-start justify-between gap-2" id={`block-${b.id}`}>
+              <div>
+                <p class="text-xs font-medium text-gray-800">{fmtDate(b.start_date)} → {fmtDate(b.end_date)}</p>
+                {b.reason && <p class="text-xs text-gray-400 mt-0.5">{b.reason}</p>}
+              </div>
+              <button
+                class="delete-block-btn text-xs text-red-400 hover:text-red-600 transition-colors shrink-0"
+                data-id={b.id}>
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <!-- Upcoming bookings (read-only) -->
+      <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-50">
+          <h3 class="font-semibold text-gray-900 text-sm">Upcoming bookings</h3>
+        </div>
+        <div class="divide-y divide-gray-50">
+          {bookings.length === 0 ? (
+            <p class="px-4 py-6 text-xs text-gray-400 text-center">No active bookings.</p>
+          ) : bookings.map((b) => (
+            <div class="px-4 py-3">
+              <p class="text-xs font-medium text-gray-800">{fmtDate(b.check_in)} → {fmtDate(b.check_out)}</p>
+              <p class="text-xs text-gray-400 mt-0.5">{b.guest_name}
+                <span class={`ml-1 px-1.5 py-0.5 rounded-full text-[10px] font-medium ${b.status === 'confirmed' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>{b.status}</span>
+              </p>
+            </div>
+          ))}
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- iCal Sync Section -->
+  <div class="bg-white rounded-2xl border border-gray-100 p-5 mt-6">
+    <h3 class="font-semibold text-gray-900 text-sm mb-1">External Calendar Sync</h3>
+    <p class="text-xs text-gray-500 mb-3">Import blocked dates from Airbnb, Booking.com, or any iCal feed.</p>
+    <div class="flex gap-2">
+      <input
+        id="ical-url-input"
+        type="url"
+        value={listing.ical_url || ''}
+        placeholder="Paste iCal export URL"
+        class="flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40"
+      />
+      <button id="ical-sync-btn" class="bg-[#1a1a2e] text-white font-medium px-4 py-2 rounded-lg text-sm hover:bg-[#2d2d4e] transition-colors whitespace-nowrap">
+        Sync Now
+      </button>
+    </div>
+    {listing.ical_last_synced && (
+      <p class="text-xs text-gray-400 mt-2">
+        Last synced: {new Date(listing.ical_last_synced).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+      </p>
+    )}
+    <p id="ical-status" class="hidden text-xs mt-2"></p>
+  </div>
+</AdminLayout>
+
+<script define:vars={{ listingId: listing.id }}>
+  const calEl    = document.getElementById('avail-calendar');
+  const monthsEl = document.getElementById('avail-months');
+  const formWrap = document.getElementById('block-form-wrap');
+  const bfStart  = document.getElementById('bf-start');
+  const bfEnd    = document.getElementById('bf-end');
+  const bfReason = document.getElementById('bf-reason');
+  const blockMsg = document.getElementById('block-msg');
+  const blocksList = document.getElementById('blocks-list');
+
+  // Parse data
+  let blocks   = JSON.parse(calEl.dataset.blocks ?? '[]');   // [{id,start,end}]
+  const bookings = JSON.parse(calEl.dataset.bookings ?? '[]'); // [{start,end}]
+
+  // Build day sets
+  function localDateStr(d) {
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
+
+  function buildDaySet(ranges) {
+    const s = new Set();
+    for (const r of ranges) {
+      const d = new Date(r.start + 'T00:00:00');
+      while (localDateStr(d) < r.end) {
+        s.add(localDateStr(d));
+        d.setDate(d.getDate() + 1);
+      }
+    }
+    return s;
+  }
+
+  let blockedDays  = buildDaySet(blocks);
+  const bookedDays = buildDaySet(bookings);
+
+  let selStart = null;
+  let selEnd   = null;
+
+  // ── Render calendar ───────────────────────────────────────────────────────
+  function renderMonth(year, month) {
+    const firstDay    = new Date(year, month, 1).getDay();
+    const daysInMonth = new Date(year, month + 1, 0).getDate();
+    const today       = localDateStr(new Date());
+    const monthName   = new Date(year, month).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+    const dayNames    = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+    let html = `<div><h4 class="font-semibold text-gray-900 text-sm mb-4 text-center">${monthName}</h4>`;
+    html += `<div class="grid grid-cols-7 gap-0.5 mb-2">`;
+    for (const d of dayNames) html += `<div class="text-center text-xs text-gray-400 font-medium py-1">${d}</div>`;
+    html += `</div><div class="grid grid-cols-7 gap-0.5">`;
+    for (let i = 0; i < firstDay; i++) html += `<div></div>`;
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const ds = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+      const isPast        = ds < today;
+      const isBlocked     = blockedDays.has(ds);
+      const isBooked      = bookedDays.has(ds);
+      const isSelEndpoint = ds === selStart || ds === selEnd;
+      const inRange       = selStart && selEnd && ds > selStart && ds < selEnd;
+      const isSel         = isSelEndpoint || inRange;
+
+      let cls = 'text-center text-xs py-1.5 rounded-lg transition-colors cursor-pointer ';
+      if (isPast) {
+        cls += 'text-gray-400 cursor-default';
+      } else if (isBooked) {
+        cls += 'bg-amber-400/25 text-amber-700 cursor-not-allowed font-medium';
+      } else if (isSelEndpoint) {
+        cls += 'bg-emerald-500 text-white font-bold ring-2 ring-emerald-400 ring-offset-1';
+      } else if (inRange) {
+        cls += 'bg-emerald-200 text-emerald-900 font-medium';
+      } else if (isBlocked) {
+        cls += 'bg-red-400/20 text-red-600 line-through hover:bg-red-400/30';
+      } else {
+        cls += 'text-gray-900 hover:bg-gray-100';
+      }
+
+      const disabled = isPast || isBooked;
+      html += `<button class="${cls}" data-date="${ds}" ${disabled ? 'disabled' : ''} type="button">${day}</button>`;
+    }
+    html += `</div></div>`;
+    return html;
+  }
+
+  function render() {
+    if (!monthsEl) return;
+    const now = new Date();
+    let html = '';
+    for (let i = 0; i < 12; i++) {
+      const m = (now.getMonth() + i) % 12;
+      const y = now.getFullYear() + Math.floor((now.getMonth() + i) / 12);
+      html += renderMonth(y, m);
+    }
+    monthsEl.innerHTML = html;
+    monthsEl.querySelectorAll('button[data-date]').forEach(btn => {
+      btn.addEventListener('click', () => handleClick(btn.dataset.date));
+    });
+  }
+
+  // ── Date selection ────────────────────────────────────────────────────────
+  function handleClick(date) {
+    if (!selStart || (selStart && selEnd)) {
+      selStart = date; selEnd = null;
+    } else if (date < selStart) {
+      selStart = date; selEnd = null;
+    } else {
+      selEnd = date;
+    }
+    updateForm();
+    render();
+  }
+
+  function updateForm() {
+    if (selStart && selEnd) {
+      bfStart.value = selStart;
+      bfEnd.value   = selEnd;
+      formWrap.classList.remove('hidden');
+    } else if (selStart) {
+      // Single date selected — quick-block single day on second click
+      bfStart.value = selStart;
+      bfEnd.value   = selStart;
+      formWrap.classList.remove('hidden');
+    } else {
+      formWrap.classList.add('hidden');
+    }
+  }
+
+  // ── Cancel selection ──────────────────────────────────────────────────────
+  document.getElementById('block-cancel-btn')?.addEventListener('click', () => {
+    selStart = null; selEnd = null;
+    formWrap.classList.add('hidden');
+    render();
+  });
+
+  // ── Submit block ──────────────────────────────────────────────────────────
+  document.getElementById('block-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = document.getElementById('block-submit-btn');
+    btn.disabled = true; btn.textContent = 'Blocking…';
+    blockMsg.classList.add('hidden');
+
+    const start  = bfStart.value;
+    const end    = bfEnd.value;
+    const reason = bfReason.value.trim() || undefined;
+
+    const res = await fetch('/api/availability/block', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ listing_id: listingId, start_date: start, end_date: end, reason }),
+    });
+
+    const json = await res.json();
+    if (res.ok) {
+      // Update local state without page reload
+      const newBlock = { id: json.data.id, start, end };
+      blocks.push(newBlock);
+      blockedDays = buildDaySet(blocks);
+      selStart = null; selEnd = null;
+      formWrap.classList.add('hidden');
+      bfReason.value = '';
+      render();
+      addBlockToList(newBlock, reason);
+    } else {
+      blockMsg.textContent = json.error ?? 'Failed to block dates';
+      blockMsg.className = 'mt-2 text-xs font-medium text-red-600';
+      blockMsg.classList.remove('hidden');
+    }
+    btn.disabled = false; btn.textContent = 'Block dates';
+  });
+
+  // ── Add block to sidebar list ─────────────────────────────────────────────
+  function fmtDate(d) {
+    return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function addBlockToList(block, reason) {
+    // Remove empty state message if present
+    blocksList.querySelectorAll('p').forEach(p => p.remove());
+
+    const div = document.createElement('div');
+    div.id = `block-${block.id}`;
+    div.className = 'px-4 py-3 flex items-start justify-between gap-2 border-t border-gray-50 first:border-t-0';
+    div.innerHTML = `
+      <div>
+        <p class="text-xs font-medium text-gray-800">${fmtDate(block.start)} → ${fmtDate(block.end)}</p>
+        ${reason ? `<p class="text-xs text-gray-400 mt-0.5">${reason}</p>` : ''}
+      </div>
+      <button class="delete-block-btn text-xs text-red-400 hover:text-red-600 transition-colors shrink-0" data-id="${block.id}">Remove</button>
+    `;
+    div.querySelector('.delete-block-btn').addEventListener('click', () => deleteBlock(block.id));
+    blocksList.appendChild(div);
+  }
+
+  // ── Delete block ──────────────────────────────────────────────────────────
+  async function deleteBlock(blockId) {
+    if (!confirm('Remove this block? Dates will become available again.')) return;
+    const res = await fetch(`/api/availability/block?id=${blockId}`, { method: 'DELETE' });
+    if (res.ok || res.status === 204) {
+      blocks = blocks.filter(b => b.id !== blockId);
+      blockedDays = buildDaySet(blocks);
+      document.getElementById(`block-${blockId}`)?.remove();
+      if (blocks.length === 0) {
+        blocksList.innerHTML = '<p class="px-4 py-6 text-xs text-gray-400 text-center">No dates blocked yet.<br />Click dates on the calendar to block them.</p>';
+      }
+      render();
+    } else {
+      alert('Failed to remove block');
+    }
+  }
+
+  // Wire up existing delete buttons
+  document.querySelectorAll('.delete-block-btn').forEach(btn => {
+    btn.addEventListener('click', () => deleteBlock(btn.dataset.id));
+  });
+
+  render();
+
+  // ── iCal Sync ─────────────────────────────────────────────────────────────
+  const icalBtn = document.getElementById('ical-sync-btn');
+  const icalInput = document.getElementById('ical-url-input');
+  const icalStatus = document.getElementById('ical-status');
+
+  icalBtn?.addEventListener('click', async () => {
+    const icalUrl = icalInput?.value?.trim();
+    if (!icalUrl) {
+      icalStatus.textContent = 'Please enter an iCal URL';
+      icalStatus.className = 'text-xs mt-2 text-red-600';
+      icalStatus.classList.remove('hidden');
+      return;
+    }
+
+    icalBtn.disabled = true;
+    icalBtn.textContent = 'Syncing…';
+    icalStatus.classList.add('hidden');
+
+    try {
+      const res = await fetch('/api/admin/listings/ical-sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listingId, icalUrl }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Sync failed');
+
+      icalStatus.textContent = `Synced: ${json.added} dates added, ${json.removed} removed (${json.total} events in feed)`;
+      icalStatus.className = 'text-xs mt-2 text-emerald-600 font-medium';
+      icalStatus.classList.remove('hidden');
+
+      if (json.added > 0) {
+        setTimeout(() => window.location.reload(), 2000);
+      }
+    } catch (err) {
+      icalStatus.textContent = err.message;
+      icalStatus.className = 'text-xs mt-2 text-red-600';
+      icalStatus.classList.remove('hidden');
+    } finally {
+      icalBtn.disabled = false;
+      icalBtn.textContent = 'Sync Now';
+    }
+  });
+</script>

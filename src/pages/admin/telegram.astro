@@ -1,0 +1,388 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const L: Record<string, Record<string, string>> = {
+  bot_connected:      { en: 'is connected and ready.', el: 'είναι συνδεδεμένο και έτοιμο.' },
+  bot_not_connected:  { en: 'Bot not connected.', el: 'Το bot δεν είναι συνδεδεμένο.' },
+  bot_set_token:      { en: 'Set', el: 'Ορίστε' },
+  bot_in_env:         { en: 'in your environment variables.', el: 'στις μεταβλητές περιβάλλοντος.' },
+  webhook_url:        { en: 'Webhook URL:', el: 'Webhook URL:' },
+  register_webhook:   { en: 'Register/refresh webhook →', el: 'Εγγραφή/ανανέωση webhook →' },
+  msg_added:          { en: 'Channel added successfully.', el: 'Το κανάλι προστέθηκε επιτυχώς.' },
+  msg_deleted:        { en: 'Channel removed.', el: 'Το κανάλι αφαιρέθηκε.' },
+  msg_updated:        { en: 'Channel updated.', el: 'Το κανάλι ενημερώθηκε.' },
+  msg_tested:         { en: 'Test message sent! Check the channel.', el: 'Το δοκιμαστικό μήνυμα εστάλη! Ελέγξτε το κανάλι.' },
+  msg_test_fail:      { en: 'Test message failed. Check the chat ID is correct and the bot is a member of the channel/group.', el: 'Αποτυχία αποστολής. Ελέγξτε ότι το Chat ID είναι σωστό και το bot είναι μέλος του καναλιού/ομάδας.' },
+  msg_error:          { en: 'Something went wrong. Please try again.', el: 'Κάτι πήγε στραβά. Παρακαλώ δοκιμάστε ξανά.' },
+  how_to_chat_id:     { en: 'How to get a Telegram Chat ID', el: 'Πώς να βρείτε το Telegram Chat ID' },
+  private_chat:       { en: 'For a private chat with the bot:', el: 'Για ιδιωτική συνομιλία με το bot:' },
+  group_channel:      { en: 'For a group or channel:', el: 'Για ομάδα ή κανάλι:' },
+  step1_private:      { en: 'Start a chat with your bot on Telegram', el: 'Ξεκινήστε συνομιλία με το bot στο Telegram' },
+  step2_private:      { en: 'Send any message to the bot', el: 'Στείλτε οποιοδήποτε μήνυμα στο bot' },
+  step3_private:      { en: 'Visit:', el: 'Επισκεφθείτε:' },
+  step4_private:      { en: 'Look for', el: 'Αναζητήστε' },
+  step1_group:        { en: 'Add the bot to the group/channel as admin', el: 'Προσθέστε το bot στην ομάδα/κανάλι ως διαχειριστή' },
+  step2_group:        { en: 'Send a message in the group', el: 'Στείλτε μήνυμα στην ομάδα' },
+  step3_group:        { en: 'Use getUpdates — the chat ID will be a negative number (e.g.', el: 'Χρησιμοποιήστε getUpdates — το Chat ID θα είναι αρνητικός αριθμός (π.χ.' },
+  add_channel:        { en: 'Add Notification Channel', el: 'Προσθήκη Καναλιού Ειδοποιήσεων' },
+  lbl_label:          { en: 'Label *', el: 'Ετικέτα *' },
+  lbl_chat_id:        { en: 'Chat ID * (number)', el: 'Chat ID * (αριθμός)' },
+  lbl_owner:          { en: 'Assigned Owner', el: 'Ανατεθειμένος Ιδιοκτήτης' },
+  owner_placeholder:  { en: 'Select owner (optional — leave blank for global channel)', el: 'Επιλέξτε ιδιοκτήτη (προαιρετικό — αφήστε κενό για γενικό κανάλι)' },
+  no_owners:          { en: 'No owners found. Create an owner account first.', el: 'Δεν βρέθηκαν ιδιοκτήτες. Δημιουργήστε πρώτα λογαριασμό ιδιοκτήτη.' },
+  notify_on:          { en: 'Notify on:', el: 'Ειδοποίηση για:' },
+  notify_new:         { en: 'New booking (with Approve/Reject buttons)', el: 'Νέα κράτηση (με κουμπιά Έγκριση/Απόρριψη)' },
+  notify_confirmed:   { en: 'Booking confirmed', el: 'Επιβεβαίωση κράτησης' },
+  notify_cancelled:   { en: 'Booking cancelled', el: 'Ακύρωση κράτησης' },
+  btn_add:            { en: 'Add Channel', el: 'Προσθήκη Καναλιού' },
+  active_channels:    { en: 'Active Channels', el: 'Ενεργά Κανάλια' },
+  no_channels:        { en: 'No channels yet. Add one above.', el: 'Δεν υπάρχουν κανάλια. Προσθέστε ένα παραπάνω.' },
+  col_label:          { en: 'Label', el: 'Ετικέτα' },
+  col_owner:          { en: 'Owner', el: 'Ιδιοκτήτης' },
+  col_chat_id:        { en: 'Chat ID', el: 'Chat ID' },
+  col_notifications:  { en: 'Notifications', el: 'Ειδοποιήσεις' },
+  col_actions:        { en: 'Actions', el: 'Ενέργειες' },
+  badge_new:          { en: 'New booking', el: 'Νέα κράτηση' },
+  badge_confirmed:    { en: 'Confirmed', el: 'Επιβεβαιωμένη' },
+  badge_cancelled:    { en: 'Cancelled', el: 'Ακυρωμένη' },
+  global_channel:     { en: 'Global (no owner)', el: 'Γενικό (χωρίς ιδιοκτήτη)' },
+  btn_test:           { en: 'Test', el: 'Δοκιμή' },
+  btn_pause:          { en: 'Pause', el: 'Παύση' },
+  btn_resume:         { en: 'Resume', el: 'Συνέχεια' },
+  btn_remove:         { en: 'Remove', el: 'Αφαίρεση' },
+  btn_edit:           { en: 'Edit', el: 'Επεξεργασία' },
+  btn_save:           { en: 'Save', el: 'Αποθήκευση' },
+  btn_cancel:         { en: 'Cancel', el: 'Ακύρωση' },
+  remove_confirm:     { en: 'Remove this channel?', el: 'Αφαίρεση αυτού του καναλιού;' },
+  edit_channel:       { en: 'Edit Channel', el: 'Επεξεργασία Καναλιού' },
+};
+function al(k: string) { return L[k]?.[lang] ?? L[k]?.en ?? k; }
+
+const service = getServiceClient();
+const msg     = Astro.url.searchParams.get('msg');
+
+// Fetch channels joined with owner profile name
+const { data: channels } = await service
+  .from('telegram_channels')
+  .select('*, owner:profiles!owner_id(id,full_name,email)')
+  .order('created_at');
+
+// Fetch all property owners + super admins for the dropdown
+const { data: owners } = await service
+  .from('profiles')
+  .select('id, full_name, email')
+  .in('role', ['property_owner', 'super_admin'])
+  .order('full_name');
+
+// Check bot status
+let botUsername = '';
+let botConnected = false;
+const token = import.meta.env.TELEGRAM_BOT_TOKEN;
+if (token) {
+  try {
+    const res = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+    const json = await res.json() as any;
+    if (json.ok) { botConnected = true; botUsername = json.result.username; }
+  } catch {}
+}
+
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? '';
+---
+
+<AdminLayout title="Telegram">
+  <div class="max-w-4xl space-y-6">
+
+    <!-- Bot status -->
+    <div class={`flex items-start gap-3 rounded-xl px-4 py-3 text-sm border ${botConnected ? 'bg-emerald-50 border-emerald-200 text-emerald-800' : 'bg-amber-50 border-amber-200 text-amber-800'}`}>
+      <span class="text-lg mt-0.5">{botConnected ? '✅' : '📵'}</span>
+      <div>
+        {botConnected
+          ? <p>Bot <strong>@{botUsername}</strong> {al('bot_connected')}</p>
+          : <p><strong>{al('bot_not_connected')}</strong> {al('bot_set_token')} <code class="bg-amber-100 px-1 rounded">TELEGRAM_BOT_TOKEN</code> {al('bot_in_env')}</p>
+        }
+        {botConnected && siteUrl && (
+          <p class="mt-1 text-emerald-700 text-xs">
+            {al('webhook_url')} <code class="bg-emerald-100 px-1 rounded">{siteUrl}/api/telegram/webhook</code>
+            — <a href="/api/telegram/register" class="underline">{al('register_webhook')}</a>
+          </p>
+        )}
+      </div>
+    </div>
+
+    <!-- Feedback -->
+    {msg === 'added'   && <div class="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm p-3 rounded-xl">{al('msg_added')}</div>}
+    {msg === 'deleted' && <div class="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-xl">{al('msg_deleted')}</div>}
+    {msg === 'updated' && <div class="bg-blue-50 border border-blue-200 text-blue-700 text-sm p-3 rounded-xl">{al('msg_updated')}</div>}
+    {msg === 'tested'  && <div class="bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm p-3 rounded-xl">{al('msg_tested')}</div>}
+    {msg === 'test-fail' && <div class="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-xl">{al('msg_test_fail')}</div>}
+    {msg === 'error'   && <div class="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-xl">{al('msg_error')}</div>}
+
+    <!-- How to register a channel -->
+    <div class="bg-blue-50 border border-blue-200 rounded-xl p-5 text-sm text-blue-900">
+      <p class="font-semibold text-blue-800 mb-3">📋 How to connect your Telegram channel to receive booking alerts</p>
+      <ol class="list-decimal list-inside space-y-2 ml-1">
+        <li>Open Telegram and go to your channel.</li>
+        <li>
+          Tap <strong>Administrators</strong> → <strong>Add Admin</strong> → search for
+          <code class="bg-blue-100 px-1.5 py-0.5 rounded font-mono">@{botUsername || 'kefalonia_rentals_bot'}</code>
+          and add it as an admin. <span class="text-blue-700">(The bot needs admin rights to post messages.)</span>
+        </li>
+        <li>
+          To get the Chat ID, <strong>forward any message from your channel to
+          <a href="https://t.me/userinfobot" target="_blank" class="underline">@userinfobot</a></strong> on Telegram.
+          It will reply instantly with the channel ID (e.g. <code class="bg-blue-100 px-1.5 py-0.5 rounded font-mono">-1001234567890</code>).
+          <span class="text-blue-700">Channel IDs always start with <strong>-100</strong>.</span>
+        </li>
+        <li>Paste that number into the <strong>Chat ID</strong> field below, choose the <strong>Assigned Owner</strong>, and click <strong>Add Channel</strong>.</li>
+        <li>Click <strong>Test</strong> next to the channel to confirm it's working — you should see a test message arrive in your channel.</li>
+      </ol>
+      <p class="mt-3 text-blue-700 text-xs">💡 Channels assigned to an owner receive booking notifications only for that owner's listings. Channels with no owner assigned receive all unrouted notifications.</p>
+    </div>
+
+    <!-- Add channel form -->
+    <div class="bg-white border border-gray-200 rounded-2xl p-6">
+      <h2 class="font-semibold text-gray-900 mb-4">{al('add_channel')}</h2>
+      <form method="POST" action="/api/admin/telegram/add" class="space-y-4">
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{al('lbl_label')}</label>
+            <input type="text" name="label" required placeholder="e.g. Owner – Nikos" class="input-field" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{al('lbl_chat_id')}</label>
+            <input type="text" name="chat_id" required placeholder="e.g. -1001234567890" class="input-field" />
+          </div>
+        </div>
+
+        <!-- Owner selector -->
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">{al('lbl_owner')}</label>
+          {!owners || owners.length === 0 ? (
+            <p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 px-3 py-2 rounded-lg">
+              {al('no_owners')}
+            </p>
+          ) : (
+            <select name="owner_id" class="input-field">
+              <option value="">{al('owner_placeholder')}</option>
+              {owners.map((o: any) => (
+                <option value={o.id}>{o.full_name} ({o.email})</option>
+              ))}
+            </select>
+          )}
+        </div>
+
+        <div>
+          <p class="text-xs font-medium text-gray-600 mb-2">{al('notify_on')}</p>
+          <div class="flex flex-wrap gap-4">
+            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input type="checkbox" name="notify_booking_new" value="true" checked class="rounded" />
+              {al('notify_new')}
+            </label>
+            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input type="checkbox" name="notify_booking_confirmed" value="true" checked class="rounded" />
+              {al('notify_confirmed')}
+            </label>
+            <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+              <input type="checkbox" name="notify_booking_cancelled" value="true" checked class="rounded" />
+              {al('notify_cancelled')}
+            </label>
+          </div>
+        </div>
+
+        <button type="submit" class="bg-[#1a1a2e] text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-[#2d2d4e] transition-colors">
+          {al('btn_add')}
+        </button>
+      </form>
+    </div>
+
+    <!-- Channels list -->
+    <div class="bg-white border border-gray-100 rounded-2xl overflow-hidden">
+      <div class="px-6 py-4 border-b border-gray-100">
+        <h2 class="font-semibold text-gray-900">{al('active_channels')} ({channels?.length ?? 0})</h2>
+      </div>
+      {!channels || channels.length === 0 ? (
+        <div class="text-center py-12 text-gray-400 text-sm">{al('no_channels')}</div>
+      ) : (
+        <div class="divide-y divide-gray-50">
+          {channels.map((ch: any) => {
+            const ownerName = ch.owner ? `${ch.owner.full_name} (${ch.owner.email})` : null;
+            return (
+              <div class="px-6 py-4">
+
+                {/* ── View row ── */}
+                <div class="channel-view" id={`view-${ch.id}`}>
+                  <div class="flex items-start justify-between gap-4">
+                    <div class="flex-1 min-w-0">
+                      <div class="flex items-center gap-2 mb-1">
+                        <span class={`inline-block w-2 h-2 rounded-full ${ch.is_active ? 'bg-emerald-400' : 'bg-gray-300'}`}></span>
+                        <p class="font-medium text-gray-900 text-sm">{ch.label}</p>
+                      </div>
+                      {/* Owner badge */}
+                      <div class="mb-1">
+                        {ownerName ? (
+                          <span class="inline-flex items-center gap-1 text-xs bg-violet-50 text-violet-700 border border-violet-200 px-2 py-0.5 rounded-full">
+                            👤 {ownerName}
+                          </span>
+                        ) : (
+                          <span class="inline-flex items-center gap-1 text-xs bg-gray-50 text-gray-500 border border-gray-200 px-2 py-0.5 rounded-full">
+                            🌐 {al('global_channel')}
+                          </span>
+                        )}
+                      </div>
+                      <p class="font-mono text-xs text-gray-400 mb-2">{ch.chat_id}</p>
+                      <div class="flex flex-wrap gap-2">
+                        {ch.notify_booking_new && (
+                          <span class="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full">{al('badge_new')}</span>
+                        )}
+                        {ch.notify_booking_confirmed && (
+                          <span class="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded-full">{al('badge_confirmed')}</span>
+                        )}
+                        {ch.notify_booking_cancelled && (
+                          <span class="text-xs bg-red-50 text-red-700 px-2 py-0.5 rounded-full">{al('badge_cancelled')}</span>
+                        )}
+                      </div>
+                    </div>
+                    <div class="flex items-center gap-2 shrink-0">
+                      <!-- Test -->
+                      <form method="POST" action="/api/admin/telegram/test">
+                        <input type="hidden" name="chat_id" value={ch.chat_id} />
+                        <button type="submit" class="text-xs text-gray-500 hover:text-gray-900 border border-gray-200 px-2.5 py-1 rounded-lg font-medium transition-colors">
+                          {al('btn_test')}
+                        </button>
+                      </form>
+                      <!-- Edit -->
+                      <button
+                        type="button"
+                        onclick={`document.getElementById('view-${ch.id}').classList.add('hidden'); document.getElementById('edit-${ch.id}').classList.remove('hidden')`}
+                        class="text-xs text-blue-600 hover:text-blue-800 border border-blue-200 px-2.5 py-1 rounded-lg font-medium transition-colors"
+                      >
+                        {al('btn_edit')}
+                      </button>
+                      <!-- Toggle -->
+                      <form method="POST" action="/api/admin/telegram/toggle">
+                        <input type="hidden" name="id" value={ch.id} />
+                        <input type="hidden" name="is_active" value={String(!ch.is_active)} />
+                        <button type="submit" class={`text-xs px-2.5 py-1 rounded-lg border font-medium transition-colors ${ch.is_active ? 'border-amber-200 text-amber-700 hover:bg-amber-50' : 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'}`}>
+                          {ch.is_active ? al('btn_pause') : al('btn_resume')}
+                        </button>
+                      </form>
+                      <!-- Delete -->
+                      <form method="POST" action="/api/admin/telegram/delete" onsubmit={`return confirm('${al('remove_confirm')}')`}>
+                        <input type="hidden" name="id" value={ch.id} />
+                        <button type="submit" class="text-xs text-red-500 hover:text-red-700 font-medium transition-colors">
+                          {al('btn_remove')}
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ── Edit row (hidden by default) ── */}
+                <div class="channel-edit hidden" id={`edit-${ch.id}`}>
+                  <p class="text-xs font-semibold text-gray-700 mb-3">{al('edit_channel')}</p>
+                  <form method="POST" action="/api/admin/telegram/update" class="space-y-3">
+                    <input type="hidden" name="id" value={ch.id} />
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">{al('lbl_label')}</label>
+                        <input type="text" name="label" required value={ch.label} class="input-field text-sm" />
+                      </div>
+                      <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1">{al('lbl_chat_id')}</label>
+                        <input type="text" name="chat_id" required value={ch.chat_id} class="input-field text-sm" />
+                      </div>
+                    </div>
+
+                    <!-- Owner selector -->
+                    <div>
+                      <label class="block text-xs font-medium text-gray-600 mb-1">{al('lbl_owner')}</label>
+                      {!owners || owners.length === 0 ? (
+                        <p class="text-xs text-gray-400">No owners available.</p>
+                      ) : (
+                        <select name="owner_id" class="input-field text-sm">
+                          <option value="" selected={!ch.owner_id}>{al('owner_placeholder')}</option>
+                          {owners.map((o: any) => (
+                            <option value={o.id} selected={ch.owner_id === o.id}>
+                              {o.full_name} ({o.email})
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                    </div>
+
+                    <div>
+                      <p class="text-xs font-medium text-gray-600 mb-2">{al('notify_on')}</p>
+                      <div class="flex flex-wrap gap-4">
+                        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                          <input type="checkbox" name="notify_booking_new" value="true" checked={ch.notify_booking_new} class="rounded" />
+                          {al('notify_new')}
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                          <input type="checkbox" name="notify_booking_confirmed" value="true" checked={ch.notify_booking_confirmed} class="rounded" />
+                          {al('notify_confirmed')}
+                        </label>
+                        <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                          <input type="checkbox" name="notify_booking_cancelled" value="true" checked={ch.notify_booking_cancelled} class="rounded" />
+                          {al('notify_cancelled')}
+                        </label>
+                      </div>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                      <button type="submit" class="bg-[#1a1a2e] text-white text-xs font-semibold px-4 py-2 rounded-lg hover:bg-[#2d2d4e] transition-colors">
+                        {al('btn_save')}
+                      </button>
+                      <button
+                        type="button"
+                        onclick={`document.getElementById('edit-${ch.id}').classList.add('hidden'); document.getElementById('view-${ch.id}').classList.remove('hidden')`}
+                        class="text-xs text-gray-500 hover:text-gray-700 px-4 py-2 rounded-lg border border-gray-200 font-medium transition-colors"
+                      >
+                        {al('btn_cancel')}
+                      </button>
+                    </div>
+                  </form>
+                </div>
+
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+
+  </div>
+</AdminLayout>
+
+<script>
+  // Notification checkbox toasts
+  const notifLabels: Record<string, string> = {
+    notify_booking_new:       'New booking notifications',
+    notify_booking_confirmed: 'Booking confirmed notifications',
+    notify_booking_cancelled: 'Booking cancelled notifications',
+  };
+  document.querySelectorAll('input[name^="notify_booking_"]').forEach((cb) => {
+    cb.addEventListener('change', () => {
+      const label = notifLabels[(cb as HTMLInputElement).name] ?? 'Notification';
+      (window as any).adminToast((cb as HTMLInputElement).checked ? `✅ ${label}: ON (save to apply)` : `🔕 ${label}: OFF (save to apply)`, 'info');
+    });
+  });
+
+  document.querySelectorAll('form[action="/api/admin/telegram/toggle"]').forEach((form) => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const fd = new FormData(form as HTMLFormElement);
+      const isActivating = fd.get('is_active') === 'true';
+      const res = await fetch('/api/admin/telegram/toggle', { method: 'POST', body: fd });
+      if (res.ok || res.redirected) {
+        (window as any).adminToast(isActivating ? '✅ Channel activated' : '⏸ Channel paused', isActivating ? 'success' : 'info');
+        setTimeout(() => window.location.reload(), 1200);
+      } else {
+        (window as any).adminToast('❌ Failed to update channel', 'error');
+      }
+    });
+  });
+</script>

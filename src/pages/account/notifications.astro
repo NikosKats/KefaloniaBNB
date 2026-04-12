@@ -1,0 +1,120 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isBg = lang === 'bg';
+const isEl = lang === 'el';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const session = Astro.locals.session;
+if (!session) return Astro.redirect('/community/join?next=/account/notifications');
+
+const service = getServiceClient();
+const userId = session.user.id;
+
+const { data: notifications } = await service
+  .from('user_notifications')
+  .select('*')
+  .eq('user_id', userId)
+  .order('created_at', { ascending: false })
+  .limit(50);
+
+// Mark all as read on page load
+await service
+  .from('user_notifications')
+  .update({ is_read: true })
+  .eq('user_id', userId)
+  .eq('is_read', false);
+
+const typeIcons: Record<string, string> = {
+  post_liked: '❤️',
+  comment_liked: '💗',
+  post_commented: '💬',
+  friend_request: '👋',
+  friend_accepted: '🤝',
+  new_message: '✉️',
+  new_community_post: '📝',
+  new_member_signup: '🎉',
+};
+
+const typeLabels: Record<string, string> = {
+  post_liked: isEl ? 'έκανε like στη δημοσίευσή σου' : isBg ? 'хареса публикацията ви' : isSr ? 'је лајковао вашу објаву' : isTr ? 'gönderinizi beğendi' : isRo ? 'a apreciat postarea ta' : 'liked your post',
+  comment_liked: isEl ? 'έκανε like στο σχόλιό σου' : isBg ? 'хареса коментара ви' : isSr ? 'је лајковао ваш коментар' : isTr ? 'yorumunuzu beğendi' : isRo ? 'a apreciat comentariul tău' : 'liked your comment',
+  post_commented: isEl ? 'σχολίασε τη δημοσίευσή σου' : isBg ? 'коментира публикацията ви' : isSr ? 'је коментарисао вашу објаву' : isTr ? 'gönderinize yorum yaptı' : isRo ? 'a comentat la postarea ta' : 'commented on your post',
+  friend_request: isEl ? 'σου έστειλε αίτημα φιλίας' : isBg ? 'ви изпрати заявка за приятелство' : isSr ? 'вам је послао захтев за пријатељство' : isTr ? 'size arkadaşlık isteği gönderdi' : isRo ? 'ți-a trimis o cerere de prietenie' : 'sent you a friend request',
+  friend_accepted: isEl ? 'αποδέχτηκε το αίτημα φιλίας σου' : isBg ? 'прие заявката ви за приятелство' : isSr ? 'је прихватио ваш захтев за пријатељство' : isTr ? 'arkadaşlık isteğinizi kabul etti' : isRo ? 'a acceptat cererea ta de prietenie' : 'accepted your friend request',
+  new_message: isEl ? 'σου έστειλε μήνυμα' : isBg ? 'ви изпрати съобщение' : isSr ? 'вам је послао поруку' : isTr ? 'size mesaj gönderdi' : isRo ? 'ți-a trimis un mesaj' : 'sent you a message',
+  new_community_post: isEl ? 'δημοσίευσε στην κοινότητα' : isBg ? 'публикува в общността' : isSr ? 'је објавио у заједници' : isTr ? 'toplulukta paylaştı' : isRo ? 'a postat în comunitate' : 'posted in the community',
+  new_member_signup: isEl ? 'εγγράφηκε στην κοινότητα' : isBg ? 'се присъедини към общността' : isSr ? 'се придружио заједници' : isTr ? 'topluluğa katıldı' : isRo ? 's-a alăturat comunității' : 'joined the community',
+};
+
+function timeAgo(dateStr: string): string {
+  const seconds = Math.floor((Date.now() - new Date(dateStr).getTime()) / 1000);
+  if (seconds < 60) return isEl ? 'μόλις τώρα' : isBg ? 'току-що' : isSr ? 'управо' : isTr ? 'az önce' : isRo ? 'chiar acum' : 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}${isEl ? 'λ' : isBg ? 'м' : isSr ? 'м' : isTr ? 'dk' : isRo ? 'm' : 'm'}`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}${isEl ? 'ω' : isBg ? 'ч' : isSr ? 'ч' : isTr ? 'sa' : isRo ? ' ore' : 'h'}`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}${isEl ? 'μ' : isBg ? 'д' : isSr ? 'д' : isTr ? 'g' : isRo ? ' zile' : 'd'}`;
+  return new Date(dateStr).toLocaleDateString();
+}
+
+function getNotifHref(n: any): string {
+  if (n.type === 'friend_request' || n.type === 'friend_accepted') return '/account/friends';
+  if (n.type === 'new_message') return '/account/messages';
+  if (n.type === 'new_member_signup') return `/community/member/${n.actor_id}`;
+  if (n.post_id) return `/community/board/${n.post_id}`;
+  return '/account/notifications';
+}
+---
+
+<BaseLayout title={isEl ? 'Ειδοποιήσεις' : isBg ? 'Известия' : isSr ? 'Обавештења' : isTr ? 'Bildirimler' : isRo ? 'Notificări' : 'Notifications'} noIndex>
+  <div class="max-w-2xl mx-auto px-4 py-10">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">{isEl ? 'Ειδοποιήσεις' : isBg ? 'Известия' : isSr ? 'Обавештења' : isTr ? 'Bildirimler' : isRo ? 'Notificări' : 'Notifications'}</h1>
+        <p class="text-sm text-gray-500 mt-1">{(notifications ?? []).length} {isEl ? 'ειδοποιήσεις' : isBg ? 'известия' : isSr ? 'обавештења' : isTr ? 'bildirim' : isRo ? 'notificări' : 'notifications'}</p>
+      </div>
+      <a href="/account" class="text-sm text-gray-500 hover:text-gray-700">&larr; {isEl ? 'Λογαριασμός' : isBg ? 'Моят акаунт' : isSr ? 'Мој налог' : isTr ? 'Hesabım' : isRo ? 'Contul Meu' : 'My Account'}</a>
+    </div>
+
+    {(!notifications || notifications.length === 0) ? (
+      <div class="text-center py-16">
+        <p class="text-4xl mb-3">🔔</p>
+        <p class="text-gray-500">{isEl ? 'Δεν υπάρχουν ειδοποιήσεις' : isBg ? 'Все още няма известия' : isSr ? 'Још нема обавештења' : isTr ? 'Henüz bildirim yok' : isRo ? 'Nicio notificare încă' : 'No notifications yet'}</p>
+      </div>
+    ) : (
+      <div class="space-y-1">
+        {notifications.map((n: any) => {
+          const href = getNotifHref(n);
+          return (
+            <a href={href} class={`flex items-start gap-3 p-3 rounded-xl transition-colors ${n.is_read ? 'hover:bg-gray-50' : 'bg-blue-50/50 hover:bg-blue-50'}`}>
+              <div class="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center text-sm font-bold overflow-hidden flex-shrink-0">
+                {n.actor_avatar ? (
+                  <img src={n.actor_avatar} alt="" class="w-full h-full object-cover" />
+                ) : (
+                  <span class="text-gray-500">{n.actor_name?.[0]?.toUpperCase() ?? '?'}</span>
+                )}
+              </div>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm text-gray-900">
+                  <span class="font-semibold">{n.actor_name}</span>{' '}
+                  {typeLabels[n.type] ?? n.type}
+                </p>
+                {n.message && <p class="text-xs text-gray-500 mt-0.5 line-clamp-1">"{n.message}"</p>}
+                <p class="text-[11px] text-gray-400 mt-1">{typeIcons[n.type] ?? '🔔'} {timeAgo(n.created_at)}</p>
+              </div>
+              {!n.is_read && (
+                <div class="w-2.5 h-2.5 bg-blue-500 rounded-full flex-shrink-0 mt-1.5"></div>
+              )}
+            </a>
+          );
+        })}
+      </div>
+    )}
+  </div>
+</BaseLayout>

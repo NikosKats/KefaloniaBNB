@@ -1,0 +1,267 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isBg = lang === 'bg';
+const isEl = lang === 'el';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://kefaloniabnb.com';
+const effectiveDate = '1 June 2025';
+
+const tLegal = isEl ? 'Νομικά' : isBg ? 'Правна информация' : isSr ? 'Правне информације' : isTr ? 'Yasal' : isRo ? 'Juridic' : 'Legal';
+const tTitle = isEl ? 'Όροι Χρήσης' : isBg ? 'Условия за ползване' : isSr ? 'Услови коришћења' : isTr ? 'Kullanım Koşulları' : isRo ? 'Termeni și Condiții' : 'Terms of Service';
+const tEffective = isEl ? 'Ημερομηνία ισχύος' : isBg ? 'Дата на влизане в сила' : isSr ? 'Датум ступања на снагу' : isTr ? 'Yürürlük tarihi' : isRo ? 'În vigoare' : 'Effective date';
+const tUpdated = isEl ? 'Τελευταία ενημέρωση' : isBg ? 'Последна актуализация' : isSr ? 'Последње ажурирање' : isTr ? 'Son güncelleme' : isRo ? 'Actualizat' : 'Last updated';
+const tLegalNote = isEl ? 'Οι παρόντες όροι είναι διαθέσιμοι στα Αγγλικά ως νομικά δεσμευτικό κείμενο.' : isBg ? 'Тези условия са достъпни на английски като правно обвързващ документ.' : isSr ? 'Ови услови су доступни на енглеском као правно обавезујући документ.' : isTr ? 'Bu koşullar yasal olarak bağlayıcı metin olarak İngilizce olarak sunulmaktadır.' : isRo ? 'Această politică este disponibilă în engleză ca document obligatoriu din punct de vedere juridic.' : '';
+
+const schemas = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'Terms of Service', item: `${siteUrl}/terms` },
+    ],
+  },
+];
+---
+
+<BaseLayout
+  title="Terms of Service — KefaloniaBNB"
+  description="Read the Terms of Service for KefaloniaBNB. By using our platform you agree to these terms governing bookings, payments, liability, and the relationship between guests and property owners."
+  schema={schemas}
+>
+
+  <!-- Hero -->
+  <section class="relative bg-[#1a1a2e] overflow-hidden">
+    <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(ellipse at 70% 50%, #c9a96e 0%, transparent 60%);"></div>
+    <div class="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 text-center">
+      <p class="text-[#c9a96e] text-xs font-semibold uppercase tracking-[0.2em] mb-4">{tLegal}</p>
+      <h1 class="text-4xl sm:text-5xl font-bold text-white leading-tight mb-6">{tTitle}</h1>
+      <p class="text-white/50 text-sm">{tEffective}: {effectiveDate} &nbsp;·&nbsp; {tUpdated}: {effectiveDate}</p>
+      {tLegalNote && <p class="text-white/40 text-xs mt-3">{tLegalNote}</p>}
+    </div>
+  </section>
+
+  <!-- Body -->
+  <section class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
+
+    <div class="prose prose-gray max-w-none
+      prose-headings:font-bold prose-headings:text-gray-900
+      prose-h2:text-2xl prose-h2:mt-14 prose-h2:mb-4 prose-h2:pb-2 prose-h2:border-b prose-h2:border-gray-100
+      prose-h3:text-lg prose-h3:mt-8 prose-h3:mb-3
+      prose-p:text-gray-600 prose-p:leading-relaxed
+      prose-li:text-gray-600 prose-li:leading-relaxed
+      prose-a:text-[#c9a96e] prose-a:no-underline hover:prose-a:underline
+      prose-strong:text-gray-800">
+
+      <p class="text-gray-500 text-sm bg-amber-50 border border-amber-100 rounded-lg px-5 py-4 not-prose mb-10">
+        <strong class="text-amber-800">Please read these Terms carefully before using KefaloniaBNB.</strong>
+        By accessing or using the website at <a href={siteUrl} class="text-[#c9a96e]">kefaloniabnb.com</a> or making a booking through any channel we operate, you confirm that you have read, understood, and agree to be bound by these Terms. If you do not agree, do not use the platform.
+      </p>
+
+      <!-- 1 -->
+      <h2>1. About KefaloniaBNB</h2>
+      <p>
+        KefaloniaBNB ("<strong>we</strong>", "<strong>us</strong>", "<strong>our</strong>", or the "<strong>Platform</strong>") is an online marketplace that connects travellers ("<strong>Guests</strong>") with independent property owners and managers ("<strong>Owners</strong>") who offer short-term rental accommodation ("<strong>Listings</strong>") in and around Kefalonia and Keramoti, Greece.
+      </p>
+      <p>
+        <strong>KefaloniaBNB is a technology intermediary, not a property owner, travel agent, real-estate agent, or accommodation provider.</strong> We do not own, control, operate, manage, offer, or supply any Listings. We are not a party to the rental agreement formed between a Guest and an Owner when a booking is made.
+      </p>
+
+      <!-- 2 -->
+      <h2>2. Eligibility</h2>
+      <p>You must be at least 18 years old and legally capable of entering into binding contracts to use the Platform. By using the Platform you represent and warrant that you meet these requirements. We reserve the right to refuse service to anyone at any time, for any reason, at our sole discretion.</p>
+
+      <!-- 3 -->
+      <h2>3. The Booking Contract</h2>
+      <h3>3.1 Direct contract between Guest and Owner</h3>
+      <p>
+        When a booking is confirmed — whether through an instant-booking payment, a bank transfer, or a Telegram Direct agreement — a <strong>legally binding rental contract is formed directly and exclusively between the Guest and the Owner</strong>. KefaloniaBNB is not a party to that contract and accepts no obligations arising from it.
+      </p>
+      <h3>3.2 Our role</h3>
+      <p>
+        Our role is limited to: (a) hosting the Listing on the Platform; (b) providing booking and communication tools; (c) facilitating payment processing where applicable; and (d) sending informational messages to Guest and Owner. We make no warranty or representation regarding the accuracy of any Listing description, the condition or suitability of any property, the identity of any Owner or Guest, or the outcome of any stay.
+      </p>
+      <h3>3.3 Telegram Direct bookings</h3>
+      <p>
+        Some Listings are available exclusively through our Telegram Direct channel. For such bookings, the Owner accepts or declines the request, and all payment terms are agreed privately between Guest and Owner outside of any payment system operated by KefaloniaBNB. We are not involved in, responsible for, or able to enforce any such payment or agreement.
+      </p>
+
+      <!-- 4 -->
+      <h2>4. Payments</h2>
+      <h3>4.1 Stripe payments</h3>
+      <p>
+        Where online payment is available, payments are processed by Stripe, Inc., a third-party payment processor. By submitting payment you also agree to Stripe's terms and privacy policy. We do not store full card details. Transaction fees charged by Stripe are non-refundable in the event of cancellation.
+      </p>
+      <h3>4.2 Bank transfers and offline payments</h3>
+      <p>
+        Where a Guest pays by bank transfer, cash, or any other offline method (including payments agreed through Telegram Direct), the Guest sends funds directly to the Owner. <strong>KefaloniaBNB does not handle, receive, hold, or guarantee such funds in any way.</strong> We accept no liability for loss, non-receipt, or dispute arising from offline payments.
+      </p>
+      <h3>4.3 Pricing</h3>
+      <p>
+        Listing prices are set by Owners and may change at any time. A confirmed booking locks the price agreed at time of confirmation. We are not responsible for pricing errors or for any difference between a displayed price and an amount charged by an Owner outside the Platform.
+      </p>
+
+      <!-- 5 -->
+      <h2>5. Cancellations and Refunds</h2>
+      <p>
+        Each Listing may have its own cancellation policy, set by the Owner and displayed on the Listing page at time of booking. <strong>Cancellation and refund terms are governed exclusively by the policy in force at booking confirmation.</strong> KefaloniaBNB does not administer refunds for payments made directly to an Owner. For payments processed through Stripe, any refund is subject to the applicable cancellation policy and is at the Owner's discretion, facilitated by us only where technically possible.
+      </p>
+      <p>
+        We reserve the right to cancel any booking at any time, for any reason including but not limited to fraudulent activity, safety concerns, or Owner request. In such cases our liability is limited to refunding any amount received by us through our own payment infrastructure; we accept no liability beyond that amount.
+      </p>
+
+      <!-- 6 -->
+      <h2>6. Guest Responsibilities</h2>
+      <p>By making a booking, the Guest agrees to:</p>
+      <ul>
+        <li>Provide accurate personal and contact information.</li>
+        <li>Pay the agreed amount in full, by the agreed method and deadline.</li>
+        <li>Comply with all house rules, check-in and check-out times, and occupancy limits specified by the Owner.</li>
+        <li>Treat the property and its contents with care and respect, leaving it in the same condition as found.</li>
+        <li>Reimburse the Owner directly for any damage caused during the stay beyond fair wear and tear.</li>
+        <li>Not use the property for any unlawful purpose or in any way that may cause nuisance, damage, or danger.</li>
+        <li>Ensure that all members of the party comply with these obligations.</li>
+      </ul>
+      <p>
+        <strong>KefaloniaBNB is not responsible for, and shall not be involved in, resolving any dispute between Guest and Owner regarding damage, cleaning, loss of personal items, noise complaints, or any other matter arising during or after a stay.</strong> Such disputes are strictly between the Guest and the Owner.
+      </p>
+
+      <!-- 7 -->
+      <h2>7. Owner Responsibilities</h2>
+      <p>By listing a property on the Platform, the Owner agrees to:</p>
+      <ul>
+        <li>Ensure all Listing information (description, photos, pricing, availability, house rules, check-in instructions) is accurate, complete, and up to date.</li>
+        <li>Hold all necessary permits, licences, and insurance required by Greek law to rent the property on a short-term basis.</li>
+        <li>Provide the property in a clean, safe, and habitable condition matching the Listing description.</li>
+        <li>Honour confirmed bookings. Cancellation of a confirmed booking by an Owner may result in removal from the Platform at our discretion.</li>
+        <li>Handle all guest damage claims, security deposits, and disputes directly with the Guest.</li>
+        <li>Comply with all applicable Greek tax, tourism, and rental regulations, including registration with the Greek Short-Term Rental Registry (AADE) where required.</li>
+      </ul>
+
+      <!-- 8 -->
+      <h2>8. Property Damage</h2>
+      <p>
+        <strong>KefaloniaBNB does not provide, arrange, or act as an insurer for property damage.</strong> Any damage caused by a Guest to a property is a matter exclusively between the Guest and the Owner. We strongly encourage Owners to: (a) require a security deposit directly from Guests; (b) maintain adequate property insurance that covers short-term rental use; and (c) document property condition before and after each stay.
+      </p>
+      <p>
+        We accept no liability whatsoever for damage to property, theft, vandalism, or any loss suffered by an Owner as a result of hosting a Guest found through the Platform.
+      </p>
+
+      <!-- 9 -->
+      <h2>9. Fraud and Scams</h2>
+      <p>
+        We implement reasonable measures to verify Listings and monitor platform activity, but we <strong>cannot guarantee the identity, intentions, or conduct of any Owner or Guest</strong>. By using the Platform you acknowledge and accept that:
+      </p>
+      <ul>
+        <li>You are responsible for conducting your own due diligence before making or accepting a payment.</li>
+        <li>KefaloniaBNB will never ask you to make a payment outside the Platform by an unofficial channel (e.g. wire transfer to an unknown account).</li>
+        <li>If you receive any communication requesting payment through unusual means, you should treat it as suspicious and contact us immediately at <a href="mailto:info@kefaloniabnb.com">info@kefaloniabnb.com</a>.</li>
+        <li>KefaloniaBNB is not liable for any financial loss resulting from fraud or deception carried out by a third party, including another user of the Platform.</li>
+      </ul>
+      <p>
+        <strong>We accept no responsibility for any loss arising from fraudulent bookings, identity theft, phishing, or any other form of scam, regardless of how that scam was facilitated.</strong>
+      </p>
+
+      <!-- 10 -->
+      <h2>10. Limitation of Liability</h2>
+      <p>
+        To the fullest extent permitted by applicable law:
+      </p>
+      <ul>
+        <li>The Platform and all content, tools, and services are provided "<strong>as is</strong>" and "<strong>as available</strong>" without warranties of any kind, express or implied.</li>
+        <li>We do not warrant that the Platform will be uninterrupted, error-free, or free of viruses or other harmful components.</li>
+        <li>We are not liable for any indirect, incidental, special, consequential, or punitive damages, including but not limited to loss of profits, loss of data, loss of goodwill, personal injury, or property damage, arising out of or in connection with your use of the Platform or any booking made through it.</li>
+        <li>Our total aggregate liability to you for any claim arising out of or relating to these Terms or your use of the Platform shall not exceed the amount of any booking service fee, if any, actually paid by you to KefaloniaBNB in the twelve (12) months preceding the claim.</li>
+        <li>We are not liable for the acts or omissions of any Guest, Owner, or third-party service provider (including Stripe), nor for any personal injury, illness, accident, death, loss, delay, cancellation, or inconvenience that may arise in connection with any stay.</li>
+      </ul>
+
+      <!-- 11 -->
+      <h2>11. Indemnification</h2>
+      <p>
+        You agree to defend, indemnify, and hold harmless KefaloniaBNB and its directors, employees, agents, and affiliates from and against any claims, liabilities, damages, losses, and expenses (including reasonable legal fees) arising out of or in any way connected with: (a) your use of the Platform; (b) your breach of these Terms; (c) any booking you make or accept; (d) your conduct at or in relation to any property; or (e) any content you submit to the Platform.
+      </p>
+
+      <!-- 12 -->
+      <h2>12. Reviews and User Content</h2>
+      <p>
+        Guests and Owners may be invited to submit reviews and ratings. By submitting content you grant us a perpetual, royalty-free, worldwide licence to display, reproduce, and adapt that content on the Platform. You are solely responsible for the accuracy and legality of content you submit. We reserve the right to remove any content at our discretion, without notice or liability.
+      </p>
+
+      <!-- 13 -->
+      <h2>13. Intellectual Property</h2>
+      <p>
+        All content on the Platform — including text, graphics, logos, photographs, and software — is owned by or licensed to KefaloniaBNB and protected by Greek and EU intellectual property law. You may not reproduce, distribute, or create derivative works without our express written permission.
+      </p>
+
+      <!-- 14 -->
+      <h2>14. Privacy</h2>
+      <p>
+        Your use of the Platform is also governed by our <a href="/privacy">Privacy Policy</a>, which is incorporated into these Terms by reference. By using the Platform you consent to the collection and use of your data as described therein.
+      </p>
+
+      <!-- 15 -->
+      <h2>15. Third-Party Links and Services</h2>
+      <p>
+        The Platform may contain links to third-party websites or integrate third-party services (including Stripe, Supabase, Telegram, and others). These are provided for convenience only. We have no control over third-party services and accept no responsibility for their content, privacy practices, or availability. Your use of any third-party service is at your own risk and subject to that third party's own terms.
+      </p>
+
+      <!-- 16 -->
+      <h2>16. Force Majeure</h2>
+      <p>
+        We shall not be liable for any failure or delay in performing our obligations where such failure or delay results from any cause beyond our reasonable control, including but not limited to: natural disasters, acts of God, war, civil unrest, pandemic, government action, strikes, or failure of third-party infrastructure.
+      </p>
+
+      <!-- 17 -->
+      <h2>17. Amendments</h2>
+      <p>
+        We reserve the right to modify these Terms at any time. We will publish the revised Terms on this page with an updated effective date. Your continued use of the Platform after any change constitutes your acceptance of the new Terms. If you do not agree to any change, you must stop using the Platform.
+      </p>
+
+      <!-- 18 -->
+      <h2>18. Termination</h2>
+      <p>
+        We may suspend or terminate your access to the Platform at any time, with or without cause or notice, including if we believe you have violated these Terms. Upon termination all provisions that by their nature should survive (including limitation of liability, indemnification, and governing law) shall survive.
+      </p>
+
+      <!-- 19 -->
+      <h2>19. Governing Law and Jurisdiction</h2>
+      <p>
+        These Terms are governed by and construed in accordance with the laws of the <strong>Hellenic Republic (Greece)</strong>. Any dispute arising out of or relating to these Terms or your use of the Platform shall be subject to the exclusive jurisdiction of the courts of <strong>Kefalonia, Greece</strong>, without prejudice to any mandatory consumer protection rights you may have under EU law.
+      </p>
+
+      <!-- 20 -->
+      <h2>20. Severability</h2>
+      <p>
+        If any provision of these Terms is found to be invalid, illegal, or unenforceable by a court of competent jurisdiction, that provision shall be severed and the remaining provisions shall continue in full force and effect.
+      </p>
+
+      <!-- 21 -->
+      <h2>21. Entire Agreement</h2>
+      <p>
+        These Terms, together with the Privacy Policy and any other policies published on the Platform, constitute the entire agreement between you and KefaloniaBNB with respect to the subject matter herein and supersede all prior or contemporaneous agreements, representations, or understandings.
+      </p>
+
+      <!-- 22 -->
+      <h2>22. Contact</h2>
+      <p>
+        Questions about these Terms may be directed to:
+      </p>
+      <p>
+        <strong>KefaloniaBNB</strong><br />
+        Email: <a href="mailto:info@kefaloniabnb.com">info@kefaloniabnb.com</a><br />
+        Website: <a href={siteUrl}>{siteUrl}</a>
+      </p>
+
+      <div class="not-prose mt-16 pt-8 border-t border-gray-100 text-sm text-gray-400">
+        These Terms were last updated on {effectiveDate}. Prior versions are available on request.
+      </div>
+
+    </div>
+  </section>
+
+</BaseLayout>

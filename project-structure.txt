@@ -1,0 +1,158 @@
+.
+├── DEPLOYMENT.md
+├── README.md
+├── astro.config.mjs
+├── package-lock.json
+├── package.json
+├── project-structure.txt
+├── public
+│   ├── _headers
+│   ├── favicon.ico
+│   └── favicon.svg
+├── scripts
+│   └── inject-routes.cjs
+├── src
+│   ├── components
+│   │   ├── admin
+│   │   ├── booking
+│   │   ├── listing
+│   │   │   ├── AmenitiesGrid.astro
+│   │   │   ├── AvailabilityCalendar.astro
+│   │   │   ├── BookingWidget.astro
+│   │   │   ├── Gallery.astro
+│   │   │   ├── ListingCard.astro
+│   │   │   └── ReviewsSection.astro
+│   │   └── shared
+│   │       ├── Footer.astro
+│   │       ├── Header.astro
+│   │       ├── LanguageSwitcher.astro
+│   │       └── StarRating.astro
+│   ├── env.d.ts
+│   ├── i18n
+│   │   └── translations.ts
+│   ├── layouts
+│   │   ├── AdminLayout.astro
+│   │   └── BaseLayout.astro
+│   ├── lib
+│   │   ├── availability.ts
+│   │   ├── email.ts
+│   │   ├── ical.ts
+│   │   ├── pricing.ts
+│   │   ├── stripe.ts
+│   │   ├── supabase.ts
+│   │   ├── telegram.ts
+│   │   └── validators.ts
+│   ├── middleware
+│   │   └── index.ts
+│   ├── pages
+│   │   ├── [policySlug].astro
+│   │   ├── about.astro
+│   │   ├── admin
+│   │   │   ├── banner
+│   │   │   │   └── index.astro
+│   │   │   ├── bookings
+│   │   │   │   ├── [id].astro
+│   │   │   │   └── index.astro
+│   │   │   ├── calendar
+│   │   │   ├── content.astro
+│   │   │   ├── coupons.astro
+│   │   │   ├── index.astro
+│   │   │   ├── listings
+│   │   │   │   ├── [id]
+│   │   │   │   │   └── availability.astro
+│   │   │   │   ├── [id].astro
+│   │   │   │   └── index.astro
+│   │   │   ├── login.astro
+│   │   │   ├── owners
+│   │   │   │   └── index.astro
+│   │   │   ├── payouts.astro
+│   │   │   ├── platform.astro
+│   │   │   ├── profile.astro
+│   │   │   ├── reviews.astro
+│   │   │   └── telegram.astro
+│   │   ├── api
+│   │   │   ├── admin
+│   │   │   │   ├── banner.ts
+│   │   │   │   ├── content
+│   │   │   │   │   ├── delete.ts
+│   │   │   │   │   └── save.ts
+│   │   │   │   ├── coupons
+│   │   │   │   │   ├── create.ts
+│   │   │   │   │   ├── delete.ts
+│   │   │   │   │   └── toggle.ts
+│   │   │   │   ├── owners
+│   │   │   │   │   └── invite.ts
+│   │   │   │   └── telegram
+│   │   │   │       ├── add.ts
+│   │   │   │       ├── delete.ts
+│   │   │   │       ├── test.ts
+│   │   │   │       └── toggle.ts
+│   │   │   ├── auth
+│   │   │   │   ├── login.ts
+│   │   │   │   └── logout.ts
+│   │   │   ├── availability
+│   │   │   │   ├── block.ts
+│   │   │   │   └── index.ts
+│   │   │   ├── bookings
+│   │   │   │   ├── [id].ts
+│   │   │   │   └── create.ts
+│   │   │   ├── coupons
+│   │   │   │   └── validate.ts
+│   │   │   ├── cron
+│   │   │   │   └── checkin-reminder.ts
+│   │   │   ├── inquiries
+│   │   │   │   └── create.ts
+│   │   │   ├── listings
+│   │   │   │   ├── [id]
+│   │   │   │   │   ├── ical.ts
+│   │   │   │   │   └── index.ts
+│   │   │   │   ├── images
+│   │   │   │   │   └── [imageId].ts
+│   │   │   │   └── index.ts
+│   │   │   ├── reviews
+│   │   │   │   └── [id].ts
+│   │   │   ├── stripe
+│   │   │   │   ├── connect
+│   │   │   │   │   ├── callback.ts
+│   │   │   │   │   ├── disconnect.ts
+│   │   │   │   │   └── onboard.ts
+│   │   │   │   └── webhook.ts
+│   │   │   ├── telegram
+│   │   │   │   ├── register.ts
+│   │   │   │   └── webhook.ts
+│   │   │   └── upload
+│   │   │       └── image.ts
+│   │   ├── area-guide.astro
+│   │   ├── book
+│   │   │   ├── [listingId].astro
+│   │   │   └── success.astro
+│   │   ├── contact.astro
+│   │   ├── faq.astro
+│   │   ├── faqs.astro
+│   │   ├── index.astro
+│   │   ├── listings
+│   │   │   └── index.astro
+│   │   ├── robots.txt.ts
+│   │   ├── sitemap.xml.ts
+│   │   └── villas
+│   │       ├── [slug].astro
+│   │       └── index.astro
+│   ├── styles
+│   │   └── global.css
+│   └── types
+│       └── index.ts
+├── supabase
+│   ├── config.toml
+│   └── migrations
+│       ├── 001_initial_schema.sql
+│       ├── 002_telegram_message_id.sql
+│       ├── 003_kefalonia_apartment.sql
+│       ├── 004_payment_method.sql
+│       ├── 005_telegram_channels.sql
+│       ├── 006_storage_bucket.sql
+│       ├── 007_listing_i18n.sql
+│       └── 008_multi_owner.sql
+├── tsconfig.json
+└── wrangler.toml
+
+48 directories, 108 files

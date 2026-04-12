@@ -1,0 +1,837 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+import qrcode from 'qrcode-generator';
+
+// Generate QR module grid (array of rows, each row is array of booleans)
+function makeQR(url: string): number[][] {
+  const qr = qrcode(0, 'M');
+  qr.addData(url);
+  qr.make();
+  const count = qr.getModuleCount();
+  const modules: number[][] = [];
+  for (let y = 0; y < count; y++) {
+    const row: number[] = [];
+    for (let x = 0; x < count; x++) row.push(qr.isDark(y, x) ? 1 : 0);
+    modules.push(row);
+  }
+  return modules;
+}
+
+const profile = Astro.locals.profile!;
+const role = profile.role;
+if (!['admin', 'super_admin', 'property_owner', 'restaurant_owner'].includes(role)) return Astro.redirect('/admin');
+
+const service = getServiceClient();
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://kefaloniabnb.com';
+
+// Fetch listings for this user (or all for admin) — not for restaurant_owner
+let allListings: any[] = [];
+if (role !== 'restaurant_owner') {
+  let listingsQuery = service
+    .from('listings')
+    .select('id, slug, title, city, google_place_id, owner_id')
+    .eq('is_active', true)
+    .order('title');
+
+  if (role === 'property_owner') {
+    const ownerIds = Astro.locals.ownerListingIds ?? [];
+    if (ownerIds.length > 0) {
+      listingsQuery = listingsQuery.in('id', ownerIds);
+    } else {
+      listingsQuery = listingsQuery.eq('id', '00000000-0000-0000-0000-000000000000');
+    }
+  }
+
+  const { data: listings } = await listingsQuery;
+  allListings = listings ?? [];
+}
+
+// Fetch restaurants for restaurant_owner (or all for admin)
+let allRestaurants: any[] = [];
+if (role !== 'property_owner') {
+  let restQuery = service
+    .from('restaurants')
+    .select('id, slug, name, city, google_place_id, owner_id, cover_photo, is_active')
+    .order('name');
+
+  // Restaurant owners only see their own active restaurants
+  if (role === 'restaurant_owner') {
+    restQuery = restQuery.eq('is_active', true);
+  }
+
+  if (role === 'restaurant_owner') {
+    const ownerIds = Astro.locals.ownerRestaurantIds ?? [];
+    if (ownerIds.length > 0) {
+      restQuery = restQuery.in('id', ownerIds);
+    } else {
+      restQuery = restQuery.eq('id', '00000000-0000-0000-0000-000000000000');
+    }
+  }
+
+  const { data: restaurants } = await restQuery;
+  allRestaurants = restaurants ?? [];
+}
+
+// Community QR codes — admin/super_admin only
+const isSuperOrAdmin = ['admin', 'super_admin'].includes(role);
+const communityQRs = isSuperOrAdmin ? [
+  { url: `${siteUrl}/community/join`, label: 'JOIN COMMUNITY', color: '#7c3aed', title: 'Join Community', desc: 'Sign up and become a member', filename: 'join-community' },
+  { url: `${siteUrl}/community/board`, label: 'COMMUNITY BOARD', color: '#2563eb', title: 'Community Board', desc: 'Browse posts and discussions', filename: 'community-board' },
+  { url: `${siteUrl}/community/reports`, label: 'LOCAL REPORTS', color: '#059669', title: 'Local Reports', desc: 'Beach & weather reports', filename: 'community-reports' },
+  { url: `${siteUrl}/community/restaurants`, label: 'RESTAURANTS', color: '#ea580c', title: 'Restaurants', desc: 'Discover local restaurants', filename: 'community-restaurants' },
+  { url: `${siteUrl}/community/technicians`, label: 'TECHNICIANS', color: '#0891b2', title: 'Technicians', desc: 'Find local professionals', filename: 'community-technicians' },
+  { url: siteUrl, label: 'KEFALONIA RENTALS', color: '#1a1a2e', title: 'kefaloniabnb.com', desc: 'Book directly for the best rates', filename: 'kefaloniabnb-home' },
+].map(q => ({ ...q, qr: JSON.stringify(makeQR(q.url)) })) : [];
+
+// Business & Partner QR codes — admin/super_admin only
+const businessQRs = isSuperOrAdmin ? [
+  { url: `${siteUrl}/partner-with-us`, label: 'PARTNER WITH US', color: '#7c3aed', title: 'Partner With Us', desc: 'List your business on kefaloniabnb.com', filename: 'partner-with-us' },
+  { url: `${siteUrl}/for-owners`, label: 'FOR OWNERS', color: '#1a1a2e', title: 'For Property Owners', desc: 'Earn more from your property', filename: 'for-owners' },
+  { url: `${siteUrl}/for-restaurant-owners`, label: 'FOR RESTAURANTS', color: '#ea580c', title: 'For Restaurant Owners', desc: 'List your restaurant for free', filename: 'for-restaurant-owners' },
+  { url: `${siteUrl}/list-your-property`, label: 'LIST PROPERTY', color: '#059669', title: 'List Your Property', desc: 'Submit your property listing', filename: 'list-your-property' },
+  { url: `${siteUrl}/become-a-cleaner`, label: 'BECOME A CLEANER', color: '#0891b2', title: 'Become a Cleaner', desc: 'Join our cleaning team', filename: 'become-a-cleaner' },
+].map(q => ({ ...q, qr: JSON.stringify(makeQR(q.url)) })) : [];
+
+// Technician QR codes — admin/super_admin only
+let allTechnicians: any[] = [];
+if (isSuperOrAdmin) {
+  const { data: techs } = await service
+    .from('technicians')
+    .select('id, name, phone, technician_categories(name_en)')
+    .eq('is_active', true)
+    .order('name');
+  allTechnicians = techs ?? [];
+}
+---
+
+<AdminLayout title="QR Codes">
+  <p class="text-sm text-gray-500 mb-4">
+    Generate QR codes for your properties and restaurants. Print them and place in your venue, on flyers, or business cards.
+    Guests scan to book directly or leave reviews — all through kefaloniabnb.com.
+  </p>
+
+  {/* Template selector */}
+  <div class="bg-white rounded-2xl border border-gray-100 p-4 mb-6">
+    <div class="flex items-center gap-3 flex-wrap">
+      <span class="text-sm font-semibold text-gray-700">Style:</span>
+      <button class="tmpl-btn px-3 py-1.5 text-xs font-semibold rounded-lg border-2" style="border-color:#1a1a2e;background:#1a1a2e;color:#fff" data-template="classic">Classic</button>
+      <button class="tmpl-btn px-3 py-1.5 text-xs font-semibold rounded-lg border-2" style="border-color:#e5e7eb;background:#fff;color:#6b7280" data-template="modern">Modern</button>
+      <button class="tmpl-btn px-3 py-1.5 text-xs font-semibold rounded-lg border-2" style="border-color:#e5e7eb;background:#fff;color:#6b7280" data-template="minimal">Minimal</button>
+      <button class="tmpl-btn px-3 py-1.5 text-xs font-semibold rounded-lg border-2" style="border-color:#e5e7eb;background:#fff;color:#6b7280" data-template="rounded">Rounded</button>
+      <button class="tmpl-btn px-3 py-1.5 text-xs font-semibold rounded-lg border-2" style="border-color:#e5e7eb;background:#fff;color:#6b7280" data-template="dark">Dark</button>
+    </div>
+  </div>
+
+  {allListings.length === 0 && allRestaurants.length === 0 && (
+    <div class="text-center py-16 text-gray-400">
+      <p class="text-4xl mb-3">📱</p>
+      <p class="font-medium">No active listings or restaurants found</p>
+    </div>
+  )}
+
+  <div class="space-y-8">
+    {allListings.map((listing: any) => {
+      const bookUrl = `${siteUrl}/rentals/${listing.slug}`;
+      const listingUrl = `${siteUrl}/rentals/${listing.slug}`;
+      const reviewUrl = `${siteUrl}/review/${listing.slug}`;
+      const googleReviewUrl = listing.google_place_id
+        ? `https://search.google.com/local/writereview?placeid=${listing.google_place_id}`
+        : null;
+      const bookQR = JSON.stringify(makeQR(bookUrl));
+      const listingQR = JSON.stringify(makeQR(listingUrl));
+      const reviewQR = JSON.stringify(makeQR(reviewUrl));
+      const googleQR = googleReviewUrl ? JSON.stringify(makeQR(googleReviewUrl)) : null;
+
+      return (
+        <div class="bg-white rounded-2xl border border-gray-100 p-6">
+          <div class="flex items-center gap-3 mb-5">
+            <span class="text-xl">🏡</span>
+            <div>
+              <h2 class="font-semibold text-gray-900">{listing.title}</h2>
+              {listing.city && <p class="text-xs text-gray-400">{listing.city}</p>}
+            </div>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+
+            {/* Book Now QR */}
+            <div class="text-center">
+              <div class="bg-gray-50 rounded-2xl p-4 mb-3">
+                <canvas
+                  class="qr-canvas mx-auto"
+                  data-qr={bookQR}
+                  data-label="BOOK NOW"
+                  data-color="#1a1a2e"
+                  width="280" height="340"
+                ></canvas>
+              </div>
+              <p class="text-sm font-semibold text-gray-900 mb-1">Book Now</p>
+              <p class="text-xs text-gray-400 mb-3 break-all">{bookUrl}</p>
+              <div class="flex gap-2 justify-center">
+                <button class="download-qr px-3 py-1.5 bg-[#1a1a2e] text-white text-xs font-semibold rounded-lg hover:bg-[#2d2d4e] transition-colors" data-filename={`book-${listing.slug}.png`}>
+                  Download PNG
+                </button>
+                <button class="print-qr px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                  Print
+                </button>
+              </div>
+            </div>
+
+            {/* View Listing QR */}
+            <div class="text-center">
+              <div class="bg-gray-50 rounded-2xl p-4 mb-3">
+                <canvas
+                  class="qr-canvas mx-auto"
+                  data-qr={listingQR}
+                  data-label="VIEW LISTING"
+                  data-color="#2563eb"
+                  width="280" height="340"
+                ></canvas>
+              </div>
+              <p class="text-sm font-semibold text-gray-900 mb-1">View Listing</p>
+              <p class="text-xs text-gray-400 mb-3 break-all">{listingUrl}</p>
+              <div class="flex gap-2 justify-center">
+                <button class="download-qr px-3 py-1.5 bg-[#1a1a2e] text-white text-xs font-semibold rounded-lg hover:bg-[#2d2d4e] transition-colors" data-filename={`listing-${listing.slug}.png`}>
+                  Download PNG
+                </button>
+                <button class="print-qr px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                  Print
+                </button>
+              </div>
+            </div>
+
+            {/* Review QR */}
+            <div class="text-center">
+              <div class="bg-gray-50 rounded-2xl p-4 mb-3">
+                <canvas
+                  class="qr-canvas mx-auto"
+                  data-qr={reviewQR}
+                  data-label="LEAVE A REVIEW"
+                  data-color="#059669"
+                  width="280" height="340"
+                ></canvas>
+              </div>
+              <p class="text-sm font-semibold text-gray-900 mb-1">Leave a Review</p>
+              <p class="text-xs text-gray-400 mb-3 break-all">{reviewUrl}</p>
+              <div class="flex gap-2 justify-center">
+                <button class="download-qr px-3 py-1.5 bg-[#1a1a2e] text-white text-xs font-semibold rounded-lg hover:bg-[#2d2d4e] transition-colors" data-filename={`review-${listing.slug}.png`}>
+                  Download PNG
+                </button>
+                <button class="print-qr px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                  Print
+                </button>
+              </div>
+            </div>
+
+            {/* Google Review QR */}
+            {googleReviewUrl ? (
+              <div class="text-center">
+                <div class="bg-gray-50 rounded-2xl p-4 mb-3">
+                  <canvas
+                    class="qr-canvas mx-auto"
+                    data-qr={googleQR}
+                    data-label="GOOGLE REVIEW"
+                    data-color="#ea4335"
+                    width="280" height="340"
+                  ></canvas>
+                </div>
+                <p class="text-sm font-semibold text-gray-900 mb-1">Google Review</p>
+                <p class="text-xs text-gray-400 mb-3">Direct to Google Maps review</p>
+                <div class="flex gap-2 justify-center">
+                  <button class="download-qr px-3 py-1.5 bg-[#1a1a2e] text-white text-xs font-semibold rounded-lg hover:bg-[#2d2d4e] transition-colors" data-filename={`google-review-${listing.slug}.png`}>
+                    Download PNG
+                  </button>
+                  <button class="print-qr px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                    Print
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div class="text-center border-2 border-dashed border-gray-200 rounded-2xl p-6 flex flex-col items-center justify-center">
+                <span class="text-3xl mb-2 opacity-40">🔍</span>
+                <p class="text-sm font-medium text-gray-400 mb-1">Google Review QR</p>
+                <p class="text-xs text-gray-400 mb-3">Add your Google Place ID to enable</p>
+                <input
+                  type="text"
+                  class="google-place-input w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-400 mb-2"
+                  data-listing-id={listing.id}
+                  placeholder="Google Place ID (e.g. ChIJ...)"
+                />
+                <button
+                  class="save-place-id px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                  data-listing-id={listing.id}
+                >
+                  Save Place ID
+                </button>
+                <a href="https://developers.google.com/maps/documentation/places/web-service/place-id" target="_blank" class="text-[10px] text-blue-500 hover:underline mt-2">
+                  How to find your Place ID
+                </a>
+              </div>
+            )}
+
+          </div>
+
+          {/* Printable flyer — all QR codes */}
+          <div class="mt-6 pt-5 border-t border-gray-100 flex items-center justify-between">
+            <p class="text-xs text-gray-400">Print a flyer with all QR codes for this property</p>
+            <button
+              class="print-flyer px-4 py-2 bg-[#1a1a2e] text-white text-xs font-semibold rounded-lg hover:bg-[#2d2d4e] transition-colors"
+              data-title={listing.title}
+              data-city={listing.city ?? ''}
+            >
+              🖨 Print Flyer
+            </button>
+          </div>
+        </div>
+      );
+    })}
+  </div>
+
+  {/* ── Restaurant QR Codes ────────────────────────────────────── */}
+  {allRestaurants.length > 0 && (
+    <>
+      {allListings.length > 0 && <h2 class="text-lg font-bold text-gray-900 mt-10 mb-4">🍽️ Restaurants</h2>}
+      <div class="space-y-8">
+        {allRestaurants.map((rest: any) => {
+          const reserveUrl = `${siteUrl}/community/restaurants/${rest.slug}/reserve`;
+          const reviewUrl = `${siteUrl}/review/restaurant/${rest.slug}`;
+          const googleReviewUrl = rest.google_place_id
+            ? `https://search.google.com/local/writereview?placeid=${rest.google_place_id}`
+            : null;
+          const reserveQR = JSON.stringify(makeQR(reserveUrl));
+          const restReviewQR = JSON.stringify(makeQR(reviewUrl));
+          const restGoogleQR = googleReviewUrl ? JSON.stringify(makeQR(googleReviewUrl)) : null;
+
+          return (
+            <div class="bg-white rounded-2xl border border-gray-100 p-6">
+              <div class="flex items-center gap-3 mb-5">
+                {rest.cover_photo ? (
+                  <img src={rest.cover_photo} alt={rest.name} class="w-10 h-10 rounded-xl object-cover" />
+                ) : (
+                  <span class="text-xl">🍽️</span>
+                )}
+                <div>
+                  <h2 class="font-semibold text-gray-900">{rest.name}</h2>
+                  {rest.city && <p class="text-xs text-gray-400">{rest.city}</p>}
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+
+                {/* Reserve Table QR */}
+                <div class="text-center">
+                  <div class="bg-gray-50 rounded-2xl p-4 mb-3">
+                    <canvas
+                      class="qr-canvas mx-auto"
+                      data-qr={reserveQR}
+                      data-label="RESERVE A TABLE"
+                      data-color="#1a1a2e"
+                      width="280" height="340"
+                    ></canvas>
+                  </div>
+                  <p class="text-sm font-semibold text-gray-900 mb-1">Reserve a Table</p>
+                  <p class="text-xs text-gray-400 mb-3 break-all">{reserveUrl}</p>
+                  <div class="flex gap-2 justify-center">
+                    <button class="download-qr px-3 py-1.5 bg-[#1a1a2e] text-white text-xs font-semibold rounded-lg hover:bg-[#2d2d4e] transition-colors" data-filename={`reserve-${rest.slug}.png`}>
+                      Download PNG
+                    </button>
+                    <button class="print-qr px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                      Print
+                    </button>
+                  </div>
+                </div>
+
+                {/* Review QR (through kefaloniabnb.com) */}
+                <div class="text-center">
+                  <div class="bg-gray-50 rounded-2xl p-4 mb-3">
+                    <canvas
+                      class="qr-canvas mx-auto"
+                      data-qr={restReviewQR}
+                      data-label="LEAVE A REVIEW"
+                      data-color="#059669"
+                      width="280" height="340"
+                    ></canvas>
+                  </div>
+                  <p class="text-sm font-semibold text-gray-900 mb-1">Leave a Review</p>
+                  <p class="text-xs text-gray-400 mb-3 break-all">{reviewUrl}</p>
+                  <div class="flex gap-2 justify-center">
+                    <button class="download-qr px-3 py-1.5 bg-[#1a1a2e] text-white text-xs font-semibold rounded-lg hover:bg-[#2d2d4e] transition-colors" data-filename={`review-${rest.slug}.png`}>
+                      Download PNG
+                    </button>
+                    <button class="print-qr px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                      Print
+                    </button>
+                  </div>
+                </div>
+
+                {/* Google Review QR */}
+                {googleReviewUrl ? (
+                  <div class="text-center">
+                    <div class="bg-gray-50 rounded-2xl p-4 mb-3">
+                      <canvas
+                        class="qr-canvas mx-auto"
+                        data-qr={restGoogleQR}
+                        data-label="GOOGLE REVIEW"
+                        data-color="#ea4335"
+                        width="280" height="340"
+                      ></canvas>
+                    </div>
+                    <p class="text-sm font-semibold text-gray-900 mb-1">Google Review</p>
+                    <p class="text-xs text-gray-400 mb-3">Direct to Google Maps review</p>
+                    <div class="flex gap-2 justify-center">
+                      <button class="download-qr px-3 py-1.5 bg-[#1a1a2e] text-white text-xs font-semibold rounded-lg hover:bg-[#2d2d4e] transition-colors" data-filename={`google-review-${rest.slug}.png`}>
+                        Download PNG
+                      </button>
+                      <button class="print-qr px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                        Print
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div class="text-center border-2 border-dashed border-gray-200 rounded-2xl p-6 flex flex-col items-center justify-center">
+                    <span class="text-3xl mb-2 opacity-40">🔍</span>
+                    <p class="text-sm font-medium text-gray-400 mb-1">Google Review QR</p>
+                    <p class="text-xs text-gray-400 mb-3">Add your Google Place ID to enable</p>
+                    <input
+                      type="text"
+                      class="google-place-input-rest w-full px-3 py-2 border border-gray-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-400 mb-2"
+                      data-restaurant-id={rest.id}
+                      placeholder="Google Place ID (e.g. ChIJ...)"
+                    />
+                    <button
+                      class="save-place-id-rest px-3 py-1.5 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700 transition-colors"
+                      data-restaurant-id={rest.id}
+                    >
+                      Save Place ID
+                    </button>
+                    <a href="https://developers.google.com/maps/documentation/places/web-service/place-id" target="_blank" class="text-[10px] text-blue-500 hover:underline mt-2">
+                      How to find your Place ID
+                    </a>
+                  </div>
+                )}
+
+              </div>
+
+              {/* Printable flyer — all QR codes */}
+              <div class="mt-6 pt-5 border-t border-gray-100 flex items-center justify-between">
+                <p class="text-xs text-gray-400">Print a flyer with all QR codes for this restaurant</p>
+                <button
+                  class="print-flyer px-4 py-2 bg-[#1a1a2e] text-white text-xs font-semibold rounded-lg hover:bg-[#2d2d4e] transition-colors"
+                  data-title={rest.name}
+                  data-city={rest.city ?? ''}
+                >
+                  🖨 Print Flyer
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </>
+  )}
+
+  {/* ── Community & Promotional QR Codes ──────────────────────── */}
+  {communityQRs.length > 0 && (
+    <>
+      <h2 class="text-lg font-bold text-gray-900 mt-10 mb-4">🌐 Community & Promotional</h2>
+      <div class="bg-white rounded-2xl border border-gray-100 p-6">
+        <div class="flex items-center gap-3 mb-5">
+          <span class="text-xl">📢</span>
+          <div>
+            <h2 class="font-semibold text-gray-900">Promote kefaloniabnb.com</h2>
+            <p class="text-xs text-gray-400">Print these QR codes on flyers, menus, welcome packets, and local businesses</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {communityQRs.map((q: any) => (
+            <div class="text-center">
+              <div class="bg-gray-50 rounded-2xl p-4 mb-3">
+                <canvas
+                  class="qr-canvas mx-auto"
+                  data-qr={q.qr}
+                  data-label={q.label}
+                  data-color={q.color}
+                  width="280" height="340"
+                ></canvas>
+              </div>
+              <p class="text-sm font-semibold text-gray-900 mb-1">{q.title}</p>
+              <p class="text-xs text-gray-400 mb-3">{q.desc}</p>
+              <div class="flex gap-2 justify-center">
+                <button class="download-qr px-3 py-1.5 bg-[#1a1a2e] text-white text-xs font-semibold rounded-lg hover:bg-[#2d2d4e] transition-colors" data-filename={`${q.filename}.png`}>
+                  Download PNG
+                </button>
+                <button class="print-qr px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                  Print
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div class="mt-6 pt-5 border-t border-gray-100 flex items-center justify-between">
+          <p class="text-xs text-gray-400">Print a flyer with all promotional QR codes</p>
+          <button
+            class="print-flyer px-4 py-2 bg-[#1a1a2e] text-white text-xs font-semibold rounded-lg hover:bg-[#2d2d4e] transition-colors"
+            data-title="kefaloniabnb.com"
+            data-city="Community & Promotions"
+          >
+            🖨 Print Flyer
+          </button>
+        </div>
+      </div>
+    </>
+  )}
+
+  {/* ── Business & Partner QR Codes ─────────────────────────────── */}
+  {businessQRs.length > 0 && (
+    <>
+      <h2 class="text-lg font-bold text-gray-900 mt-10 mb-4">🤝 Business & Partners</h2>
+      <div class="bg-white rounded-2xl border border-gray-100 p-6">
+        <div class="flex items-center gap-3 mb-5">
+          <span class="text-xl">💼</span>
+          <div>
+            <h2 class="font-semibold text-gray-900">Attract Owners, Cleaners & Partners</h2>
+            <p class="text-xs text-gray-400">Print these QR codes to recruit property owners, restaurant owners, cleaners, and partners</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {businessQRs.map((q: any) => (
+            <div class="text-center">
+              <div class="bg-gray-50 rounded-2xl p-4 mb-3">
+                <canvas
+                  class="qr-canvas mx-auto"
+                  data-qr={q.qr}
+                  data-label={q.label}
+                  data-color={q.color}
+                  width="280" height="340"
+                ></canvas>
+              </div>
+              <p class="text-sm font-semibold text-gray-900 mb-1">{q.title}</p>
+              <p class="text-xs text-gray-400 mb-3">{q.desc}</p>
+              <div class="flex gap-2 justify-center">
+                <button class="download-qr px-3 py-1.5 bg-[#1a1a2e] text-white text-xs font-semibold rounded-lg hover:bg-[#2d2d4e] transition-colors" data-filename={`${q.filename}.png`}>
+                  Download PNG
+                </button>
+                <button class="print-qr px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                  Print
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div class="mt-6 pt-5 border-t border-gray-100 flex items-center justify-between">
+          <p class="text-xs text-gray-400">Print a flyer with all business & partner QR codes</p>
+          <button
+            class="print-flyer px-4 py-2 bg-[#1a1a2e] text-white text-xs font-semibold rounded-lg hover:bg-[#2d2d4e] transition-colors"
+            data-title="kefaloniabnb.com"
+            data-city="Business & Partners"
+          >
+            🖨 Print Flyer
+          </button>
+        </div>
+      </div>
+    </>
+  )}
+
+  {/* ── Technician QR Codes ────────────────────────────────────── */}
+  {allTechnicians.length > 0 && (
+    <>
+      <h2 class="text-lg font-bold text-gray-900 mt-10 mb-4">🔧 Technicians</h2>
+      <div class="bg-white rounded-2xl border border-gray-100 p-6">
+        <div class="flex items-center gap-3 mb-5">
+          <span class="text-xl">🛠️</span>
+          <div>
+            <h2 class="font-semibold text-gray-900">Technician QR Codes</h2>
+            <p class="text-xs text-gray-400">Each QR links to the technician's profile & review form</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {allTechnicians.map((tech: any) => {
+            const profileUrl = `${siteUrl}/community/technicians#tech-${tech.id}`;
+            const techQR = JSON.stringify(makeQR(profileUrl));
+            const catName = (tech as any).technician_categories?.name_en ?? '';
+            return (
+              <div class="text-center">
+                <div class="bg-gray-50 rounded-2xl p-4 mb-3">
+                  <canvas
+                    class="qr-canvas mx-auto"
+                    data-qr={techQR}
+                    data-label={tech.name.toUpperCase().slice(0, 20)}
+                    data-color="#0891b2"
+                    width="280" height="340"
+                  ></canvas>
+                </div>
+                <p class="text-sm font-semibold text-gray-900 mb-0.5">{tech.name}</p>
+                {catName && <p class="text-xs text-gray-400 mb-1">{catName}</p>}
+                <p class="text-xs text-gray-400 mb-3">Profile + Leave a review</p>
+                <div class="flex gap-2 justify-center">
+                  <button class="download-qr px-3 py-1.5 bg-[#1a1a2e] text-white text-xs font-semibold rounded-lg hover:bg-[#2d2d4e] transition-colors" data-filename={`tech-${tech.name.toLowerCase().replace(/\s+/g, '-')}.png`}>
+                    Download PNG
+                  </button>
+                  <button class="print-qr px-3 py-1.5 border border-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 transition-colors">
+                    Print
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div class="mt-6 pt-5 border-t border-gray-100 flex items-center justify-between">
+          <p class="text-xs text-gray-400">Print a flyer with all technician QR codes</p>
+          <button
+            class="print-flyer px-4 py-2 bg-[#1a1a2e] text-white text-xs font-semibold rounded-lg hover:bg-[#2d2d4e] transition-colors"
+            data-title="Local Technicians"
+            data-city="kefaloniabnb.com"
+          >
+            🖨 Print Flyer
+          </button>
+        </div>
+      </div>
+    </>
+  )}
+</AdminLayout>
+
+<script is:inline>
+(function() {
+  // QR modules are pre-computed server-side via qrcode-generator (npm)
+  // and embedded as JSON in data-qr attributes on each canvas.
+
+  var currentTemplate = 'classic';
+
+  var templates = {
+    // ── Classic: white bg, colored label bar, branding ──
+    classic: function(ctx, w, h, modules, qrSize, label, color) {
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+      var scale = qrSize / modules.length;
+      var ox = (w - qrSize) / 2, oy = 20;
+      ctx.fillStyle = '#000000';
+      for (var y = 0; y < modules.length; y++) for (var x = 0; x < modules.length; x++) {
+        if (modules[y][x]) ctx.fillRect(ox + x * scale, oy + y * scale, scale + 0.5, scale + 0.5);
+      }
+      var barY = oy + qrSize + 15;
+      ctx.fillStyle = color;
+      ctx.beginPath(); ctx.roundRect((w - 240) / 2, barY, 240, 28, 6); ctx.fill();
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 11px Inter,system-ui,sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(label, w / 2, barY + 18);
+      ctx.fillStyle = '#9ca3af'; ctx.font = '10px Inter,system-ui,sans-serif';
+      ctx.fillText('kefaloniabnb.com', w / 2, barY + 50);
+      ctx.fillStyle = '#d1d5db'; ctx.font = '8px Inter,system-ui,sans-serif';
+      ctx.fillText('Scan with your phone camera', w / 2, barY + 65);
+    },
+
+    // ── Modern: gradient top bar, shadow effect, large branding ──
+    modern: function(ctx, w, h, modules, qrSize, label, color) {
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+      // Top colored strip
+      var grad = ctx.createLinearGradient(0, 0, w, 0);
+      grad.addColorStop(0, color); grad.addColorStop(1, shiftColor(color, 30));
+      ctx.fillStyle = grad; ctx.fillRect(0, 0, w, 44);
+      ctx.fillStyle = '#fff'; ctx.font = 'bold 13px Inter,system-ui,sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(label, w / 2, 28);
+      // QR
+      var scale = qrSize / modules.length;
+      var ox = (w - qrSize) / 2, oy = 58;
+      // Shadow
+      ctx.fillStyle = 'rgba(0,0,0,0.04)';
+      ctx.beginPath(); ctx.roundRect(ox - 12, oy - 12, qrSize + 24, qrSize + 24, 12); ctx.fill();
+      ctx.fillStyle = '#fff';
+      ctx.beginPath(); ctx.roundRect(ox - 10, oy - 10, qrSize + 20, qrSize + 20, 10); ctx.fill();
+      ctx.fillStyle = '#000';
+      for (var y = 0; y < modules.length; y++) for (var x = 0; x < modules.length; x++) {
+        if (modules[y][x]) ctx.fillRect(ox + x * scale, oy + y * scale, scale + 0.5, scale + 0.5);
+      }
+      ctx.fillStyle = '#1a1a2e'; ctx.font = 'bold 12px Inter,system-ui,sans-serif';
+      ctx.fillText('kefaloniabnb.com', w / 2, oy + qrSize + 28);
+      ctx.fillStyle = '#9ca3af'; ctx.font = '9px Inter,system-ui,sans-serif';
+      ctx.fillText('Scan to continue', w / 2, oy + qrSize + 44);
+    },
+
+    // ── Minimal: clean, no colors, thin border ──
+    minimal: function(ctx, w, h, modules, qrSize, label, color) {
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+      // Thin border
+      ctx.strokeStyle = '#e5e7eb'; ctx.lineWidth = 1;
+      ctx.strokeRect(8, 8, w - 16, h - 16);
+      var scale = qrSize / modules.length;
+      var ox = (w - qrSize) / 2, oy = 30;
+      ctx.fillStyle = '#111';
+      for (var y = 0; y < modules.length; y++) for (var x = 0; x < modules.length; x++) {
+        if (modules[y][x]) ctx.fillRect(ox + x * scale, oy + y * scale, scale + 0.5, scale + 0.5);
+      }
+      ctx.fillStyle = '#374151'; ctx.font = '600 11px Inter,system-ui,sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(label, w / 2, oy + qrSize + 22);
+      ctx.fillStyle = '#9ca3af'; ctx.font = '9px Inter,system-ui,sans-serif';
+      ctx.fillText('kefaloniabnb.com', w / 2, oy + qrSize + 40);
+    },
+
+    // ── Rounded: colored QR modules with rounded corners ──
+    rounded: function(ctx, w, h, modules, qrSize, label, color) {
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+      var scale = qrSize / modules.length;
+      var ox = (w - qrSize) / 2, oy = 20;
+      var r = scale * 0.35;
+      ctx.fillStyle = color;
+      for (var y = 0; y < modules.length; y++) for (var x = 0; x < modules.length; x++) {
+        if (modules[y][x]) { ctx.beginPath(); ctx.roundRect(ox + x * scale + 0.3, oy + y * scale + 0.3, scale - 0.3, scale - 0.3, r); ctx.fill(); }
+      }
+      ctx.fillStyle = color; ctx.font = 'bold 11px Inter,system-ui,sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(label, w / 2, oy + qrSize + 22);
+      ctx.fillStyle = '#6b7280'; ctx.font = '10px Inter,system-ui,sans-serif';
+      ctx.fillText('kefaloniabnb.com', w / 2, oy + qrSize + 42);
+      ctx.fillStyle = '#d1d5db'; ctx.font = '8px Inter,system-ui,sans-serif';
+      ctx.fillText('Scan with your phone camera', w / 2, oy + qrSize + 58);
+    },
+
+    // ── Dark: dark background, light QR ──
+    dark: function(ctx, w, h, modules, qrSize, label, color) {
+      ctx.fillStyle = '#1a1a2e'; ctx.fillRect(0, 0, w, h);
+      // Rounded white card for QR
+      var scale = qrSize / modules.length;
+      var ox = (w - qrSize) / 2, oy = 40;
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.roundRect(ox - 14, oy - 14, qrSize + 28, qrSize + 28, 14); ctx.fill();
+      ctx.fillStyle = '#1a1a2e';
+      for (var y = 0; y < modules.length; y++) for (var x = 0; x < modules.length; x++) {
+        if (modules[y][x]) ctx.fillRect(ox + x * scale, oy + y * scale, scale + 0.5, scale + 0.5);
+      }
+      // Label
+      ctx.fillStyle = color; ctx.font = 'bold 12px Inter,system-ui,sans-serif'; ctx.textAlign = 'center';
+      ctx.fillText(label, w / 2, oy + qrSize + 32);
+      ctx.fillStyle = '#c9a96e'; ctx.font = 'bold 11px Inter,system-ui,sans-serif';
+      ctx.fillText('kefaloniabnb.com', w / 2, oy + qrSize + 52);
+      ctx.fillStyle = '#6b7280'; ctx.font = '8px Inter,system-ui,sans-serif';
+      ctx.fillText('Scan with your phone camera', w / 2, oy + qrSize + 68);
+    }
+  };
+
+  function shiftColor(hex, amount) {
+    var r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+    r = Math.min(255, r + amount); g = Math.min(255, g + amount); b = Math.min(255, b + amount);
+    return '#' + ((1<<24)+(r<<16)+(g<<8)+b).toString(16).slice(1);
+  }
+
+  // ── Draw a single QR canvas ──
+  function drawQRCanvas(canvas) {
+    var label = canvas.dataset.label || '';
+    var color = canvas.dataset.color || '#1a1a2e';
+    var ctx = canvas.getContext('2d');
+    var w = canvas.width, h = canvas.height;
+
+    try {
+      var modules = JSON.parse(canvas.dataset.qr);
+      var qrSize = 200;
+      templates[currentTemplate](ctx, w, h, modules, qrSize, label, color);
+    } catch(e) {
+      ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h);
+      ctx.fillStyle = '#ef4444'; ctx.font = '11px system-ui'; ctx.textAlign = 'center';
+      ctx.fillText('QR Error', w/2, h/2);
+    }
+  }
+
+  function drawAll() {
+    document.querySelectorAll('.qr-canvas').forEach(function(c) { drawQRCanvas(c); });
+  }
+  drawAll();
+
+  // ── Template selector ──
+  document.querySelectorAll('.tmpl-btn').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('.tmpl-btn').forEach(function(b) {
+        b.style.borderColor = '#e5e7eb'; b.style.color = '#6b7280'; b.style.background = '#fff';
+      });
+      btn.style.borderColor = '#1a1a2e'; btn.style.color = '#fff'; btn.style.background = '#1a1a2e';
+      currentTemplate = btn.dataset.template;
+      drawAll();
+    });
+  });
+
+  // ── Download button ──
+  document.querySelectorAll('.download-qr').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var card = btn.closest('.text-center') || btn.closest('div');
+      var canvas = card.querySelector('.qr-canvas');
+      if (!canvas) return;
+      var link = document.createElement('a');
+      link.download = btn.dataset.filename || 'qr-code.png';
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    });
+  });
+
+  // ── Print single QR ──
+  document.querySelectorAll('.print-qr').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var card = btn.closest('.text-center') || btn.closest('div');
+      var canvas = card.querySelector('.qr-canvas');
+      if (!canvas) return;
+      var win = window.open('', '_blank');
+      win.document.write('<html><head><title>Print QR Code</title><style>body{display:flex;justify-content:center;align-items:center;min-height:100vh;margin:0;font-family:system-ui}@media print{body{padding:0}}</style></head><body>');
+      win.document.write('<img src="' + canvas.toDataURL('image/png') + '" style="max-width:400px" />');
+      win.document.write('</body></html>');
+      win.document.close();
+      setTimeout(function() { win.print(); }, 300);
+    });
+  });
+
+  // ── Print flyer ──
+  document.querySelectorAll('.print-flyer').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      var container = btn.closest('.bg-white');
+      var canvases = container.querySelectorAll('.qr-canvas');
+      var title = btn.dataset.title || 'Property';
+      var city = btn.dataset.city || '';
+      var win = window.open('', '_blank');
+      win.document.write('<html><head><title>' + title + ' - QR Codes</title>');
+      win.document.write('<style>body{font-family:Inter,system-ui,sans-serif;padding:40px;max-width:800px;margin:0 auto}h1{font-size:24px;margin:0 0 4px}h2{font-size:14px;color:#666;margin:0 0 8px;font-weight:normal}.brand{font-size:18px;color:#1a1a2e;font-weight:700;margin-bottom:30px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:30px;margin-top:20px}.qr-item{text-align:center}.qr-item img{max-width:250px;margin:0 auto}.footer{margin-top:40px;text-align:center;color:#999;font-size:12px;border-top:1px solid #eee;padding-top:20px}@media print{body{padding:20px}}</style></head><body>');
+      win.document.write('<div class="brand">kefaloniabnb.com</div>');
+      win.document.write('<h1>' + title + '</h1>');
+      if (city) win.document.write('<h2>' + city + '</h2>');
+      win.document.write('<div class="grid">');
+      canvases.forEach(function(c) { win.document.write('<div class="qr-item"><img src="' + c.toDataURL('image/png') + '" /></div>'); });
+      win.document.write('</div>');
+      win.document.write('<div class="footer">Scan any QR code with your phone camera<br><strong>kefaloniabnb.com</strong> — Book directly, best rates guaranteed</div>');
+      win.document.write('</body></html>');
+      win.document.close();
+      setTimeout(function() { win.print(); }, 500);
+    });
+  });
+
+  // ── Save Google Place ID (listings) ──
+  document.querySelectorAll('.save-place-id').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
+      var listingId = btn.dataset.listingId;
+      var input = btn.parentElement.querySelector('.google-place-input');
+      var placeId = input.value.trim();
+      if (!placeId) return;
+      btn.disabled = true; btn.textContent = 'Saving...';
+      try {
+        var res = await fetch('/api/admin/listings/' + listingId, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ google_place_id: placeId }) });
+        if (res.ok) window.location.reload(); else alert('Failed to save.');
+      } catch(e) { alert('Failed to save.'); }
+      btn.disabled = false; btn.textContent = 'Save Place ID';
+    });
+  });
+
+  // ── Save Google Place ID (restaurants) ──
+  document.querySelectorAll('.save-place-id-rest').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
+      var restaurantId = btn.dataset.restaurantId;
+      var input = btn.parentElement.querySelector('.google-place-input-rest');
+      var placeId = input.value.trim();
+      if (!placeId) return;
+      btn.disabled = true; btn.textContent = 'Saving...';
+      try {
+        var res = await fetch('/api/admin/restaurants/' + restaurantId, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ google_place_id: placeId }) });
+        if (res.ok) window.location.reload(); else alert('Failed to save.');
+      } catch(e) { alert('Failed to save.'); }
+      btn.disabled = false; btn.textContent = 'Save Place ID';
+    });
+  });
+})();
+</script>

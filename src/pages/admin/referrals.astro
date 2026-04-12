@@ -1,0 +1,161 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const profile = Astro.locals.profile!;
+if (!profile || !['admin', 'super_admin'].includes(profile.role)) return Astro.redirect('/admin');
+
+const service = getServiceClient();
+
+// Clicks per ref_code, last 90 days
+const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+const { data: clicks } = await service
+  .from('referral_clicks')
+  .select('ref_code, landing_page, created_at')
+  .gte('created_at', since)
+  .order('created_at', { ascending: false });
+
+const all = clicks ?? [];
+
+// Aggregate by ref_code
+const byCode: Record<string, { clicks: number; last: string; pages: Record<string, number> }> = {};
+for (const row of all) {
+  const code = row.ref_code ?? 'unknown';
+  if (!byCode[code]) byCode[code] = { clicks: 0, last: row.created_at, pages: {} };
+  byCode[code].clicks++;
+  if (row.created_at > byCode[code].last) byCode[code].last = row.created_at;
+  const page = row.landing_page ?? '/';
+  byCode[code].pages[page] = (byCode[code].pages[page] ?? 0) + 1;
+}
+
+const sorted = Object.entries(byCode).sort((a, b) => b[1].clicks - a[1].clicks);
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
+// Bookings with ref_source
+const { data: refBookings } = await service
+  .from('bookings')
+  .select('id, ref_source, created_at, total_price, status')
+  .not('ref_source', 'is', null)
+  .order('created_at', { ascending: false })
+  .limit(50);
+---
+
+<AdminLayout title="Referrals">
+
+  <div class="mb-6">
+    <p class="text-sm text-gray-500">Last 90 days · {all.length} total clicks across {sorted.length} referral codes</p>
+  </div>
+
+  {sorted.length === 0 ? (
+    <div class="text-center py-20 text-gray-400">
+      <p class="text-4xl mb-3">🔗</p>
+      <p class="font-medium">No referral clicks yet</p>
+      <p class="text-sm mt-1">Share links with <code>?ref=your_code</code> to start tracking.</p>
+    </div>
+  ) : (
+    <div class="space-y-3 mb-10">
+      {sorted.map(([code, stats]) => {
+        const topPage = Object.entries(stats.pages).sort((a, b) => b[1] - a[1])[0];
+        return (
+          <div class="bg-white rounded-2xl border border-gray-100 p-5 flex items-center justify-between gap-4 flex-wrap">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-3 mb-1 flex-wrap">
+                <span class="font-mono font-semibold text-gray-900">{code}</span>
+                <span class="text-xs bg-[#c9a96e]/10 text-[#c9a96e] font-semibold px-2.5 py-0.5 rounded-full">
+                  {stats.clicks} click{stats.clicks !== 1 ? 's' : ''}
+                </span>
+              </div>
+              <div class="text-xs text-gray-400">
+                Last click {fmtDate(stats.last)}
+                {topPage && <span class="ml-3">Top page: <span class="font-mono">{topPage[0]}</span> ({topPage[1]}×)</span>}
+              </div>
+            </div>
+            <div class="shrink-0">
+              <a
+                href={`/?ref=${encodeURIComponent(code)}`}
+                target="_blank"
+                class="min-h-[44px] inline-flex items-center text-sm text-[#c9a96e] font-medium hover:opacity-80 border border-[#c9a96e]/30 px-4 py-2.5 rounded-lg transition-opacity"
+              >
+                Test link ↗
+              </a>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  )}
+
+  <!-- Bookings from referrals -->
+  <div class="mt-10">
+    <h2 class="text-base font-semibold text-gray-900 mb-4">Bookings from referrals</h2>
+    {(refBookings ?? []).length === 0 ? (
+      <p class="text-sm text-gray-400 py-8 text-center">No bookings with a referral source yet.</p>
+    ) : (
+      <!-- Mobile booking cards -->
+      <div class="lg:hidden space-y-3">
+        {(refBookings ?? []).map((b: any) => (
+          <div class="bg-white rounded-2xl border border-gray-100 p-4 space-y-2">
+            <div class="flex items-start justify-between gap-2">
+              <span class="font-mono font-semibold text-gray-900">{b.ref_source}</span>
+              <span class={`px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${
+                b.status === 'confirmed' ? 'bg-emerald-100 text-emerald-700' :
+                b.status === 'pending'   ? 'bg-amber-100 text-amber-700' :
+                'bg-gray-100 text-gray-500'
+              }`}>
+                {b.status}
+              </span>
+            </div>
+            <div class="flex gap-4 text-sm text-gray-500">
+              <span>{fmtDate(b.created_at)}</span>
+              <span class="text-gray-900 font-medium">€{Number(b.total_price ?? 0).toFixed(2)}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <!-- Desktop booking table -->
+      <div class="hidden lg:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-100 text-left">
+              <th class="px-5 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Ref code</th>
+              <th class="px-5 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Date</th>
+              <th class="px-5 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Total</th>
+              <th class="px-5 py-3 font-medium text-gray-500 text-xs uppercase tracking-wide">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(refBookings ?? []).map((b: any) => (
+              <tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                <td class="px-5 py-3 font-mono text-gray-900">{b.ref_source}</td>
+                <td class="px-5 py-3 text-gray-500">{fmtDate(b.created_at)}</td>
+                <td class="px-5 py-3 text-gray-900">€{Number(b.total_price ?? 0).toFixed(2)}</td>
+                <td class="px-5 py-3">
+                  <span class={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                    b.status === 'confirmed' ? 'bg-emerald-100 text-emerald-700' :
+                    b.status === 'pending'   ? 'bg-amber-100 text-amber-700' :
+                    'bg-gray-100 text-gray-500'
+                  }`}>
+                    {b.status}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    )}
+  </div>
+
+  <!-- Usage tip -->
+  <div class="mt-10 bg-blue-50 border border-blue-100 rounded-2xl p-5 text-sm text-blue-700">
+    <p class="font-semibold mb-1">How to use referral links</p>
+    <p>Append <code class="bg-blue-100 px-1.5 py-0.5 rounded text-xs font-mono">?ref=your_code</code> to any page URL.
+      Example: <code class="bg-blue-100 px-1.5 py-0.5 rounded text-xs font-mono">https://kefaloniabnb.com/rentals?ref=instagram_bio</code></p>
+    <p class="mt-2">The ref code is stored in a cookie for 30 days and attached to the next booking made from that browser.</p>
+  </div>
+
+</AdminLayout>

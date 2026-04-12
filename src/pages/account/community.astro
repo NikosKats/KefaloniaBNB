@@ -1,0 +1,133 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isBg = lang === 'bg';
+const isEl = lang === 'el';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const t = {
+  myCommunity: isEl ? 'Η Κοινότητά μου' : isBg ? 'Моята общност' : isSr ? 'Моја заједница' : isTr ? 'Topluluğum' : isRo ? 'Comunitatea Mea' : 'My Community',
+  myAccount: isEl ? 'Ο Λογαριασμός μου' : isBg ? 'Моят акаунт' : isSr ? 'Мој налог' : isTr ? 'Hesabım' : isRo ? 'Contul Meu' : 'My Account',
+  posts: isEl ? 'Δημοσιεύσεις' : isBg ? 'Публикации' : isSr ? 'Објаве' : isTr ? 'Gönderiler' : isRo ? 'Postări' : 'Posts',
+  comments: isEl ? 'Σχόλια' : isBg ? 'Коментари' : isSr ? 'Коментари' : isTr ? 'Yorumlar' : isRo ? 'Comentarii' : 'Comments',
+  likes: isEl ? 'Αρέσει' : isBg ? 'Харесвания' : isSr ? 'Лајкови' : isTr ? 'Beğeniler' : isRo ? 'Aprecieri' : 'Likes',
+  noPosts: isEl ? 'Δεν υπάρχουν δημοσιεύσεις ακόμα.' : isBg ? 'Все още няма публикации.' : isSr ? 'Још нема објава.' : isTr ? 'Henüz gönderi yok.' : isRo ? 'Nicio postare încă.' : 'No posts yet.',
+  noComments: isEl ? 'Δεν υπάρχουν σχόλια ακόμα.' : isBg ? 'Все още няма коментари.' : isSr ? 'Још нема коментара.' : isTr ? 'Henüz yorum yok.' : isRo ? 'Niciun comentariu încă.' : 'No comments yet.',
+  noLikes: isEl ? 'Δεν υπάρχουν likes ακόμα.' : isBg ? 'Все още няма харесвания.' : isSr ? 'Још нема лајкова.' : isTr ? 'Henüz beğeni yok.' : isRo ? 'Nicio apreciere încă.' : 'No likes yet.',
+  likesLabel: isEl ? 'αρέσει' : isBg ? 'харесвания' : isSr ? 'лајкова' : isTr ? 'beğeni' : isRo ? 'aprecieri' : 'likes',
+  commentsLabel: isEl ? 'σχόλια' : isBg ? 'коментари' : isSr ? 'коментара' : isTr ? 'yorum' : isRo ? 'comentarii' : 'comments',
+  on: isEl ? 'στο:' : isBg ? 'на:' : isSr ? 'на:' : isTr ? 'konuda:' : isRo ? 'la:' : 'on:',
+};
+
+const session = Astro.locals.session;
+if (!session) return Astro.redirect('/community/join?next=/account/community');
+
+const service = getServiceClient();
+const userId = session.user.id;
+
+const [postsRes, commentsRes, likesRes] = await Promise.all([
+  service.from('community_posts').select('id, title, body, category, like_count, comment_count, created_at').eq('author_id', userId).order('created_at', { ascending: false }).limit(30),
+  service.from('community_comments').select('id, body, created_at, post_id, community_posts(id, title)').eq('author_id', userId).order('created_at', { ascending: false }).limit(30),
+  service.from('community_likes').select('id, created_at, post_id, community_posts(id, title)').eq('user_id', userId).not('post_id', 'is', null).order('created_at', { ascending: false }).limit(30),
+]);
+
+const posts = postsRes.data ?? [];
+const comments = commentsRes.data ?? [];
+const likes = likesRes.data ?? [];
+---
+
+<BaseLayout title={t.myCommunity} noIndex>
+  <div class="max-w-3xl mx-auto px-4 py-10">
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold text-gray-900">{t.myCommunity}</h1>
+      <a href="/account" class="text-sm text-gray-500 hover:text-gray-700">&larr; {t.myAccount}</a>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex border-b border-gray-200 mb-6">
+      <button data-tab="posts" class="px-4 py-2.5 text-sm font-semibold text-[#1a1a2e] border-b-2 border-[#1a1a2e]">{t.posts} ({posts.length})</button>
+      <button data-tab="comments" class="px-4 py-2.5 text-sm font-medium text-gray-400 border-b-2 border-transparent hover:text-gray-600">{t.comments} ({comments.length})</button>
+      <button data-tab="likes" class="px-4 py-2.5 text-sm font-medium text-gray-400 border-b-2 border-transparent hover:text-gray-600">{t.likes} ({likes.length})</button>
+    </div>
+
+    <!-- Posts panel -->
+    <div data-panel="posts">
+      {posts.length === 0 ? (
+        <p class="text-center text-gray-400 text-sm py-12">{t.noPosts}</p>
+      ) : (
+        <div class="space-y-3">
+          {posts.map((p: any) => (
+            <a href={`/community/board/${p.id}`} class="block bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-shadow">
+              <span class="text-xs text-gray-400">{new Date(p.created_at).toLocaleDateString()} · {p.category}</span>
+              {p.title && <h3 class="font-semibold text-gray-900 mt-1 text-sm">{p.title}</h3>}
+              <p class="text-sm text-gray-600 mt-1 line-clamp-2">{p.body}</p>
+              <div class="flex gap-3 text-xs text-gray-400 mt-2">
+                <span>{p.like_count} {t.likesLabel}</span>
+                <span>{p.comment_count} {t.commentsLabel}</span>
+              </div>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+
+    <!-- Comments panel -->
+    <div data-panel="comments" class="hidden">
+      {comments.length === 0 ? (
+        <p class="text-center text-gray-400 text-sm py-12">{t.noComments}</p>
+      ) : (
+        <div class="space-y-3">
+          {comments.map((c: any) => (
+            <a href={`/community/board/${c.post_id}`} class="block bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-shadow">
+              <span class="text-xs text-gray-400">{new Date(c.created_at).toLocaleDateString()}</span>
+              <p class="text-sm text-gray-600 mt-1 line-clamp-2">{c.body}</p>
+              {(c as any).community_posts?.title && (
+                <p class="text-xs text-[#c9a96e] mt-2">{t.on} {(c as any).community_posts.title}</p>
+              )}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+
+    <!-- Likes panel -->
+    <div data-panel="likes" class="hidden">
+      {likes.length === 0 ? (
+        <p class="text-center text-gray-400 text-sm py-12">{t.noLikes}</p>
+      ) : (
+        <div class="space-y-3">
+          {likes.map((l: any) => (
+            <a href={`/community/board/${l.post_id}`} class="block bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-shadow">
+              <span class="text-xs text-gray-400">{new Date(l.created_at).toLocaleDateString()}</span>
+              {(l as any).community_posts?.title && (
+                <p class="text-sm text-gray-700 mt-1">{(l as any).community_posts.title}</p>
+              )}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  </div>
+</BaseLayout>
+
+<script is:inline>
+  var tabs = document.querySelectorAll('[data-tab]');
+  var panels = document.querySelectorAll('[data-panel]');
+  var activeClass = 'px-4 py-2.5 text-sm font-semibold text-[#1a1a2e] border-b-2 border-[#1a1a2e]';
+  var inactiveClass = 'px-4 py-2.5 text-sm font-medium text-gray-400 border-b-2 border-transparent hover:text-gray-600';
+
+  tabs.forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      var target = tab.dataset.tab;
+      tabs.forEach(function(t) { t.className = inactiveClass; });
+      tab.className = activeClass;
+      panels.forEach(function(p) {
+        p.classList.toggle('hidden', p.dataset.panel !== target);
+      });
+    });
+  });
+</script>

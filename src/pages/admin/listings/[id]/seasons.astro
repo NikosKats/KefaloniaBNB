@@ -1,0 +1,253 @@
+---
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../../lib/supabase.ts';
+
+const { id } = Astro.params;
+const profile = Astro.locals.profile!;
+const isOwner = profile.role === 'property_owner';
+const ownerListingIds = Astro.locals.ownerListingIds ?? [];
+
+const service = getServiceClient();
+
+const { data: listing } = await service
+  .from('listings')
+  .select('id,title,slug,base_price')
+  .eq('id', id!)
+  .single();
+
+if (!listing) return Astro.redirect('/admin/listings');
+if (isOwner && !ownerListingIds.includes(listing.id)) return Astro.redirect('/admin/listings');
+
+const { data: seasons } = await service
+  .from('seasons')
+  .select('*')
+  .eq('listing_id', id!)
+  .order('start_date');
+
+const seasonList = seasons ?? [];
+
+function fmtDate(d: string) {
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+---
+
+<AdminLayout title={`Seasons — ${listing.title}`}>
+  <div class="flex items-center gap-3 mb-6">
+    <a href="/admin/listings" class="text-gray-400 hover:text-gray-600 text-sm transition-colors">← All listings</a>
+    <span class="text-gray-300">/</span>
+    <a href={`/admin/listings/${listing.id}`} class="text-gray-400 hover:text-gray-600 text-sm transition-colors">{listing.title}</a>
+    <span class="text-gray-300">/</span>
+    <span class="text-sm text-gray-700 font-medium">Seasons & Pricing</span>
+  </div>
+
+  <!-- Info banner -->
+  <div class="bg-blue-50 border border-blue-100 rounded-xl p-4 mb-6 text-sm text-blue-800">
+    <strong>How season pricing works:</strong> The base price for this listing is <strong>€{listing.base_price}/night</strong>.
+    Each season multiplies that base price. A modifier of <strong>1.5</strong> = €{(listing.base_price * 1.5).toFixed(0)}/night (+50%).
+    A modifier of <strong>0.8</strong> = €{(listing.base_price * 0.8).toFixed(0)}/night (−20% discount).
+    If dates overlap multiple seasons, the first matching season applies.
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+    <!-- Add season form -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <h2 class="font-semibold text-gray-900 mb-4">Add season</h2>
+      <form id="season-form" class="space-y-4">
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Season name</label>
+          <input id="s-name" type="text" placeholder="e.g. High Season, Easter Week, August Peak"
+            class="input-field text-sm w-full" required />
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Start date</label>
+            <input id="s-start" type="date" class="input-field text-sm w-full" required />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">End date</label>
+            <input id="s-end" type="date" class="input-field text-sm w-full" required />
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Price modifier</label>
+          <input id="s-modifier" type="number" step="0.01" min="0.1" max="10" placeholder="e.g. 1.5 for +50%"
+            class="input-field text-sm w-full" required />
+          <p id="modifier-hint" class="text-xs text-gray-400 mt-1">Enter a multiplier: 1.0 = base price, 1.5 = +50%, 0.8 = −20%</p>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">Min nights override (optional)</label>
+          <input id="s-min-nights" type="number" min="1" placeholder="Leave blank to use listing default"
+            class="input-field text-sm w-full" />
+        </div>
+        <div id="season-msg" class="hidden text-xs font-medium"></div>
+        <button type="submit" id="season-submit"
+          class="w-full py-2.5 bg-[#1a1a2e] text-white text-sm font-semibold rounded-xl hover:bg-[#2a2a4e] transition-colors">
+          Add season
+        </button>
+      </form>
+    </div>
+
+    <!-- Seasons list -->
+    <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+      <div class="px-5 py-4 border-b border-gray-50">
+        <h2 class="font-semibold text-gray-900">Active seasons</h2>
+      </div>
+      <div id="seasons-list">
+        {seasonList.length === 0 ? (
+          <p class="px-5 py-8 text-sm text-gray-400 text-center">No seasons configured.<br />Add one to override nightly pricing for specific date ranges.</p>
+        ) : seasonList.map((s: any) => {
+          const effectivePrice = (listing.base_price * s.price_modifier).toFixed(0);
+          const pctChange = ((s.price_modifier - 1) * 100).toFixed(0);
+          const isUp = s.price_modifier >= 1;
+          return (
+            <div class="px-5 py-4 border-b border-gray-50 last:border-b-0 flex items-start justify-between gap-3" id={`season-${s.id}`}>
+              <div class="flex-1 min-w-0">
+                <p class="text-sm font-semibold text-gray-900">{s.name}</p>
+                <p class="text-xs text-gray-500 mt-0.5">{fmtDate(s.start_date)} → {fmtDate(s.end_date)}</p>
+                <div class="flex items-center gap-2 mt-1.5">
+                  <span class="text-sm font-bold text-gray-900">€{effectivePrice}/night</span>
+                  <span class={`text-xs font-medium px-1.5 py-0.5 rounded-full ${isUp ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}`}>
+                    ×{s.price_modifier} ({isUp ? '+' : ''}{pctChange}%)
+                  </span>
+                  {s.min_nights && (
+                    <span class="text-xs text-gray-400">min {s.min_nights}n</span>
+                  )}
+                </div>
+              </div>
+              <button class="delete-season-btn text-xs text-red-400 hover:text-red-600 transition-colors shrink-0 mt-1"
+                data-id={s.id}>
+                Remove
+              </button>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+
+  </div>
+</AdminLayout>
+
+<script define:vars={{ listingId: id, basePrice: listing.base_price }}>
+  const form      = document.getElementById('season-form');
+  const msgEl     = document.getElementById('season-msg');
+  const submitBtn = document.getElementById('season-submit');
+  const listEl    = document.getElementById('seasons-list');
+  const modInput  = document.getElementById('s-modifier');
+  const hintEl    = document.getElementById('modifier-hint');
+
+  // Live preview of effective price
+  modInput.addEventListener('input', () => {
+    const mod = parseFloat(modInput.value);
+    if (!isNaN(mod) && mod > 0) {
+      const ep = (basePrice * mod).toFixed(0);
+      const pct = ((mod - 1) * 100).toFixed(0);
+      const sign = mod >= 1 ? '+' : '';
+      hintEl.textContent = `→ €${ep}/night (${sign}${pct}% of base €${basePrice})`;
+      hintEl.className = 'text-xs mt-1 ' + (mod >= 1 ? 'text-amber-600' : 'text-emerald-600');
+    } else {
+      hintEl.textContent = 'Enter a multiplier: 1.0 = base price, 1.5 = +50%, 0.8 = −20%';
+      hintEl.className = 'text-xs text-gray-400 mt-1';
+    }
+  });
+
+  // Submit
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    msgEl.classList.add('hidden');
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Saving…';
+
+    const body = {
+      name:           document.getElementById('s-name').value.trim(),
+      start_date:     document.getElementById('s-start').value,
+      end_date:       document.getElementById('s-end').value,
+      price_modifier: document.getElementById('s-modifier').value,
+      min_nights:     document.getElementById('s-min-nights').value || null,
+    };
+
+    const res = await fetch(`/api/listings/${listingId}/seasons`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const json = await res.json();
+
+    if (res.ok) {
+      addSeasonToList(json.season);
+      form.reset();
+      hintEl.textContent = 'Enter a multiplier: 1.0 = base price, 1.5 = +50%, 0.8 = −20%';
+      hintEl.className = 'text-xs text-gray-400 mt-1';
+      showMsg('Season added successfully!', 'green');
+    } else {
+      showMsg(json.error ?? 'Failed to save season', 'red');
+    }
+
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Add season';
+  });
+
+  function showMsg(text, color) {
+    msgEl.textContent = text;
+    msgEl.className = `text-xs font-medium ${color === 'green' ? 'text-emerald-600' : 'text-red-600'}`;
+    msgEl.classList.remove('hidden');
+    setTimeout(() => msgEl.classList.add('hidden'), 4000);
+  }
+
+  function fmt(d) {
+    return new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+  }
+
+  function addSeasonToList(s) {
+    // Remove empty state
+    listEl.querySelectorAll('p').forEach(p => p.remove());
+
+    const ep   = (basePrice * s.price_modifier).toFixed(0);
+    const pct  = ((s.price_modifier - 1) * 100).toFixed(0);
+    const sign = s.price_modifier >= 1 ? '+' : '';
+    const isUp = s.price_modifier >= 1;
+    const badgeCls = isUp
+      ? 'bg-amber-100 text-amber-700'
+      : 'bg-emerald-100 text-emerald-700';
+
+    const div = document.createElement('div');
+    div.id = `season-${s.id}`;
+    div.className = 'px-5 py-4 border-b border-gray-50 last:border-b-0 flex items-start justify-between gap-3';
+    div.innerHTML = `
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-semibold text-gray-900">${s.name}</p>
+        <p class="text-xs text-gray-500 mt-0.5">${fmt(s.start_date)} → ${fmt(s.end_date)}</p>
+        <div class="flex items-center gap-2 mt-1.5">
+          <span class="text-sm font-bold text-gray-900">€${ep}/night</span>
+          <span class="text-xs font-medium px-1.5 py-0.5 rounded-full ${badgeCls}">×${s.price_modifier} (${sign}${pct}%)</span>
+          ${s.min_nights ? `<span class="text-xs text-gray-400">min ${s.min_nights}n</span>` : ''}
+        </div>
+      </div>
+      <button class="delete-season-btn text-xs text-red-400 hover:text-red-600 transition-colors shrink-0 mt-1" data-id="${s.id}">Remove</button>
+    `;
+    div.querySelector('.delete-season-btn').addEventListener('click', () => deleteSeason(s.id));
+    listEl.appendChild(div);
+  }
+
+  async function deleteSeason(seasonId) {
+    if (!confirm('Remove this season? Dates will revert to base price.')) return;
+    const res = await fetch(`/api/listings/${listingId}/seasons`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: seasonId }),
+    });
+    if (res.ok || res.status === 204) {
+      document.getElementById(`season-${seasonId}`)?.remove();
+      if (!listEl.querySelector('[id^="season-"]')) {
+        listEl.innerHTML = '<p class="px-5 py-8 text-sm text-gray-400 text-center">No seasons configured.<br />Add one to override nightly pricing for specific date ranges.</p>';
+      }
+    } else {
+      alert('Failed to remove season');
+    }
+  }
+
+  // Wire up existing delete buttons
+  document.querySelectorAll('.delete-season-btn').forEach(btn => {
+    btn.addEventListener('click', () => deleteSeason(btn.dataset.id));
+  });
+</script>

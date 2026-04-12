@@ -1,0 +1,320 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# PR Pipeline — fast feedback loop for every pull request
+#
+# Target total time: < 8 minutes
+# Strategy:
+#   - Lint + type-check + unit tests run in parallel
+#   - E2E runs chromium-only on the smoke subset
+#   - Build validates the Astro output compiles cleanly
+#   - JMeter is NOT run on PRs (nightly and pre-release only)
+#
+# Required secrets (Settings → Secrets → Actions):
+#   SUPABASE_URL          — test/staging Supabase project URL
+#   SUPABASE_ANON_KEY     — anon key for the test project
+#   SUPABASE_SERVICE_KEY  — service role key (API tests only)
+#   PUBLIC_SITE_URL       — e.g. https://staging.kefaloniabnb.com
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: PR — Quality Gate
+
+on:
+  pull_request:
+    branches: [main, develop, staging]
+  push:
+    branches: [develop]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_VERSION: '22'
+  # Vitest/Playwright timeout ceiling
+  CI: 'true'
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 1 — Static analysis: lint + type-check
+  # Runs first, fails fast. No server needed.
+  # ────────────────────────────────────────────────────────────────────────────
+  static-analysis:
+    name: Lint & Type-Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type-check (astro check)
+        run: npm run type-check
+
+      # Add ESLint / Biome here when configured:
+      # - name: Lint
+      #   run: npm run lint
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 2 — Unit + API integration tests
+  # Pure Vitest run, no browser, no server. Should complete in < 60 s.
+  # ────────────────────────────────────────────────────────────────────────────
+  unit-tests:
+    name: Unit & API Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: static-analysis
+
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      TEST_SUPABASE_URL: ${{ secrets.TEST_SUPABASE_URL }}
+      TEST_SUPABASE_SERVICE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_KEY }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY_TEST }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET_TEST }}
+      PUBLIC_SITE_URL: 'https://test.kefaloniabnb.com'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run unit + API tests with coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: coverage-report-${{ github.run_number }}
+          path: coverage/
+          retention-days: 14
+
+      - name: Coverage gate — fail if thresholds not met
+        # vitest --coverage already exits non-zero if thresholds fail;
+        # this step makes the failure reason explicit in the log.
+        run: |
+          if [ -f coverage/coverage-summary.json ]; then
+            echo "Coverage summary generated successfully"
+            cat coverage/coverage-summary.json | python3 -c "
+          import json, sys
+          data = json.load(sys.stdin)
+          total = data.get('total', {})
+          lines = total.get('lines', {}).get('pct', 0)
+          fns   = total.get('functions', {}).get('pct', 0)
+          print(f'Lines: {lines}%  Functions: {fns}%')
+          if lines < 80 or fns < 80:
+            print('FAIL: Coverage below threshold (lines: 80%, functions: 80%)')
+            sys.exit(1)
+          print('PASS: Coverage thresholds met')
+            "
+          fi
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 3 — E2E smoke tests (chromium only, P1 subset)
+  # Starts the dev server, runs the smoke-tagged subset.
+  # Uses public/mock data only — no real admin credentials on PRs.
+  # ────────────────────────────────────────────────────────────────────────────
+  e2e-smoke:
+    name: E2E Smoke (Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: unit-tests
+
+    env:
+      TEST_BASE_URL: 'http://localhost:4321'
+      PUBLIC_SITE_URL: 'http://localhost:4321'
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      # Admin tests auto-skip when these are not set
+      TEST_ADMIN_EMAIL: ''
+      TEST_ADMIN_PASSWORD: ''
+      TEST_LISTING_SLUG: ${{ secrets.TEST_LISTING_SLUG }}
+      TEST_LISTING_ID: ${{ secrets.TEST_LISTING_ID }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers (chromium only)
+        run: npx playwright install chromium --with-deps
+
+      - name: Run E2E smoke tests (chromium, non-admin)
+        run: |
+          npx playwright test \
+            --project=chromium \
+            tests/e2e/homepage.spec.ts \
+            tests/e2e/listings.spec.ts \
+            tests/e2e/contact.spec.ts \
+            tests/e2e/faqs.spec.ts \
+            tests/e2e/i18n.spec.ts
+        env:
+          CI: 'true'
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-pr-${{ github.run_number }}
+          path: playwright-report/
+          retention-days: 7
+
+      - name: Upload Playwright traces on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces-${{ github.run_number }}
+          path: test-results/
+          retention-days: 7
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 4 — Accessibility smoke (chromium, public pages)
+  # Runs axe-core against homepage, listings, contact, faqs.
+  # Only runs when files in src/ change to avoid noise on config-only PRs.
+  # ────────────────────────────────────────────────────────────────────────────
+  accessibility-smoke:
+    name: Accessibility Smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: unit-tests
+    # Only run when source files changed
+    if: |
+      contains(github.event.pull_request.changed_files, 'src/') ||
+      github.event_name == 'push'
+
+    env:
+      TEST_BASE_URL: 'http://localhost:4321'
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      PUBLIC_SITE_URL: 'http://localhost:4321'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Playwright browsers (chromium only)
+        run: npx playwright install chromium --with-deps
+
+      - name: Run accessibility tests
+        run: |
+          npx playwright test \
+            --project=chromium \
+            tests/e2e/accessibility.spec.ts
+
+      - name: Upload accessibility report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: a11y-report-${{ github.run_number }}
+          path: playwright-report/
+          retention-days: 7
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 5 — Build validation
+  # Verifies the Astro + Wrangler build compiles cleanly.
+  # Must pass even if E2E is skipped.
+  # ────────────────────────────────────────────────────────────────────────────
+  build:
+    name: Build Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    needs: static-analysis
+
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      PUBLIC_SITE_URL: 'https://kefaloniabnb.com'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Astro
+        run: npm run build
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-${{ github.run_number }}
+          path: dist/
+          retention-days: 3
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # GATE — all required jobs must pass before PR can be merged
+  # Add this job to branch protection rules as a required status check.
+  # ────────────────────────────────────────────────────────────────────────────
+  pr-gate:
+    name: PR Gate (all checks passed)
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs:
+      - static-analysis
+      - unit-tests
+      - e2e-smoke
+      - build
+    if: always()
+
+    steps:
+      - name: Check all required jobs passed
+        run: |
+          if [[ "${{ needs.static-analysis.result }}" != "success" ]]; then
+            echo "FAIL: static-analysis did not pass"
+            exit 1
+          fi
+          if [[ "${{ needs.unit-tests.result }}" != "success" ]]; then
+            echo "FAIL: unit-tests did not pass"
+            exit 1
+          fi
+          if [[ "${{ needs.e2e-smoke.result }}" != "success" ]]; then
+            echo "FAIL: e2e-smoke did not pass"
+            exit 1
+          fi
+          if [[ "${{ needs.build.result }}" != "success" ]]; then
+            echo "FAIL: build did not pass"
+            exit 1
+          fi
+          echo "All required PR checks passed."

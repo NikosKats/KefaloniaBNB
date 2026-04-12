@@ -1,0 +1,163 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+import { sanitizeHtml } from '../../lib/sanitize.ts';
+
+const { slug } = Astro.params;
+const service = getServiceClient();
+
+const { data: post } = await service
+  .from('blog_posts')
+  .select('*')
+  .eq('slug', slug)
+  .eq('is_published', true)
+  .single();
+
+if (!post) return Astro.redirect('/blog');
+
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://kefaloniabnb.com';
+const postUrl = `${siteUrl}/blog/${post.slug}`;
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+const articleSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'Article',
+  headline: post.title,
+  description: post.meta_description || post.excerpt || '',
+  image: post.cover_image ? [post.cover_image] : undefined,
+  author: {
+    '@type': 'Organization',
+    name: post.author ?? 'KefaloniaBNB',
+    url: siteUrl,
+  },
+  publisher: {
+    '@type': 'Organization',
+    name: 'KefaloniaBNB',
+    url: siteUrl,
+    logo: { '@type': 'ImageObject', url: `${siteUrl}/favicon.svg` },
+  },
+  datePublished: post.published_at,
+  dateModified: post.updated_at,
+  mainEntityOfPage: { '@type': 'WebPage', '@id': postUrl },
+  url: postUrl,
+  keywords: (post.tags ?? []).join(', '),
+};
+
+const breadcrumbSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+    { '@type': 'ListItem', position: 2, name: 'Blog', item: `${siteUrl}/blog` },
+    { '@type': 'ListItem', position: 3, name: post.title, item: postUrl },
+  ],
+};
+---
+
+<BaseLayout
+  title={post.meta_title || post.title}
+  description={post.meta_description || post.excerpt || `${post.title} — KefaloniaBNB travel guide.`}
+  ogImage={post.cover_image ?? undefined}
+  ogType="article"
+  canonical={postUrl}
+  schema={[articleSchema, breadcrumbSchema]}
+>
+  <article class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+
+    <!-- Breadcrumb -->
+    <nav class="text-sm text-gray-400 mb-8" aria-label="Breadcrumb">
+      <ol class="flex items-center gap-2">
+        <li><a href="/" class="hover:text-gray-700 transition-colors">{isEl ? 'Αρχική' : isBg ? 'Начало' : isSr ? 'Почетна' : isTr ? 'Ana Sayfa' : isRo ? 'Acasă' : 'Home'}</a></li>
+        <li aria-hidden="true">/</li>
+        <li><a href="/blog" class="hover:text-gray-700 transition-colors">Blog</a></li>
+        <li aria-hidden="true">/</li>
+        <li class="text-gray-600 truncate">{post.title}</li>
+      </ol>
+    </nav>
+
+    <!-- Tags -->
+    {(post.tags ?? []).length > 0 && (
+      <div class="flex flex-wrap gap-2 mb-4">
+        {(post.tags as string[]).map((tag: string) => (
+          <span class="text-xs font-medium text-[#c9a96e] bg-[#c9a96e]/10 px-2.5 py-1 rounded-full">
+            {tag}
+          </span>
+        ))}
+      </div>
+    )}
+
+    <!-- Title -->
+    <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 leading-tight mb-4">{post.title}</h1>
+
+    <!-- Meta -->
+    <div class="flex items-center gap-4 text-sm text-gray-400 mb-8 pb-8 border-b border-gray-100">
+      <span>{isEl ? 'Από' : isBg ? 'От' : isSr ? 'Od' : isTr ? 'Yazan:' : isRo ? 'De' : 'By'} {post.author ?? 'KefaloniaBNB'}</span>
+      {post.published_at && (
+        <time datetime={post.published_at}>{fmtDate(post.published_at)}</time>
+      )}
+    </div>
+
+    <!-- Cover image -->
+    {post.cover_image && (
+      <figure class="mb-10 -mx-4 sm:-mx-6 lg:-mx-8">
+        <img
+          src={post.cover_image}
+          alt={post.title}
+          class="w-full aspect-video object-cover rounded-2xl"
+          loading="eager"
+        />
+      </figure>
+    )}
+
+    <!-- Excerpt lead -->
+    {post.excerpt && (
+      <p class="text-xl text-gray-600 leading-relaxed mb-8 font-light">{post.excerpt}</p>
+    )}
+
+    <!-- Content -->
+    <div
+      class="prose prose-lg max-w-none
+        prose-headings:font-bold prose-headings:text-gray-900
+        prose-h2:text-2xl prose-h2:mt-10 prose-h2:mb-4
+        prose-h3:text-xl prose-h3:mt-8 prose-h3:mb-3
+        prose-p:text-gray-700 prose-p:leading-relaxed prose-p:mb-5
+        prose-a:text-[#c9a96e] prose-a:font-medium hover:prose-a:opacity-80
+        prose-ul:pl-5 prose-ul:space-y-1.5
+        prose-ol:pl-5 prose-ol:space-y-1.5
+        prose-li:text-gray-700
+        prose-img:rounded-2xl prose-img:my-8 prose-img:w-full
+        prose-blockquote:border-l-4 prose-blockquote:border-[#c9a96e] prose-blockquote:pl-4 prose-blockquote:italic prose-blockquote:text-gray-600
+        prose-strong:text-gray-900 prose-strong:font-semibold"
+      set:html={sanitizeHtml(post.content ?? '')}
+    />
+
+    <!-- Footer share / CTA -->
+    <div class="mt-16 pt-8 border-t border-gray-100">
+      <div class="bg-[#1a1a2e] rounded-2xl p-8 text-white text-center">
+        <p class="text-[#c9a96e] text-sm font-semibold uppercase tracking-widest mb-2">{isEl ? 'Έτοιμοι να επισκεφθείτε;' : isBg ? 'Готови ли сте да посетите?' : isSr ? 'Спремни за посету?' : isTr ? 'Ziyaret etmeye hazır mısınız?' : isRo ? 'Sunteți gata să vizitați?' : 'Ready to visit?'}</p>
+        <h2 class="text-2xl font-bold mb-3">{isEl ? 'Κλείστε τη Διαμονή σας στην Καβάλα' : isBg ? 'Резервирайте престоя си в Kefalonia' : isSr ? 'Rezervišite boravak u Kavali' : isTr ? 'Kefalonia\'da Konaklamanızı Rezerve Edin' : isRo ? 'Rezervați Sejurul în Kefalonia' : 'Book Your Stay in Kefalonia'}</h2>
+        <p class="text-gray-300 mb-6 max-w-lg mx-auto">
+          {isEl ? 'Δείτε τις επιλεγμένες εξοχικές κατοικίες μας στην Κεραμωτή και την Καβάλα. Απευθείας κράτηση, καλύτερες τιμές εγγυημένες.' : isBg ? 'Разгледайте нашите внимателно подбрани ваканционни имоти в Keramoti и Kefalonia. Директна резервация, най-добри цени гарантирани.' : isSr ? 'Pregledajte naše pažljivo odabrane smeštaje u Keramotiju i Kavali. Direktna rezervacija, najbolje cene garantovane.' : isTr ? 'Keramoti ve Kefalonia\'daki özenle seçilmiş tatil kiralıklarımıza göz atın. Doğrudan rezervasyon, en iyi fiyatlar garantili.' : isRo ? 'Răsfoiți închirierile noastre de vacanță selectate manual în Keramoti și Kefalonia. Rezervare directă, cele mai bune tarife garantate.' : 'Browse our hand-picked vacation rentals in Keramoti and Kefalonia. Direct booking, best rates guaranteed.'}
+        </p>
+        <a href="/rentals" class="inline-flex items-center gap-2 bg-[#c9a96e] text-white font-semibold px-6 py-3 rounded-xl hover:bg-[#b8935d] transition-colors">
+          {isEl ? 'Δείτε Όλες τις Κατοικίες →' : isBg ? 'Вижте всички имоти →' : isSr ? 'Pogledajte sve smeštaje →' : isTr ? 'Tüm Kiralıkları Görüntüle →' : isRo ? 'Vezi Toate Închirierile →' : 'View All Rentals →'}
+        </a>
+      </div>
+    </div>
+
+    <!-- Back link -->
+    <div class="mt-8">
+      <a href="/blog" class="text-sm text-gray-400 hover:text-gray-700 transition-colors">{isEl ? '← Πίσω σε όλα τα άρθρα' : isBg ? '← Обратно към всички статии' : isSr ? '← Nazad na sve objave' : isTr ? '← Tüm makalelere geri dön' : isRo ? '← Înapoi la toate postările' : '← Back to all posts'}</a>
+    </div>
+
+  </article>
+</BaseLayout>

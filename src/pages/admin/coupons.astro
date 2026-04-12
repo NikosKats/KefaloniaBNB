@@ -1,0 +1,242 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const L: Record<string, Record<string, string>> = {
+  coupon_codes:     { en: 'Coupon Codes', el: 'Κωδικοί Κουπονιών' },
+  new_coupon:       { en: '+ New Coupon', el: '+ Νέο Κουπόνι' },
+  msg_created:      { en: 'Coupon created successfully.', el: 'Το κουπόνι δημιουργήθηκε επιτυχώς.' },
+  msg_deleted:      { en: 'Coupon deleted.', el: 'Το κουπόνι διαγράφηκε.' },
+  msg_toggled:      { en: 'Coupon status updated.', el: 'Η κατάσταση κουπονιού ενημερώθηκε.' },
+  create_coupon:    { en: 'Create Coupon', el: 'Δημιουργία Κουπονιού' },
+  lbl_code:         { en: 'Code *', el: 'Κωδικός *' },
+  lbl_disc_type:    { en: 'Discount type *', el: 'Τύπος έκπτωσης *' },
+  lbl_disc_val:     { en: 'Discount value *', el: 'Αξία έκπτωσης *' },
+  lbl_max_uses:     { en: 'Max uses (blank = unlimited)', el: 'Μέγ. χρήσεις (κενό = απεριόριστο)' },
+  lbl_valid_from:   { en: 'Valid from', el: 'Ισχύει από' },
+  lbl_valid_until:  { en: 'Valid until', el: 'Ισχύει έως' },
+  opt_percent:      { en: 'Percent (%)', el: 'Ποσοστό (%)' },
+  opt_fixed:        { en: 'Fixed (€)', el: 'Σταθερό (€)' },
+  btn_create:       { en: 'Create', el: 'Δημιουργία' },
+  btn_cancel:       { en: 'Cancel', el: 'Άκυρο' },
+  th_code:          { en: 'Code', el: 'Κωδικός' },
+  th_discount:      { en: 'Discount', el: 'Έκπτωση' },
+  th_uses:          { en: 'Uses', el: 'Χρήσεις' },
+  th_valid_until:   { en: 'Valid until', el: 'Ισχύει έως' },
+  th_status:        { en: 'Status', el: 'Κατάσταση' },
+  no_coupons:       { en: 'No coupons yet. Create your first one.', el: 'Δεν υπάρχουν κουπόνια. Δημιουργήστε το πρώτο.' },
+  active:           { en: 'Active', el: 'Ενεργό' },
+  inactive:         { en: 'Inactive', el: 'Ανενεργό' },
+  deactivate:       { en: 'Deactivate', el: 'Απενεργοποίηση' },
+  activate:         { en: 'Activate', el: 'Ενεργοποίηση' },
+  delete:           { en: 'Delete', el: 'Διαγραφή' },
+  delete_confirm:   { en: 'Delete this coupon?', el: 'Διαγραφή αυτού του κουπονιού;' },
+};
+function al(k: string) { return L[k]?.[lang] ?? L[k]?.en ?? k; }
+
+const service = getServiceClient();
+const action  = Astro.url.searchParams.get('action');
+const msg     = Astro.url.searchParams.get('msg');
+
+const { data: coupons } = await service
+  .from('coupons')
+  .select('*')
+  .order('created_at', { ascending: false });
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+---
+
+<AdminLayout title="Coupons">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-xl font-bold text-gray-900">{al('coupon_codes')}</h1>
+    <button
+      id="new-btn"
+      class="min-h-[44px] bg-[#1a1a2e] text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-[#2d2d4e] transition-colors"
+    >
+      {al('new_coupon')}
+    </button>
+  </div>
+
+  {msg === 'created' && <div class="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm p-3 rounded-xl">{al('msg_created')}</div>}
+  {msg === 'deleted' && <div class="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-xl">{al('msg_deleted')}</div>}
+  {msg === 'toggled' && <div class="mb-4 bg-blue-50 border border-blue-200 text-blue-700 text-sm p-3 rounded-xl">{al('msg_toggled')}</div>}
+
+  <!-- New coupon form (hidden by default) -->
+  <div id="new-form" class="hidden mb-6 bg-white border border-gray-200 rounded-2xl p-6">
+    <h2 class="font-semibold text-gray-900 mb-4">{al('create_coupon')}</h2>
+    <form method="POST" action="/api/admin/coupons/create" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">{al('lbl_code')}</label>
+        <input type="text" name="code" required placeholder="SUMMER20" class="input-field uppercase" style="text-transform:uppercase" />
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">{al('lbl_disc_type')}</label>
+        <select name="discount_type" class="input-field">
+          <option value="percent">{al('opt_percent')}</option>
+          <option value="fixed">{al('opt_fixed')}</option>
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">{al('lbl_disc_val')}</label>
+        <input type="number" name="discount_value" required min="1" step="0.01" placeholder="20" class="input-field" />
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">{al('lbl_max_uses')}</label>
+        <input type="number" name="max_uses" min="1" placeholder="∞" class="input-field" />
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">{al('lbl_valid_from')}</label>
+        <input type="date" name="valid_from" class="input-field" />
+      </div>
+      <div>
+        <label class="block text-xs font-medium text-gray-600 mb-1">{al('lbl_valid_until')}</label>
+        <input type="date" name="valid_until" class="input-field" />
+      </div>
+      <div class="sm:col-span-2 flex gap-3">
+        <button type="submit" class="bg-[#1a1a2e] text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-[#2d2d4e] transition-colors">
+          {al('btn_create')}
+        </button>
+        <button type="button" id="cancel-btn" class="border border-gray-300 text-gray-700 text-sm font-medium px-5 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
+          {al('btn_cancel')}
+        </button>
+      </div>
+    </form>
+  </div>
+
+  <!-- Coupons — Mobile cards -->
+  <div class="lg:hidden space-y-3">
+    {(!coupons || coupons.length === 0) && (
+      <div class="bg-white rounded-2xl border border-gray-100 p-8 text-center text-gray-400">
+        <p class="text-3xl mb-2">🏷️</p>
+        <p class="text-sm">{al('no_coupons')}</p>
+      </div>
+    )}
+    {(coupons ?? []).map((c: any) => (
+      <div class="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
+        <div class="flex items-start justify-between gap-2">
+          <p class="font-mono font-semibold text-gray-900 text-lg">{c.code}</p>
+          <span class={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${c.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+            {c.is_active ? al('active') : al('inactive')}
+          </span>
+        </div>
+        <div class="grid grid-cols-2 gap-2 text-sm">
+          <div>
+            <p class="text-xs text-gray-400">{al('th_discount')}</p>
+            <p class="text-gray-700">{c.discount_type === 'percent' ? `${c.discount_value}%` : `€${c.discount_value}`}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-400">{al('th_uses')}</p>
+            <p class="text-gray-500">{c.used_count ?? 0}{c.max_uses ? ` / ${c.max_uses}` : ''}</p>
+          </div>
+          <div>
+            <p class="text-xs text-gray-400">{al('th_valid_until')}</p>
+            <p class="text-gray-500">{c.valid_until ? fmtDate(c.valid_until) : '—'}</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2 pt-1 border-t border-gray-100">
+          <form method="POST" action="/api/admin/coupons/toggle">
+            <input type="hidden" name="id" value={c.id} />
+            <input type="hidden" name="is_active" value={String(!c.is_active)} />
+            <button type="submit" class="min-h-[44px] px-4 py-2.5 text-sm text-blue-600 hover:text-blue-800 font-medium transition-colors">
+              {c.is_active ? al('deactivate') : al('activate')}
+            </button>
+          </form>
+          <form method="POST" action="/api/admin/coupons/delete" onsubmit={`return confirm('${al('delete_confirm')}')`}>
+            <input type="hidden" name="id" value={c.id} />
+            <button type="submit" class="min-h-[44px] px-4 py-2.5 text-sm text-red-500 hover:text-red-700 font-medium transition-colors">
+              {al('delete')}
+            </button>
+          </form>
+        </div>
+      </div>
+    ))}
+  </div>
+
+  <!-- Coupons table (desktop) -->
+  <div class="hidden lg:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
+    {!coupons || coupons.length === 0 ? (
+      <div class="text-center py-16 text-gray-400">
+        <p class="text-3xl mb-2">🏷️</p>
+        <p class="text-sm">{al('no_coupons')}</p>
+      </div>
+    ) : (
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-100">
+          <tr>
+            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{al('th_code')}</th>
+            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{al('th_discount')}</th>
+            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{al('th_uses')}</th>
+            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{al('th_valid_until')}</th>
+            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{al('th_status')}</th>
+            <th class="px-5 py-3"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          {coupons.map((c: any) => (
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="px-5 py-4 font-mono font-semibold text-gray-900">{c.code}</td>
+              <td class="px-5 py-4 text-gray-700">
+                {c.discount_type === 'percent' ? `${c.discount_value}%` : `€${c.discount_value}`}
+              </td>
+              <td class="px-5 py-4 text-gray-500">
+                {c.used_count ?? 0}{c.max_uses ? ` / ${c.max_uses}` : ''}
+              </td>
+              <td class="px-5 py-4 text-gray-500">
+                {c.valid_until ? fmtDate(c.valid_until) : '—'}
+              </td>
+              <td class="px-5 py-4">
+                <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${c.is_active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {c.is_active ? al('active') : al('inactive')}
+                </span>
+              </td>
+              <td class="px-5 py-4">
+                <div class="flex items-center gap-2 justify-end">
+                  <form method="POST" action="/api/admin/coupons/toggle">
+                    <input type="hidden" name="id" value={c.id} />
+                    <input type="hidden" name="is_active" value={String(!c.is_active)} />
+                    <button type="submit" class="text-xs text-blue-600 hover:text-blue-800 font-medium transition-colors">
+                      {c.is_active ? al('deactivate') : al('activate')}
+                    </button>
+                  </form>
+                  <form method="POST" action="/api/admin/coupons/delete" onsubmit={`return confirm('${al('delete_confirm')}')`}>
+                    <input type="hidden" name="id" value={c.id} />
+                    <button type="submit" class="text-xs text-red-500 hover:text-red-700 font-medium transition-colors">
+                      {al('delete')}
+                    </button>
+                  </form>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+  </div>
+</AdminLayout>
+
+<script is:inline>
+  document.getElementById('new-btn')?.addEventListener('click', () => {
+    document.getElementById('new-form')?.classList.remove('hidden');
+  });
+  document.getElementById('cancel-btn')?.addEventListener('click', () => {
+    document.getElementById('new-form')?.classList.add('hidden');
+  });
+
+  document.querySelectorAll('form[action="/api/admin/coupons/toggle"]').forEach(function(form) {
+    form.addEventListener('submit', async function(e) {
+      e.preventDefault();
+      var fd = new FormData(form);
+      var isActivating = fd.get('is_active') === 'true';
+      var res = await fetch('/api/admin/coupons/toggle', { method: 'POST', body: fd });
+      if (res.ok || res.redirected) {
+        window.adminToast(isActivating ? '✅ Coupon enabled' : '🔕 Coupon disabled', isActivating ? 'success' : 'info');
+        setTimeout(function() { window.location.reload(); }, 1200);
+      } else {
+        window.adminToast('❌ Failed to update coupon', 'error');
+      }
+    });
+  });
+</script>

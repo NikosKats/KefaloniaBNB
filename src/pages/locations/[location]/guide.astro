@@ -1,0 +1,338 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { getLocationBySlug } from '../../../lib/locations';
+import { getGuideForLocation, categoryIcon, diningIcon, priceLabel } from '../../../lib/guide-content';
+import { type Lang } from '../../../i18n/translations.ts';
+import { getRegionLabel } from '../../../i18n/locations-i18n.ts';
+const lang = (Astro.locals.lang ?? 'en') as Lang;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const { location: slug } = Astro.params;
+const loc = getLocationBySlug(slug!);
+if (!loc) return Astro.redirect('/locations');
+
+const guide = getGuideForLocation(loc);
+const siteUrl = 'https://kefaloniabnb.com';
+
+// Fetch approved partner businesses for this location
+const supabase = Astro.locals.supabase;
+const { data: partnerBizRaw } = await supabase
+  .from('partner_businesses')
+  .select('*, partner_coupons(*)')
+  .eq('location_slug', loc.slug)
+  .eq('status', 'active')
+  .order('featured', { ascending: false })
+  .order('sort_order')
+  .order('created_at');
+const partnerBiz = partnerBizRaw ?? [];
+
+const bizTypeIcon: Record<string, string> = {
+  taverna: '🐟', restaurant: '🍽', cafe: '☕', bar: '🍹',
+  boat_rental: '⛵', guided_tour: '🗺', watersports: '🏄',
+  transport: '🚗', shop: '🛍', other: '📍',
+};
+
+const regionLabel = getRegionLabel(loc.region, lang);
+const breadcrumbBack = loc.region === 'thassos' ? '/locations/thassos' : '/locations/kefalonia';
+
+const seoTitle = `${loc.name} Local Guide — Things to Do, Where to Eat, Travel Tips`;
+const seoDescription = `Local guide to ${loc.name}: best activities, restaurants, getting around tips and insider advice for your stay. Updated for ${new Date().getFullYear()}.`;
+
+const schema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: regionLabel, item: `${siteUrl}${breadcrumbBack}` },
+      { '@type': 'ListItem', position: 3, name: loc.name, item: `${siteUrl}/locations/${loc.slug}` },
+      { '@type': 'ListItem', position: 4, name: 'Local Guide', item: `${siteUrl}/locations/${loc.slug}/guide` },
+    ],
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'TouristDestination',
+    name: loc.name,
+    description: guide.intro,
+    ...(loc.latitude && loc.longitude ? { geo: { '@type': 'GeoCoordinates', latitude: loc.latitude, longitude: loc.longitude } } : {}),
+    touristType: loc.bestFor,
+  },
+];
+
+---
+
+<BaseLayout title={seoTitle} description={seoDescription} schema={schema}>
+
+  <!-- Hero -->
+  <section class="bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] text-white py-16 px-4">
+    <div class="max-w-4xl mx-auto">
+      <nav class="flex items-center gap-2 text-xs text-white/40 mb-5">
+        <a href="/" class="hover:text-white/70 transition-colors">{isEl ? 'Αρχική' : isBg ? 'Начало' : isSr ? 'Почетна' : isTr ? 'Ana Sayfa' : isRo ? 'Acasă' : 'Home'}</a>
+        <span>/</span>
+        <a href={breadcrumbBack} class="hover:text-white/70 transition-colors">{regionLabel}</a>
+        <span>/</span>
+        <a href={`/locations/${loc.slug}`} class="hover:text-white/70 transition-colors">{loc.name}</a>
+        <span>/</span>
+        <span class="text-white/70">{isEl ? 'Τοπικός Οδηγός' : isBg ? 'Местен наръчник' : isSr ? 'Локални водич' : isTr ? 'Yerel Rehber' : isRo ? 'Ghid Local' : 'Local Guide'}</span>
+      </nav>
+
+      <div class="flex items-start gap-4">
+        <span class="text-4xl">🗺</span>
+        <div>
+          <p class="text-xs text-[#c9a96e] font-semibold uppercase tracking-widest mb-1">{isEl ? 'Τοπικός Οδηγός' : isBg ? 'Местен наръчник' : isSr ? 'Локални водич' : isTr ? 'Yerel Rehber' : isRo ? 'Ghid Local' : 'Local Guide'}</p>
+          <h1 class="text-3xl sm:text-4xl font-bold mb-3">{loc.name}</h1>
+          <p class="text-white/70 text-base max-w-2xl leading-relaxed">{guide.intro}</p>
+        </div>
+      </div>
+
+      <!-- Quick links -->
+      <div class="flex flex-wrap gap-2 mt-6 ml-12">
+        <a href="#activities" class="text-xs bg-white/10 hover:bg-white/20 border border-white/10 text-white/80 rounded-full px-3 py-1.5 transition-colors">{isEl ? 'Τι να Κάνετε' : isBg ? 'Какво да правите' : isSr ? 'Шта да радите' : isTr ? 'Yapılacak Şeyler' : isRo ? 'Lucruri de Făcut' : 'Things to Do'}</a>
+        <a href="#dining" class="text-xs bg-white/10 hover:bg-white/20 border border-white/10 text-white/80 rounded-full px-3 py-1.5 transition-colors">{isEl ? 'Πού να Φάτε' : isBg ? 'Къде да хапнете' : isSr ? 'Где да jedete' : isTr ? 'Nerede Yenir' : isRo ? 'Unde să Mănânci' : 'Where to Eat'}</a>
+        <a href="#getting-around" class="text-xs bg-white/10 hover:bg-white/20 border border-white/10 text-white/80 rounded-full px-3 py-1.5 transition-colors">{isEl ? 'Πώς να Κινηθείτε' : isBg ? 'Как да се придвижвате' : isSr ? 'Кретање' : isTr ? 'Nasıl Gezersiniz' : isRo ? 'Cum să Ajungi' : 'Getting Around'}</a>
+        <a href="#tips" class="text-xs bg-white/10 hover:bg-white/20 border border-white/10 text-white/80 rounded-full px-3 py-1.5 transition-colors">{isEl ? 'Τοπικές Συμβουλές' : isBg ? 'Местни съвети' : isSr ? 'Локални савети' : isTr ? 'Yerel İpuçları' : isRo ? 'Sfaturi Locale' : 'Local Tips'}</a>
+        <a href="#partner" class="text-xs bg-[#c9a96e]/30 hover:bg-[#c9a96e]/50 border border-[#c9a96e]/30 text-[#c9a96e] rounded-full px-3 py-1.5 transition-colors">{isEl ? 'Καταχωρίστε την Επιχείρησή σας' : isBg ? 'Добавете бизнеса си' : isSr ? 'Огласите свој бизнис' : isTr ? 'İşletmenizi Listeleyin' : isRo ? 'Listează-ți Afacerea' : 'List Your Business'}</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- Best time -->
+  <div class="bg-amber-50 border-b border-amber-100 py-3 px-4">
+    <div class="max-w-4xl mx-auto flex items-center gap-3 text-sm text-amber-800">
+      <span>📅</span>
+      <span><strong>{isEl ? 'Καλύτερη εποχή για επίσκεψη:' : isBg ? 'Най-добро време за посещение:' : isSr ? 'Најбоље време за посету:' : isTr ? 'Ziyaret için en iyi zaman:' : isRo ? 'Cel mai bun moment pentru vizită:' : 'Best time to visit:'}</strong> {guide.bestTime}</span>
+    </div>
+  </div>
+
+  <div class="max-w-4xl mx-auto px-4 sm:px-6 py-12 space-y-16">
+
+    <!-- Activities -->
+    <section id="activities">
+      <div class="flex items-center gap-3 mb-6">
+        <span class="text-2xl">🎯</span>
+        <h2 class="text-2xl font-bold text-gray-900">{isEl ? `Τι να Κάνετε στη/ν ${loc.name}` : isBg ? `Какво да правите в ${loc.name}` : isSr ? `Шта да радите у ${loc.name}` : isTr ? `${loc.name}'de Yapılacaklar` : isRo ? `Lucruri de Făcut în ${loc.name}` : `Things to Do in ${loc.name}`}</h2>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {guide.activities.map((activity) => (
+          <div class="bg-white border border-gray-100 rounded-2xl p-5 hover:border-[#c9a96e]/40 hover:shadow-sm transition-all">
+            <div class="flex items-start gap-3">
+              <span class="text-2xl mt-0.5 shrink-0">{categoryIcon[activity.category] ?? '📍'}</span>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap mb-1">
+                  <h3 class="font-semibold text-gray-900 text-sm">{activity.name}</h3>
+                  {activity.priceRange && (
+                    <span class="text-xs text-gray-400 bg-gray-50 border border-gray-100 rounded-full px-2 py-0.5" title={priceLabel[activity.priceRange]}>
+                      {activity.priceRange}
+                    </span>
+                  )}
+                </div>
+                <p class="text-sm text-gray-600 leading-relaxed">{activity.description}</p>
+                {activity.tip && (
+                  <p class="mt-2 text-xs text-[#c9a96e] flex items-start gap-1">
+                    <span class="shrink-0">💡</span>
+                    <span>{activity.tip}</span>
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- Dining -->
+    <section id="dining">
+      <div class="flex items-center gap-3 mb-6">
+        <span class="text-2xl">🍽</span>
+        <h2 class="text-2xl font-bold text-gray-900">{isEl ? 'Πού να Φάτε & να Πιείτε' : isBg ? 'Къде да хапнете и пиете' : isSr ? 'Где да jedete i pijete' : isTr ? 'Nerede Yenir ve İçilir' : isRo ? 'Unde să Mănânci și să Bei' : 'Where to Eat & Drink'}</h2>
+      </div>
+      <div class="space-y-3">
+        {guide.dining.map((place) => (
+          <div class="bg-white border border-gray-100 rounded-2xl p-4 flex items-start gap-4">
+            <span class="text-2xl shrink-0 mt-0.5">{diningIcon[place.type] ?? '🍽'}</span>
+            <div class="flex-1">
+              <div class="flex items-center gap-2 flex-wrap mb-1">
+                <h3 class="font-semibold text-gray-900 text-sm">{place.name}</h3>
+                <span class="text-xs text-gray-400 capitalize">{place.type}</span>
+                <span class="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-full px-2 py-0.5">{place.priceRange} · {priceLabel[place.priceRange]}</span>
+              </div>
+              <p class="text-sm text-gray-600">{place.description}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- Getting Around -->
+    <section id="getting-around">
+      <div class="flex items-center gap-3 mb-6">
+        <span class="text-2xl">🚗</span>
+        <h2 class="text-2xl font-bold text-gray-900">{isEl ? 'Μετακινήσεις' : isBg ? 'Придвижване' : isSr ? 'Кретање по граду' : isTr ? 'Ulaşım' : isRo ? 'Deplasare' : 'Getting Around'}</h2>
+      </div>
+      <div class="bg-white border border-gray-100 rounded-2xl divide-y divide-gray-50">
+        {guide.gettingAround.map((item) => (
+          <div class="px-5 py-4 flex items-start gap-3">
+            <span class="text-gray-400 mt-0.5 shrink-0">→</span>
+            <p class="text-sm text-gray-700">{item}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- Tips -->
+    <section id="tips">
+      <div class="flex items-center gap-3 mb-6">
+        <span class="text-2xl">💡</span>
+        <h2 class="text-2xl font-bold text-gray-900">{isEl ? 'Τοπικές Συμβουλές' : isBg ? 'Вътрешни съвети' : isSr ? 'Инсајдерски савети' : isTr ? 'Yerel İpuçları' : isRo ? 'Sfaturi din Interior' : 'Insider Tips'}</h2>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {guide.tips.map((tip) => (
+          <div class="bg-amber-50 border border-amber-100 rounded-xl px-4 py-3 flex items-start gap-2">
+            <span class="text-amber-500 shrink-0 mt-0.5">★</span>
+            <p class="text-sm text-amber-900">{tip}</p>
+          </div>
+        ))}
+      </div>
+    </section>
+
+    <!-- Partner businesses -->
+    {partnerBiz.length > 0 && (
+      <section id="local-businesses">
+        <div class="flex items-center gap-3 mb-6">
+          <span class="text-2xl">🤝</span>
+          <h2 class="text-2xl font-bold text-gray-900">{isEl ? 'Προτεινόμενες Τοπικές Επιχειρήσεις' : isBg ? 'Препоръчани местни бизнеси' : isSr ? 'Препоручена локална предузећа' : isTr ? 'Önerilen Yerel İşletmeler' : isRo ? 'Afaceri Locale Recomandate' : 'Recommended Local Businesses'}</h2>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {partnerBiz.map((b: any) => (
+            <div class={`bg-white border rounded-2xl p-5 flex flex-col gap-3 ${b.featured ? 'border-[#c9a96e]/40 shadow-sm' : 'border-gray-100'}`}>
+              <div class="flex items-start gap-3">
+                <span class="text-2xl shrink-0">{bizTypeIcon[b.type] ?? '📍'}</span>
+                <div class="flex-1 min-w-0">
+                  <div class="flex items-center gap-2 flex-wrap">
+                    <h3 class="font-semibold text-gray-900 text-sm">{b.name}</h3>
+                    {b.featured && <span class="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">{isEl ? '★ Προτεινόμενο' : isBg ? '★ Препоръчано' : isSr ? '★ Препоручено' : isTr ? '★ Önerilen' : isRo ? '★ Recomandat' : '★ Recommended'}</span>}
+                    {b.price_range && <span class="text-xs text-gray-400">{b.price_range}</span>}
+                  </div>
+                  {b.highlight && <p class="text-xs font-medium text-[#c9a96e] mt-0.5">"{b.highlight}"</p>}
+                  <p class="text-sm text-gray-600 mt-1">{b.description}</p>
+                </div>
+              </div>
+              {/* Active coupons */}
+              {(b.partner_coupons ?? []).filter((c: any) => c.is_active).map((c: any) => (
+                <div class="bg-emerald-50 border border-emerald-200 rounded-xl px-3 py-2.5" id={`coupon-${c.id}`}>
+                  <div class="flex items-center justify-between gap-3">
+                    <div>
+                      <div class="flex items-center gap-2 mb-0.5">
+                        <span class="text-xs font-semibold text-emerald-700 bg-emerald-100 rounded-full px-2 py-0.5">
+                          {c.discount_type === 'percent' ? `-${c.discount_value}%` : `-€${c.discount_value}`}
+                        </span>
+                      </div>
+                      <p class="text-xs text-emerald-700">{c.description}</p>
+                      {c.valid_until && <p class="text-xs text-emerald-600/70 mt-0.5">{isEl ? 'Ισχύει έως' : isBg ? 'Валидно до' : isSr ? 'Важи до' : isTr ? 'Son tarih:' : isRo ? 'Valabil până la' : 'Valid until'} {new Date(c.valid_until).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</p>}
+                    </div>
+                    <button
+                      class="show-code-btn shrink-0 text-xs font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg px-3 py-1.5 transition-colors"
+                      data-coupon-id={c.id} data-business-id={b.id} data-location={loc.slug}>
+                      {isEl ? 'Εμφάνιση Κωδικού' : isBg ? 'Покажи код' : isSr ? 'Прикажи код' : isTr ? 'Kodu Göster' : isRo ? 'Arată Codul' : 'Show Code'}
+                    </button>
+                  </div>
+                  {/* Reveal section — shown after guest taps "Show Code" */}
+                  <div class="coupon-reveal hidden mt-3 pt-3 border-t border-emerald-200">
+                    <p class="text-xs text-emerald-700 mb-2">{isEl ? 'Δείξτε το στην επιχείρηση — σαρώνουν το QR για επιβεβαίωση:' : isBg ? 'Покажете го на бизнеса — те сканират QR кода за потвърждение:' : isSr ? 'Покажите ово предузећу — они скенирају QR код за потврду:' : isTr ? 'Bunu işletmeye gösterin — onaylamak için QR\'ı tarayacaklar:' : isRo ? 'Arătați acest lucru afacerii — ei scanează QR-ul pentru confirmare:' : 'Show this to the business — they scan the QR to confirm:'}</p>
+                    <div class="flex gap-4 items-center">
+                      <div class="flex-1">
+                        <p class="font-mono font-bold text-emerald-800 text-xl tracking-widest coupon-code-text"></p>
+                        <p class="text-xs text-emerald-500 mt-1">{isEl ? '← κωδικός ή σκανάρετε QR →' : isBg ? '← код или сканирайте QR →' : isSr ? '← код или скенирајте QR →' : isTr ? '← kod veya QR tara →' : isRo ? '← cod sau scanează QR →' : '← code or scan QR →'}</p>
+                      </div>
+                      <img class="coupon-qr w-24 h-24 rounded-xl border border-emerald-200 shrink-0" src="" alt="Scan to confirm" />
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {(b.phone || b.website || b.google_maps_url || b.address) && (
+                <div class="flex flex-wrap gap-3 text-xs border-t border-gray-50 pt-3">
+                  {b.phone && (
+                    <a href={`tel:${b.phone}`} class="flex items-center gap-1 text-gray-600 hover:text-[#1a1a2e] transition-colors">
+                      <span>📞</span> {b.phone}
+                    </a>
+                  )}
+                  {b.website && (
+                    <a href={b.website} target="_blank" rel="noopener noreferrer" class="flex items-center gap-1 text-blue-500 hover:text-blue-700 transition-colors">
+                      <span>🔗</span> {isEl ? 'Ιστοσελίδα' : isBg ? 'Уебсайт' : isSr ? 'Веб-сајт' : isTr ? 'Web sitesi' : isRo ? 'Site web' : 'Website'}
+                    </a>
+                  )}
+                  {b.google_maps_url && (
+                    <a href={b.google_maps_url} target="_blank" rel="noopener noreferrer" class="flex items-center gap-1 text-gray-600 hover:text-[#1a1a2e] transition-colors">
+                      <span>📍</span> {isEl ? 'Χάρτης' : isBg ? 'Карта' : isSr ? 'Карта' : isTr ? 'Harita' : isRo ? 'Hartă' : 'Map'}
+                    </a>
+                  )}
+                  {b.address && <span class="text-gray-400">{b.address}</span>}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </section>
+    )}
+
+    <!-- Back to listings CTA -->
+    <div class="bg-[#1a1a2e] rounded-2xl p-6 text-white flex flex-col sm:flex-row items-center justify-between gap-4">
+      <div>
+        <p class="font-semibold">{isEl ? `Έτοιμοι να κλείσετε διαμονή στη/ν ${loc.name};` : isBg ? `Готови да резервирате в ${loc.name}?` : isSr ? `Спремни да резервишете боравак у ${loc.name}?` : isTr ? `${loc.name}'de konaklamanızı rezerve etmeye hazır mısınız?` : isRo ? `Sunteți gata să rezervați sejurul în ${loc.name}?` : `Ready to book your stay in ${loc.name}?`}</p>
+        <p class="text-sm text-white/60 mt-0.5">{isEl ? 'Περιηγηθείτε σε ακίνητα με άμεση κράτηση — χωρίς χρεώσεις πλατφόρμας.' : isBg ? 'Разгледайте имоти с директна резервация — без такси за платформа.' : isSr ? 'Прегледајте некретнине са директном резервацијом — без накнада платформе.' : isTr ? 'Doğrudan rezervasyonlu mülklere göz atın — platform ücreti yok.' : isRo ? 'Răsfoiți proprietățile cu rezervare directă — fără comisioane de platformă.' : 'Browse properties with direct booking — no platform fees.'}</p>
+      </div>
+      <a href={`/locations/${loc.slug}`}
+        class="shrink-0 bg-[#c9a96e] hover:bg-[#b8934a] text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors">
+        {isEl ? `Δείτε Ενοικιάσεις στη/ν ${loc.name} →` : isBg ? `Вижте наеми в ${loc.name} →` : isSr ? `Погледај смештај у ${loc.name} →` : isTr ? `${loc.name}'deki Kiralıklara Bak →` : isRo ? `Vezi Închirieri în ${loc.name} →` : `See Rentals in ${loc.name} →`}
+      </a>
+    </div>
+
+  </div>
+
+</BaseLayout>
+
+<script>
+  // ── Show Code / Reveal tracking ──────────────────────────────────────
+  document.querySelectorAll('.show-code-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const couponId = (btn as HTMLElement).dataset.couponId!;
+      const bizId    = (btn as HTMLElement).dataset.businessId!;
+      const location = (btn as HTMLElement).dataset.location!;
+      const card     = document.getElementById(`coupon-${couponId}`)!;
+      const revealEl = card.querySelector('.coupon-reveal') as HTMLElement;
+      const codeEl   = card.querySelector('.coupon-code-text') as HTMLElement;
+      const qrEl     = card.querySelector('.coupon-qr') as HTMLImageElement;
+
+      (btn as HTMLButtonElement).disabled = true;
+      btn.textContent = 'Loading…';
+
+      const res = await fetch('/api/partners/coupon-reveal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ coupon_id: couponId, business_id: bizId, source: location }),
+      }).catch(() => null);
+
+      if (!res?.ok) {
+        btn.textContent = 'Error — try again';
+        (btn as HTMLButtonElement).disabled = false;
+        return;
+      }
+
+      const data = await res.json();
+      codeEl.textContent = data.code;
+
+      const confirmUrl = `https://kefaloniabnb.com${data.confirm_url}`;
+      qrEl.src = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(confirmUrl)}&size=150x150&margin=4`;
+
+      revealEl.classList.remove('hidden');
+      btn.textContent = '✓ Code shown';
+      (btn as HTMLElement).classList.replace('bg-emerald-600', 'bg-gray-400');
+    });
+  });
+
+</script>

@@ -1,0 +1,67 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { t, type Lang } from '../i18n/translations.ts';
+const lang = (Astro.locals.lang ?? 'en') as Lang;
+
+const { policySlug } = Astro.params;
+const supabase = Astro.locals.supabase;
+
+const ALLOWED = ['cancellation-policy', 'privacy-policy', 'terms'];
+if (!ALLOWED.includes(policySlug ?? '')) return Astro.redirect('/');
+
+const { data: page } = await supabase
+  .from('cms_pages')
+  .select('*')
+  .eq('slug', policySlug)
+  .eq('is_published', true)
+  .single();
+
+if (!page) return Astro.redirect('/');
+
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://kefaloniabnb.com';
+const pageUrl = `${siteUrl}/${policySlug}`;
+const policySchema = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'WebPage',
+    name: page.meta_title ?? page.title,
+    url: pageUrl,
+    description: page.meta_description ?? `${page.title} – KefaloniaBNB`,
+    dateModified: page.updated_at,
+    inLanguage: 'en',
+    isPartOf: { '@type': 'WebSite', url: siteUrl, name: 'KefaloniaBNB' },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: page.title, item: pageUrl },
+    ],
+  },
+];
+---
+
+<BaseLayout
+  title={page.meta_title ?? page.title}
+  description={page.meta_description ?? `${page.title} – KefaloniaBNB`}
+  canonical={pageUrl}
+  schema={policySchema}
+>
+  <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+    <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-8">{page.title}</h1>
+    <div class="prose prose-gray max-w-none">
+      {page.body?.split('\n').map((line: string) => {
+        if (line.startsWith('## ')) return <h2 class="text-xl font-bold text-gray-900 mt-8 mb-3">{line.slice(3)}</h2>;
+        if (line.startsWith('**') && line.endsWith('**')) return <p class="font-semibold text-gray-900 mt-4">{line.slice(2, -2)}</p>;
+        if (line.startsWith('- ')) return <li class="text-gray-600 ml-4 list-disc">{line.slice(2)}</li>;
+        if (line.trim() === '') return <br />;
+        return <p class="text-gray-600 leading-relaxed mb-3">{line}</p>;
+      })}
+    </div>
+    <div class="mt-12 pt-8 border-t border-gray-100 text-sm text-gray-400">
+      <p>{t(lang, 'policy.last_updated')}: {new Date(page.updated_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</p>
+      <p class="mt-1">{t(lang, 'policy.questions')} <a href="/contact" class="text-[#1a1a2e] underline">{t(lang, 'common.contact_us')}.</a></p>
+    </div>
+  </div>
+</BaseLayout>

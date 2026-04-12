@@ -1,0 +1,203 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const L: Record<string, Record<string, string>> = {
+  cms_pages:        { en: 'CMS Pages', el: 'Σελίδες CMS' },
+  new_page:         { en: '+ New Page', el: '+ Νέα Σελίδα' },
+  msg_saved:        { en: 'Page saved successfully.', el: 'Η σελίδα αποθηκεύτηκε επιτυχώς.' },
+  msg_deleted:      { en: 'Page deleted.', el: 'Η σελίδα διαγράφηκε.' },
+  new_page_title:   { en: 'New Page', el: 'Νέα Σελίδα' },
+  edit_prefix:      { en: 'Edit:', el: 'Επεξεργασία:' },
+  lbl_title:        { en: 'Title *', el: 'Τίτλος *' },
+  lbl_slug:         { en: 'Slug * (e.g. cancellation-policy)', el: 'Slug * (π.χ. cancellation-policy)' },
+  lbl_meta_title:   { en: 'Meta title', el: 'Meta τίτλος' },
+  lbl_meta_desc:    { en: 'Meta description', el: 'Meta περιγραφή' },
+  lbl_body:         { en: 'Body (Markdown-lite: ## Heading, **bold**, - list item)', el: 'Περιεχόμενο (Markdown: ## Τίτλος, **έντονο**, - λίστα)' },
+  lbl_published:    { en: 'Published', el: 'Δημοσιευμένο' },
+  btn_save:         { en: 'Save', el: 'Αποθήκευση' },
+  btn_cancel:       { en: 'Cancel', el: 'Άκυρο' },
+  btn_delete_page:  { en: 'Delete page', el: 'Διαγραφή σελίδας' },
+  delete_confirm:   { en: 'Delete this page?', el: 'Διαγραφή αυτής της σελίδας;' },
+  th_title:         { en: 'Title', el: 'Τίτλος' },
+  th_slug:          { en: 'Slug', el: 'Slug' },
+  th_updated:       { en: 'Updated', el: 'Ενημερώθηκε' },
+  th_status:        { en: 'Status', el: 'Κατάσταση' },
+  no_pages:         { en: 'No pages yet.', el: 'Δεν υπάρχουν σελίδες ακόμα.' },
+  published:        { en: 'Published', el: 'Δημοσιευμένο' },
+  draft:            { en: 'Draft', el: 'Πρόχειρο' },
+  view:             { en: 'View ↗', el: 'Προβολή ↗' },
+  edit:             { en: 'Edit', el: 'Επεξεργασία' },
+};
+function al(k: string) { return L[k]?.[lang] ?? L[k]?.en ?? k; }
+
+const service = getServiceClient();
+const msg     = Astro.url.searchParams.get('msg');
+const editId  = Astro.url.searchParams.get('edit');
+
+const { data: pages } = await service
+  .from('cms_pages')
+  .select('*')
+  .order('slug');
+
+const editPage = editId ? pages?.find((p: any) => p.id === editId) : null;
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+---
+
+<AdminLayout title="Content">
+  <div class="flex items-center justify-between mb-6">
+    <h1 class="text-xl font-bold text-gray-900">{al('cms_pages')}</h1>
+    <a
+      href="/admin/content?edit=new"
+      class="min-h-[44px] inline-flex items-center bg-[#1a1a2e] text-white text-sm font-semibold px-4 py-2.5 rounded-xl hover:bg-[#2d2d4e] transition-colors"
+    >
+      {al('new_page')}
+    </a>
+  </div>
+
+  {msg === 'saved'   && <div class="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-700 text-sm p-3 rounded-xl">{al('msg_saved')}</div>}
+  {msg === 'deleted' && <div class="mb-4 bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-xl">{al('msg_deleted')}</div>}
+
+  {editId && (
+    <!-- Edit / New form -->
+    <div class="bg-white border border-gray-200 rounded-2xl p-6 mb-6">
+      <h2 class="font-semibold text-gray-900 mb-4">{editId === 'new' ? al('new_page_title') : `${al('edit_prefix')} ${editPage?.title ?? editId}`}</h2>
+      <form method="POST" action="/api/admin/content/save" class="space-y-4">
+        {editId !== 'new' && <input type="hidden" name="id" value={editId} />}
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{al('lbl_title')}</label>
+            <input type="text" name="title" required value={editPage?.title ?? ''} class="input-field" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{al('lbl_slug')}</label>
+            <input type="text" name="slug" required value={editPage?.slug ?? ''} placeholder="cancellation-policy" class="input-field" />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-medium text-gray-600 mb-1">{al('lbl_meta_title')}</label>
+            <input type="text" name="meta_title" value={editPage?.meta_title ?? ''} class="input-field" />
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-medium text-gray-600 mb-1">{al('lbl_meta_desc')}</label>
+            <input type="text" name="meta_description" value={editPage?.meta_description ?? ''} class="input-field" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-600 mb-1">
+            {al('lbl_body')}
+          </label>
+          <textarea
+            name="body"
+            rows="16"
+            class="input-field resize-y font-mono text-xs"
+          >{editPage?.body ?? ''}</textarea>
+        </div>
+        <div class="flex items-center gap-3">
+          <label class="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+            <input type="checkbox" name="is_published" value="true" checked={editPage?.is_published ?? true} class="rounded" />
+            {al('lbl_published')}
+          </label>
+        </div>
+        <div class="flex gap-3">
+          <button type="submit" class="bg-[#1a1a2e] text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-[#2d2d4e] transition-colors">
+            {al('btn_save')}
+          </button>
+          <a href="/admin/content" class="border border-gray-300 text-gray-700 text-sm font-medium px-5 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
+            {al('btn_cancel')}
+          </a>
+          {editId !== 'new' && editPage && (
+            <form method="POST" action="/api/admin/content/delete" onsubmit={`return confirm('${al('delete_confirm')}')`} class="ml-auto">
+              <input type="hidden" name="id" value={editId} />
+              <button type="submit" class="min-h-[44px] text-sm text-red-500 hover:text-red-700 font-medium px-4 py-2.5 transition-colors">
+                {al('btn_delete_page')}
+              </button>
+            </form>
+          )}
+        </div>
+      </form>
+    </div>
+  )}
+
+  <!-- Mobile card view -->
+  <div class="lg:hidden space-y-3">
+    {!pages || pages.length === 0 ? (
+      <div class="bg-white rounded-2xl border border-gray-100 p-6 text-center text-gray-400">
+        <p class="text-3xl mb-2">📄</p>
+        <p class="text-sm">{al('no_pages')}</p>
+      </div>
+    ) : (
+      pages.map((p: any) => (
+        <div class="bg-white rounded-2xl border border-gray-100 p-4 space-y-2">
+          <div class="flex items-start justify-between gap-2">
+            <div>
+              <p class="font-medium text-gray-900">{p.title}</p>
+              <p class="font-mono text-gray-500 text-xs mt-0.5">/{p.slug}</p>
+            </div>
+            <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium shrink-0 ${p.is_published ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+              {p.is_published ? al('published') : al('draft')}
+            </span>
+          </div>
+          <p class="text-xs text-gray-400">{al('th_updated')}: {fmtDate(p.updated_at)}</p>
+          <div class="flex gap-2 pt-1">
+            <a href={`/${p.slug}`} target="_blank" class="min-h-[44px] inline-flex items-center px-4 py-2.5 text-sm text-gray-500 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">{al('view')}</a>
+            <a href={`/admin/content?edit=${p.id}`} class="min-h-[44px] inline-flex items-center px-4 py-2.5 text-sm text-[#1a1a2e] border border-[#1a1a2e]/20 rounded-xl hover:bg-gray-50 font-medium transition-colors">{al('edit')}</a>
+          </div>
+        </div>
+      ))
+    )}
+  </div>
+
+  <!-- Desktop table -->
+  <div class="hidden lg:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
+    {!pages || pages.length === 0 ? (
+      <div class="text-center py-16 text-gray-400">
+        <p class="text-3xl mb-2">📄</p>
+        <p class="text-sm">{al('no_pages')}</p>
+      </div>
+    ) : (
+      <table class="w-full text-sm">
+        <thead class="bg-gray-50 border-b border-gray-100">
+          <tr>
+            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{al('th_title')}</th>
+            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{al('th_slug')}</th>
+            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{al('th_updated')}</th>
+            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{al('th_status')}</th>
+            <th class="px-5 py-3"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          {pages.map((p: any) => (
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="px-5 py-4 font-medium text-gray-900">{p.title}</td>
+              <td class="px-5 py-4 font-mono text-gray-500 text-xs">{p.slug}</td>
+              <td class="px-5 py-4 text-gray-400">{fmtDate(p.updated_at)}</td>
+              <td class="px-5 py-4">
+                <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${p.is_published ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                  {p.is_published ? al('published') : al('draft')}
+                </span>
+              </td>
+              <td class="px-5 py-4 text-right">
+                <div class="flex items-center gap-3 justify-end">
+                  <a href={`/${p.slug}`} target="_blank" class="text-xs text-gray-400 hover:text-gray-700 transition-colors">{al('view')}</a>
+                  <a href={`/admin/content?edit=${p.id}`} class="text-xs text-[#1a1a2e] hover:text-[#c9a96e] font-medium transition-colors">{al('edit')}</a>
+                </div>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    )}
+  </div>
+</AdminLayout>
+
+<script>
+  document.querySelectorAll('input[name="is_published"]').forEach((cb) => {
+    cb.addEventListener('change', () => {
+      (window as any).adminToast((cb as HTMLInputElement).checked ? '✅ Published (save to apply)' : '📝 Set to draft (save to apply)', 'info');
+    });
+  });
+</script>

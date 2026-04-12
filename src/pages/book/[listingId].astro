@@ -1,0 +1,939 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { calculatePriceClient, calculateCouponDiscount, formatPrice } from '../../lib/pricing.ts';
+import { fmtDateShort as fmtDate } from '../../lib/format.ts';
+import { t, type Lang } from '../../i18n/translations.ts';
+import type { Listing, Season } from '../../types/index.ts';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const { listingId } = Astro.params;
+const supabase = Astro.locals.supabase;
+const lang = (Astro.locals.lang ?? 'en') as Lang;
+const url = Astro.url;
+
+const checkIn  = url.searchParams.get('check_in') ?? '';
+const checkOut = url.searchParams.get('check_out') ?? '';
+const guests   = parseInt(url.searchParams.get('guests') ?? '2') || 2;
+const coupon   = url.searchParams.get('coupon') ?? '';
+
+if (!checkIn || !checkOut) return Astro.redirect('/rentals');
+
+const service = getServiceClient();
+const { data: listing, error } = await service
+  .from('listings').select('*').eq('id', listingId).eq('is_active', true).single();
+if (error || !listing) return Astro.redirect('/rentals');
+
+// Stripe card payment available when instant booking is enabled
+const stripeAvailable = listing.instant_booking === true;
+// Telegram Direct available when explicitly enabled on the listing
+const telegramDirectAvailable = listing.allow_telegram_direct === true;
+
+const { data: seasons } = await service.from('seasons').select('*').eq('listing_id', listingId);
+
+const { data: available } = await supabase.rpc('check_availability', {
+  p_listing_id: listingId, p_check_in: checkIn, p_check_out: checkOut,
+});
+
+let couponDiscount = 0;
+let couponId: string | null = null;
+if (coupon) {
+  const { data: vc } = await supabase.from('coupons').select('*')
+    .eq('code', coupon.toUpperCase()).eq('is_active', true).single();
+  if (vc) {
+    couponId = vc.id;
+    const p0 = calculatePriceClient(listing as Listing, checkIn, checkOut, guests, seasons ?? []);
+    couponDiscount = calculateCouponDiscount(vc, p0.baseTotal, p0.extraGuestFee);
+  }
+}
+
+const price = calculatePriceClient(listing as Listing, checkIn, checkOut, guests, seasons ?? [], couponDiscount);
+
+// Check if user is logged in — pre-fill details and skip verification
+const session = Astro.locals.session;
+let userProfile: { full_name?: string; email?: string; phone?: string } | null = null;
+if (session) {
+  const { data } = await service.from('profiles').select('full_name,email,phone').eq('id', session.user.id).single();
+  userProfile = data;
+}
+const isLoggedIn = !!session;
+
+const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY;
+const fbAppId = import.meta.env.PUBLIC_FACEBOOK_APP_ID ?? '';
+
+const isBg = lang === 'bg';
+const isEl = lang === 'el';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const tLoginFaster = isEl ? 'Συνδεθείτε για ταχύτερη κράτηση' : isBg ? 'Влезте за по-бърза резервация' : isSr ? 'Пријавите се за бржу резервацију' : isTr ? 'Daha hızlı rezervasyon için giriş yapın' : isRo ? 'Autentificați-vă pentru rezervare mai rapidă' : 'Log in for faster booking';
+const tSkipVerify = isEl ? 'Παραλείψτε την επαλήθευση email και παρακολουθήστε τις κρατήσεις σας.' : isBg ? 'Пропуснете потвърждението на имейл и проследявайте резервациите си на едно място.' : isSr ? 'Прескочите верификацију имејла и пратите све резервације.' : isTr ? 'E-posta doğrulamasını atlayın ve tüm rezervasyonlarınızı tek yerden takip edin.' : isRo ? 'Săriți verificarea email și urmăriți toate rezervările într-un singur loc.' : 'Skip email verification and track all your bookings in one place.';
+const tBookingAs = isEl ? 'Κράτηση ως' : isBg ? 'Резервация като' : isSr ? 'Резервација као' : isTr ? 'Olarak rezervasyon' : isRo ? 'Rezervare ca' : 'Booking as';
+const tNoVerify = isEl ? '— δεν απαιτείται επαλήθευση email' : isBg ? '— не е нужно потвърждение на имейл' : isSr ? '— верификација имејла није потребна' : isTr ? '— e-posta doğrulaması gerekmez' : isRo ? '— nu este necesară verificarea email' : '— no email verification needed';
+const tDirectOwner = isEl ? 'Απευθείας με τον ιδιοκτήτη' : isBg ? 'Директно със собственика' : isSr ? 'Директно са власником' : isTr ? 'Ev sahibiyle doğrudan' : isRo ? 'Direct cu proprietarul' : 'Direct with Owner';
+const tDirectOwnerDesc = isEl ? 'Ο ιδιοκτήτης επιβεβαιώνει μέσω Telegram. Πληρώστε απευθείας — χωρίς χρεώσεις.' : isBg ? 'Собственикът потвърждава чрез Telegram. Платете директно — без такси.' : isSr ? 'Власник потврђује преко Телеграма. Платите директно — без провизије.' : isTr ? 'Ev sahibi Telegram üzerinden onaylar. Doğrudan ödeyin — platform ücreti yok.' : isRo ? 'Proprietarul confirmă prin Telegram. Plătiți direct — fără comisioane.' : 'Owner confirms via Telegram. Pay directly — no platform fees.';
+const tDirectOwnerMethods = isEl ? 'Μετρητά · Τραπεζική μεταφορά · Οποιαδήποτε μέθοδο συμφωνήσετε' : isBg ? 'Кеш · Банков превод · Всеки метод, за който се съгласите' : isSr ? 'Готовина · Банковни трансфер · Било који договорени метод' : isTr ? 'Nakit · Banka havalesi · Anlaştığınız herhangi bir yöntem' : isRo ? 'Numerar · Transfer bancar · Orice metodă conveniți cu proprietarul' : 'Cash · Bank transfer · Any method you agree with the owner';
+const tPaymentPlan = isEl ? 'Πλάνο πληρωμής' : isBg ? 'План за плащане' : isSr ? 'План плаћања' : isTr ? 'Ödeme planı' : isRo ? 'Plan de plată' : 'Payment Plan';
+const tPaymentPlanDesc = isEl ? 'Επιλέξτε πώς θέλετε να πληρώσετε' : isBg ? 'Изберете как искате да платите' : isSr ? 'Изаберите како желите да платите' : isTr ? 'Nasıl ödemek istediğinizi seçin' : isRo ? 'Alegeți cum doriți să plătiți' : "Choose how you'd like to pay";
+const tPayFull = isEl ? 'Πληρωμή ολόκληρου' : isBg ? 'Пълно плащане' : isSr ? 'Плаћање у целости' : isTr ? 'Tam ödeme' : isRo ? 'Plată integrală' : 'Pay in full';
+const tPayFullDesc = isEl ? 'Πληρώστε το συνολικό ποσό σήμερα' : isBg ? 'Платете пълната сума днес' : isSr ? 'Платите укупан износ данас' : isTr ? 'Toplam tutarı bugün ödeyin' : isRo ? 'Plătiți suma totală astăzi' : 'Pay the total amount today';
+const tPayDeposit = isEl ? 'Πληρωμή προκαταβολής' : isBg ? 'Платете депозит сега' : isSr ? 'Платите депозит сада' : isTr ? 'Depozitoyu şimdi ödeyin' : isRo ? 'Plătiți avansul acum' : 'Pay deposit now';
+const tPayDepositDesc = isEl ? 'Το υπόλοιπο κατά την άφιξη' : isBg ? 'Остатъкът при пристигане' : isSr ? 'Остатак при доласку' : isTr ? 'Kalan tutar varışta' : isRo ? 'Restul de plătit la sosire' : 'Remaining balance due on arrival';
+const tFlexible = isEl ? 'Ευέλικτο' : isBg ? 'Гъвкаво' : isSr ? 'Флексибилно' : isTr ? 'Esnek' : isRo ? 'Flexibil' : 'Flexible';
+const tNow = isEl ? 'τώρα' : isBg ? 'сега' : isSr ? 'сада' : isTr ? 'şimdi' : isRo ? 'acum' : 'now';
+const tOnArrival = isEl ? 'κατά την άφιξη' : isBg ? 'при пристигане' : isSr ? 'при доласку' : isTr ? 'varışta' : isRo ? 'la sosire' : 'on arrival';
+const tDepositReserve = isEl ? 'Προκαταβολή για κράτηση' : isBg ? 'Депозит за резервация' : isSr ? 'Депозит за резервацију' : isTr ? 'Rezervasyon için depozito' : isRo ? 'Avans pentru rezervare' : 'Deposit to reserve';
+const tDepositReserveDesc = isEl ? 'Πληρώστε προκαταβολή — υπόλοιπο κατά την άφιξη' : isBg ? 'Платете депозит сега — остатъкът при пристигане' : isSr ? 'Платите депозит — остатак при доласку' : isTr ? 'Depozitoyu şimdi ödeyin — kalan varışta' : isRo ? 'Plătiți avansul acum — restul la sosire' : 'Pay a deposit now — remainder due on arrival';
+const tRemainingDue = isEl ? 'υπόλοιπο κατά την άφιξη' : isBg ? 'остатък при пристигане' : isSr ? 'остатак при доласку' : isTr ? 'kalan varışta' : isRo ? 'rest de plătit la sosire' : 'remaining due on arrival';
+const tRequestToBook = isEl ? 'Αίτημα κράτησης' : isBg ? 'Заявка за резервация' : isSr ? 'Захтев за резервацију' : isTr ? 'Rezervasyon talebi' : isRo ? 'Cerere de rezervare' : 'Request to Book';
+const tOrBookViaMsg = isEl ? 'ή κράτηση μέσω μηνύματος' : isBg ? 'или резервирайте чрез съобщение' : isSr ? 'или резервишите путем поруке' : isTr ? 'veya mesajla rezervasyon yapın' : isRo ? 'sau rezervați prin mesaj' : 'or book via message';
+const tSendDetails = isEl ? 'Στείλτε τα στοιχεία κράτησης απευθείας στον οικοδεσπότη' : isBg ? 'Изпратете данните за резервацията директно на домакина' : isSr ? 'Пошаљите податке о резервацији директно домаћину' : isTr ? 'Rezervasyon bilgilerinizi doğrudan ev sahibine gönderin' : isRo ? 'Trimiteți detaliile rezervării direct gazdei' : 'Send your booking details directly to the host';
+const tBookViaWA = isEl ? 'Κράτηση μέσω WhatsApp' : isBg ? 'Резервирайте чрез WhatsApp' : isSr ? 'Резервишите преко WhatsApp-а' : isTr ? 'WhatsApp ile rezervasyon' : isRo ? 'Rezervați prin WhatsApp' : 'Book via WhatsApp';
+const tBookViaViber = isEl ? 'Κράτηση μέσω Viber' : isBg ? 'Резервирайте чрез Viber' : isSr ? 'Резервишите преко Viber-а' : isTr ? 'Viber ile rezervasyon' : isRo ? 'Rezervați prin Viber' : 'Book via Viber';
+const tBookViaTelegram = isEl ? 'Κράτηση μέσω Telegram' : isBg ? 'Резервирайте чрез Telegram' : isSr ? 'Резервишите преко Телеграма' : isTr ? 'Telegram ile rezervasyon' : isRo ? 'Rezervați prin Telegram' : 'Book via Telegram';
+const tSelectCountry = isEl ? 'Επιλέξτε χώρα…' : isBg ? 'Изберете държава…' : isSr ? 'Изаберите земљу…' : isTr ? 'Ülke seçin…' : isRo ? 'Selectați țara…' : 'Select country…';
+
+const depositPercent: number  = listing.deposit_percent ?? 0;
+const depositAmount           = Math.round(price.total * depositPercent) / 100;
+const remainingAmount         = Math.round((price.total - depositAmount) * 100) / 100;
+const offersDeposit           = depositPercent > 0;
+// offer_full_payment: only true when explicitly set to true
+const offerFullPayment: boolean = listing.offer_full_payment === true;
+// Bank transfer available when offer_bank_transfer is enabled AND at least one of full-payment or deposit is enabled
+const bankTransferAvailable   = listing.offer_bank_transfer === true && (offerFullPayment || offersDeposit);
+
+---
+
+<BaseLayout title={`${t(lang, 'book.title')} — ${listing.title}`} noIndex>
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+
+    <div class="mb-8">
+      <a href={`/rentals/${listing.slug}`} class="text-sm text-gray-500 hover:text-gray-900 transition-colors flex items-center gap-1">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+        {t(lang, 'book.back')} {listing.title}
+      </a>
+    </div>
+
+    {!available ? (
+      <div class="max-w-md mx-auto text-center py-16">
+        <p class="text-5xl mb-4">🚫</p>
+        <h2 class="text-2xl font-bold text-gray-900 mb-2">{t(lang, 'book.dates_not_avail')}</h2>
+        <p class="text-gray-500 mb-6">{t(lang, 'book.dates_error_hint')}</p>
+        <a href={`/rentals/${listing.slug}`} class="inline-block bg-[#1a1a2e] text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">
+          {t(lang, 'book.choose_dates')}
+        </a>
+      </div>
+    ) : (
+      <div class="grid grid-cols-1 lg:grid-cols-5 gap-10">
+
+        <!-- ── Form (3/5) ──────────────────────────────────────────────── -->
+        <div class="lg:col-span-3">
+          <h1 class="text-2xl font-bold text-gray-900 mb-8">{t(lang, 'book.title')}</h1>
+
+          {/* ── Optional login section for non-logged-in guests ──────── */}
+          {!isLoggedIn && (
+            <div class="bg-gray-50 rounded-xl p-4 mb-6 border border-gray-100">
+              <p class="text-sm font-medium text-gray-700 mb-1">{tLoginFaster}</p>
+              <p class="text-xs text-gray-500 mb-3">{tSkipVerify}</p>
+              <div class="flex flex-wrap gap-2">
+                <button id="google-login-btn" type="button" class="inline-flex items-center gap-2 bg-white border border-gray-200 text-gray-700 font-medium px-4 py-2 rounded-lg text-sm hover:bg-gray-50 transition-colors">
+                  <svg class="w-4 h-4" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+                  Google
+                </button>
+                {fbAppId && (
+                  <button id="fb-login-btn" type="button" class="inline-flex items-center gap-2 bg-[#1877F2] text-white font-medium px-4 py-2 rounded-lg text-sm hover:bg-[#166fe5] transition-colors">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                    Facebook
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {isLoggedIn && userProfile && (
+            <div class="bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 mb-6 flex items-center gap-2">
+              <span class="text-emerald-600 text-sm">&#10003;</span>
+              <p class="text-sm text-emerald-800">{tBookingAs} <strong>{userProfile.full_name || userProfile.email}</strong> {tNoVerify}</p>
+            </div>
+          )}
+
+          <form id="booking-form" class="space-y-8">
+            <input type="hidden" name="listing_id"    value={listingId} />
+            <input type="hidden" name="check_in"      value={checkIn} />
+            <input type="hidden" name="check_out"     value={checkOut} />
+            <input type="hidden" name="guests_adults" value={guests} />
+            {couponId && <input type="hidden" name="coupon_id"   value={couponId} />}
+            {coupon   && <input type="hidden" name="coupon_code" value={coupon} />}
+            <input type="hidden" name="payment_type" id="payment_type_hidden" value="full" />
+
+            <!-- Your details -->
+            <section>
+              <h2 class="font-semibold text-gray-900 mb-4 text-xs uppercase tracking-widest text-gray-500">{t(lang, 'book.your_details')}</h2>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">{t(lang, 'book.full_name')} *</label>
+                  <input type="text" name="guest_name" required class="input-field" placeholder="Alexandra Smith" value={userProfile?.full_name ?? ''} />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">{t(lang, 'book.email')} *</label>
+                  <input type="email" name="guest_email" required class="input-field" placeholder="you@example.com" value={userProfile?.email ?? ''} />
+                </div>
+                <!-- Phone with dial-code picker -->
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">{t(lang, 'book.phone')}</label>
+                  <input type="hidden" name="guest_phone" id="guest_phone_combined" />
+                  <div class="flex rounded-xl border border-gray-200 overflow-hidden focus-within:ring-2 focus-within:ring-[#1a1a2e] bg-white">
+                    <select id="dial_code" class="bg-white text-sm text-gray-700 pl-3 pr-2 py-3 border-r border-gray-200 focus:outline-none cursor-pointer shrink-0" style="min-width:110px">
+                      <option value="+30">🇬🇷 +30</option>
+                      <option value="+49">🇩🇪 +49</option>
+                      <option value="+44">🇬🇧 +44</option>
+                      <option value="+33">🇫🇷 +33</option>
+                      <option value="+39">🇮🇹 +39</option>
+                      <option value="+34">🇪🇸 +34</option>
+                      <option value="+31">🇳🇱 +31</option>
+                      <option value="+32">🇧🇪 +32</option>
+                      <option value="+41">🇨🇭 +41</option>
+                      <option value="+43">🇦🇹 +43</option>
+                      <option value="+46">🇸🇪 +46</option>
+                      <option value="+47">🇳🇴 +47</option>
+                      <option value="+45">🇩🇰 +45</option>
+                      <option value="+358">🇫🇮 +358</option>
+                      <option value="+48">🇵🇱 +48</option>
+                      <option value="+420">🇨🇿 +420</option>
+                      <option value="+36">🇭🇺 +36</option>
+                      <option value="+40">🇷🇴 +40</option>
+                      <option value="+359">🇧🇬 +359</option>
+                      <option value="+351">🇵🇹 +351</option>
+                      <option value="+357">🇨🇾 +357</option>
+                      <option value="+385">🇭🇷 +385</option>
+                      <option value="+381">🇷🇸 +381</option>
+                      <option value="+421">🇸🇰 +421</option>
+                      <option value="+386">🇸🇮 +386</option>
+                      <option value="+355">🇦🇱 +355</option>
+                      <option value="+389">🇲🇰 +389</option>
+                      <option value="+382">🇲🇪 +382</option>
+                      <option value="+387">🇧🇦 +387</option>
+                      <option value="+380">🇺🇦 +380</option>
+                      <option value="+7">🇷🇺 +7</option>
+                      <option value="+90">🇹🇷 +90</option>
+                      <option value="+972">🇮🇱 +972</option>
+                      <option value="+971">🇦🇪 +971</option>
+                      <option value="+966">🇸🇦 +966</option>
+                      <option value="+1">🇺🇸 +1</option>
+                      <option value="+1">🇨🇦 +1</option>
+                      <option value="+61">🇦🇺 +61</option>
+                      <option value="+64">🇳🇿 +64</option>
+                      <option value="+81">🇯🇵 +81</option>
+                      <option value="+86">🇨🇳 +86</option>
+                      <option value="+82">🇰🇷 +82</option>
+                      <option value="+91">🇮🇳 +91</option>
+                      <option value="+55">🇧🇷 +55</option>
+                      <option value="+54">🇦🇷 +54</option>
+                      <option value="+27">🇿🇦 +27</option>
+                    </select>
+                    <input
+                      type="tel"
+                      id="phone_number"
+                      class="flex-1 px-3 py-3 text-sm text-gray-900 placeholder-gray-400 focus:outline-none bg-transparent"
+                      placeholder="6900 000 000"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">{t(lang, 'book.country')}</label>
+                    <select name="guest_country" class="input-field">
+                      <option value="">{tSelectCountry}</option>
+                      <option value="Greece">🇬🇷 Greece</option>
+                      <option value="Germany">🇩🇪 Germany</option>
+                      <option value="United Kingdom">🇬🇧 United Kingdom</option>
+                      <option value="France">🇫🇷 France</option>
+                      <option value="Italy">🇮🇹 Italy</option>
+                      <option value="Spain">🇪🇸 Spain</option>
+                      <option value="Netherlands">🇳🇱 Netherlands</option>
+                      <option value="Belgium">🇧🇪 Belgium</option>
+                      <option value="Switzerland">🇨🇭 Switzerland</option>
+                      <option value="Austria">🇦🇹 Austria</option>
+                      <option value="Sweden">🇸🇪 Sweden</option>
+                      <option value="Norway">🇳🇴 Norway</option>
+                      <option value="Denmark">🇩🇰 Denmark</option>
+                      <option value="Finland">🇫🇮 Finland</option>
+                      <option value="Poland">🇵🇱 Poland</option>
+                      <option value="Czech Republic">🇨🇿 Czech Republic</option>
+                      <option value="Hungary">🇭🇺 Hungary</option>
+                      <option value="Romania">🇷🇴 Romania</option>
+                      <option value="Bulgaria">🇧🇬 Bulgaria</option>
+                      <option value="Portugal">🇵🇹 Portugal</option>
+                      <option value="Cyprus">🇨🇾 Cyprus</option>
+                      <option value="Croatia">🇭🇷 Croatia</option>
+                      <option value="Serbia">🇷🇸 Serbia</option>
+                      <option value="Slovakia">🇸🇰 Slovakia</option>
+                      <option value="Slovenia">🇸🇮 Slovenia</option>
+                      <option value="Albania">🇦🇱 Albania</option>
+                      <option value="North Macedonia">🇲🇰 North Macedonia</option>
+                      <option value="Kosovo">🇽🇰 Kosovo</option>
+                      <option value="Bosnia and Herzegovina">🇧🇦 Bosnia and Herzegovina</option>
+                      <option value="Montenegro">🇲🇪 Montenegro</option>
+                      <option value="Ukraine">🇺🇦 Ukraine</option>
+                      <option value="Russia">🇷🇺 Russia</option>
+                      <option value="Turkey">🇹🇷 Turkey</option>
+                      <option value="Israel">🇮🇱 Israel</option>
+                      <option value="United Arab Emirates">🇦🇪 United Arab Emirates</option>
+                      <option value="Saudi Arabia">🇸🇦 Saudi Arabia</option>
+                      <option value="United States">🇺🇸 United States</option>
+                      <option value="Canada">🇨🇦 Canada</option>
+                      <option value="Australia">🇦🇺 Australia</option>
+                      <option value="New Zealand">🇳🇿 New Zealand</option>
+                      <option value="Japan">🇯🇵 Japan</option>
+                      <option value="China">🇨🇳 China</option>
+                      <option value="South Korea">🇰🇷 South Korea</option>
+                      <option value="India">🇮🇳 India</option>
+                      <option value="Brazil">🇧🇷 Brazil</option>
+                      <option value="Argentina">🇦🇷 Argentina</option>
+                      <option value="South Africa">🇿🇦 South Africa</option>
+                      <option value="Other">🌍 Other</option>
+                    </select>
+                  </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">{t(lang, 'book.message')}</label>
+                  <textarea name="guest_message" rows="3" class="input-field resize-none" placeholder="Anything you'd like us to know..."></textarea>
+                </div>
+              </div>
+            </section>
+
+            <!-- Guests -->
+            <section>
+              <h2 class="font-semibold text-gray-900 mb-4 text-xs uppercase tracking-widest text-gray-500">{t(lang, 'listings.filter.guests')}</h2>
+              <div class="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">{t(lang, 'book.adults')} *</label>
+                  <select name="guests_adults" class="input-field" required>
+                    {Array.from({ length: listing.max_guests }, (_, i) => (
+                      <option value={i + 1} selected={i + 1 === guests}>{i + 1}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">{t(lang, 'book.children')}</label>
+                  <select name="guests_children" class="input-field">
+                    {Array.from({ length: 11 }, (_, i) => <option value={i}>{i}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">{t(lang, 'book.infants')}</label>
+                  <select name="guests_infants" class="input-field">
+                    {Array.from({ length: 6 }, (_, i) => <option value={i}>{i}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-gray-700 mb-1">{t(lang, 'book.pets')}</label>
+                  <select name="guests_pets" class="input-field">
+                    {Array.from({ length: 4 }, (_, i) => <option value={i}>{i}</option>)}
+                  </select>
+                </div>
+              </div>
+            </section>
+
+            <!-- ── Payment method choice ──────────────────────────────── -->
+            <section>
+              <h2 class="font-semibold text-gray-900 mb-4 text-xs uppercase tracking-widest text-gray-500">{t(lang, 'book.payment_method')}</h2>
+              <div class="grid grid-cols-1 gap-4" id="payment-options">
+
+                <!-- Stripe card payment — instant booking only -->
+                {stripeAvailable && (
+                  <label id="opt-stripe" class="payment-option flex flex-col gap-3 border-2 border-[#1a1a2e] rounded-2xl p-5 cursor-pointer transition-all">
+                    <input type="radio" name="payment_method" value="stripe" checked class="sr-only" />
+                    <div class="flex items-start justify-between">
+                      <div class="w-10 h-10 bg-[#635BFF]/10 rounded-xl flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5 text-[#635BFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                        </svg>
+                      </div>
+                      <span class="text-xs font-medium text-[#635BFF] bg-[#635BFF]/10 px-2 py-0.5 rounded-full">{t(lang, 'book.instant_badge')}</span>
+                    </div>
+                    <div>
+                      <p class="font-semibold text-gray-900">{t(lang, 'book.pay_stripe')}</p>
+                      <p class="text-xs text-gray-500 mt-0.5">{t(lang, 'book.pay_stripe_desc')}</p>
+                    </div>
+                    <div class="flex gap-2 mt-auto text-xs text-gray-400 items-center">
+                      <span>Visa · Mastercard · Apple Pay</span>
+                    </div>
+                  </label>
+                )}
+
+                <!-- Telegram Direct — free, owner confirms via Telegram -->
+                {telegramDirectAvailable && (
+                  <label id="opt-telegram" class={`payment-option flex flex-col gap-3 border-2 ${!stripeAvailable ? 'border-[#1a1a2e]' : 'border-gray-200'} rounded-2xl p-5 cursor-pointer transition-all`}>
+                    <input type="radio" name="payment_method" value="telegram_direct" checked={!stripeAvailable} class="sr-only" />
+                    <div class="flex items-start justify-between">
+                      <div class="w-10 h-10 bg-[#0088cc]/10 rounded-xl flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5 text-[#0088cc]" fill="currentColor" viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+                      </div>
+                      <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">Free · No fees</span>
+                    </div>
+                    <div>
+                      <p class="font-semibold text-gray-900">{tDirectOwner}</p>
+                      <p class="text-xs text-gray-500 mt-0.5">{tDirectOwnerDesc}</p>
+                    </div>
+                    <div class="flex gap-2 mt-auto text-xs text-gray-400 items-center">
+                      <span>{tDirectOwnerMethods}</span>
+                    </div>
+                  </label>
+                )}
+
+                <!-- Bank transfer — only when full or deposit payment is enabled -->
+                {bankTransferAvailable && (
+                <label id="opt-bank" class={`payment-option flex flex-col gap-3 border-2 ${stripeAvailable || telegramDirectAvailable ? 'border-gray-200' : 'border-[#1a1a2e]'} rounded-2xl p-5 cursor-pointer transition-all`}>
+                  <input type="radio" name="payment_method" value="bank_transfer" checked={!stripeAvailable && !telegramDirectAvailable} class="sr-only" />
+                  <div class="flex items-start justify-between">
+                    <div class="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center shrink-0">
+                      <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 14v3m4-3v3m4-3v3M3 21h18M3 10h18M3 7l9-4 9 4M4 10h16v11H4V10z" />
+                      </svg>
+                    </div>
+                    <span class="text-xs font-medium text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{t(lang, 'book.on_approval_badge')}</span>
+                  </div>
+                  <div>
+                    <p class="font-semibold text-gray-900">{t(lang, 'book.pay_bank')}</p>
+                    <p class="text-xs text-gray-500 mt-0.5">{t(lang, 'book.pay_bank_desc')}</p>
+                  </div>
+                  <div class="flex gap-2 mt-auto text-xs text-gray-400 items-center">
+                    <span>Revolut · Wise · IBAN</span>
+                  </div>
+                </label>
+                )}
+              </div>
+            </section>
+
+            <!-- ── Payment plan (Stripe / bank transfer / Telegram Direct) ── -->
+            {offersDeposit && (stripeAvailable || bankTransferAvailable || telegramDirectAvailable) && (
+              <section>
+                {offersDeposit && offerFullPayment ? (
+                  <>
+                    <h2 class="font-semibold mb-1 text-xs uppercase tracking-widest text-gray-500">{tPaymentPlan}</h2>
+                    <p class="text-xs text-gray-400 mb-4">{tPaymentPlanDesc}</p>
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4" id="plan-options">
+                      <!-- Full payment -->
+                      <label id="plan-full" class="plan-option flex flex-col gap-3 border-2 border-[#1a1a2e] rounded-2xl p-5 cursor-pointer transition-all">
+                        <input type="radio" name="plan_select" value="full" checked class="sr-only" />
+                        <div class="w-10 h-10 bg-[#1a1a2e]/5 rounded-xl flex items-center justify-center shrink-0">
+                          <svg class="w-5 h-5 text-[#1a1a2e]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                        </div>
+                        <div>
+                          <p class="font-semibold text-gray-900">{tPayFull}</p>
+                          <p class="text-xs text-gray-500 mt-0.5">{tPayFullDesc}</p>
+                        </div>
+                        <p class="text-lg font-bold text-gray-900">{formatPrice(price.total)}</p>
+                      </label>
+                      <!-- Deposit option -->
+                      <label id="plan-deposit" class="plan-option flex flex-col gap-3 border-2 border-gray-200 hover:border-gray-300 rounded-2xl p-5 cursor-pointer transition-all">
+                        <input type="radio" name="plan_select" value="deposit" class="sr-only" />
+                        <div class="flex items-start justify-between">
+                          <div class="w-10 h-10 bg-emerald-50 rounded-xl flex items-center justify-center shrink-0">
+                            <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          </div>
+                          <span class="text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">{tFlexible}</span>
+                        </div>
+                        <div>
+                          <p class="font-semibold text-gray-900">{tPayDeposit}</p>
+                          <p class="text-xs text-gray-500 mt-0.5">{tPayDepositDesc}</p>
+                        </div>
+                        <div>
+                          <p class="text-lg font-bold text-gray-900">{formatPrice(depositAmount)} <span class="text-sm font-normal text-gray-500">{tNow}</span></p>
+                          <p class="text-xs text-gray-400 mt-0.5">+ {formatPrice(remainingAmount)} {tOnArrival}</p>
+                        </div>
+                      </label>
+                    </div>
+                  </>
+                ) : (
+                  /* Deposit-only: no choice, show info card and force deposit plan */
+                  <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-5">
+                    <input type="hidden" name="plan_select" value="deposit" />
+                    <div class="flex items-center gap-3 mb-3">
+                      <div class="w-9 h-9 bg-emerald-100 rounded-xl flex items-center justify-center shrink-0">
+                        <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p class="font-semibold text-gray-900">{tDepositReserve}</p>
+                        <p class="text-xs text-gray-500">{tDepositReserveDesc}</p>
+                      </div>
+                    </div>
+                    <div class="flex items-baseline gap-2">
+                      <span class="text-2xl font-bold text-gray-900">{formatPrice(depositAmount)}</span>
+                      <span class="text-sm text-gray-500">{tNow}</span>
+                    </div>
+                    <p class="text-xs text-gray-400 mt-1">+ {formatPrice(remainingAmount)} {tRemainingDue}</p>
+                  </div>
+                )}
+              </section>
+            )}
+
+            <!-- House rules -->
+            <div class="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
+              {t(lang, 'book.house_rules_text').replace('{n}', String(listing.max_guests))}
+            </div>
+
+            <!-- Error -->
+            <div id="booking-error" class="hidden bg-red-50 border border-red-200 rounded-xl p-4 text-sm text-red-700"></div>
+
+            <!-- Submit -->
+            <div>
+              <button
+                type="submit"
+                id="submit-btn"
+                class="w-full bg-[#1a1a2e] hover:bg-[#2d2d4e] text-white font-bold py-4 rounded-xl transition-colors text-sm cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {stripeAvailable ? `${t(lang, 'book.confirm_pay')} — ${formatPrice(price.total)}` : `${tRequestToBook} — ${formatPrice(price.total)}`}
+              </button>
+              <p id="payment-note"
+                data-stripe={t(lang, 'book.stripe_note')}
+                data-bank={t(lang, 'book.bank_note')}
+                class="text-center text-xs text-gray-400 mt-2">
+                {stripeAvailable ? t(lang, 'book.stripe_note') : t(lang, 'book.bank_note')}
+              </p>
+            </div>
+
+            {/* ── Book via messaging apps ─────────────────────────────── */}
+            {listing.host_messaging_visible && listing.host_phone && (listing.host_whatsapp || listing.host_viber || listing.host_telegram) && (() => {
+              const phone = (listing.host_phone ?? '').replace(/[^+\d]/g, '');
+              // Normalize to full international format (add GR country code if missing)
+              const phoneClean = phone.startsWith('+') ? phone.slice(1) : phone.startsWith('30') ? phone : '30' + phone;
+              return (
+                <section>
+                  <div class="relative flex items-center my-2">
+                    <div class="flex-grow border-t border-gray-200"></div>
+                    <span class="mx-4 text-xs text-gray-400 uppercase tracking-wide">{tOrBookViaMsg}</span>
+                    <div class="flex-grow border-t border-gray-200"></div>
+                  </div>
+                  <p class="text-xs text-gray-500 text-center mb-4">{tSendDetails}</p>
+                  <div class="flex flex-col sm:flex-row gap-3" id="msg-book-buttons"
+                    data-phone={phoneClean}
+                    data-listing-title={listing.title}
+                    data-check-in={fmtDate(checkIn)}
+                    data-check-out={fmtDate(checkOut)}
+                    data-guests={String(guests)}
+                    data-total={formatPrice(price.total)}
+                    data-nights={String(price.nights)}
+                    data-whatsapp={listing.host_whatsapp ? 'true' : 'false'}
+                    data-viber={listing.host_viber ? 'true' : 'false'}
+                    data-telegram={listing.host_telegram ? 'true' : 'false'}
+                  >
+                    {listing.host_whatsapp && (
+                      <a id="wa-book-btn" href="#" target="_blank" rel="noopener noreferrer"
+                        class="flex-1 flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#1ebe57] text-white font-semibold py-3 rounded-xl transition-colors text-sm">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                        {tBookViaWA}
+                      </a>
+                    )}
+                    {listing.host_viber && (
+                      <a id="viber-book-btn" href="#" target="_blank" rel="noopener noreferrer"
+                        class="flex-1 flex items-center justify-center gap-2 bg-[#7360F2] hover:bg-[#5f4dd4] text-white font-semibold py-3 rounded-xl transition-colors text-sm">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M11.4 0C9.473.028 5.333.344 3.02 2.467 1.302 4.187.567 6.747.467 9.907c-.1 3.16-.233 9.087 5.567 10.707h.007l-.007 2.46s-.04.993.617 1.193c.793.247 1.26-.51 2.02-1.327.42-.453.993-1.12 1.427-1.627 3.933.333 6.96-.427 7.307-.547.8-.273 5.327-.84 6.06-6.867.76-6.227-.367-10.16-2.4-11.913C19.277.533 15.2.027 13.267.007 12.84 0 12.16-.007 11.4 0zm.267 1.767c.7.007 1.307.02 1.68.04 1.667.02 5.32.447 6.8 1.907 1.613 1.4 2.58 4.94 1.92 10.147-.607 4.747-4.12 5.413-4.8 5.647-.287.1-2.94.76-6.28.573 0 0-2.487 3-3.267 3.787-.12.127-.267.18-.367.153-.14-.033-.18-.187-.173-.413l.033-4.107s-.007-.007 0 0c-4.94-1.32-4.653-6.34-4.58-9.073.073-2.727.667-4.967 2.133-6.413 1.98-1.78 5.56-2.22 6.9-2.247z"/></svg>
+                        {tBookViaViber}
+                      </a>
+                    )}
+                    {listing.host_telegram && (
+                      <a id="tg-book-btn" href="#" target="_blank" rel="noopener noreferrer"
+                        class="flex-1 flex items-center justify-center gap-2 bg-[#0088cc] hover:bg-[#006daa] text-white font-semibold py-3 rounded-xl transition-colors text-sm">
+                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 000 12a12 12 0 0012 12 12 12 0 0012-12A12 12 0 0012 0a12 12 0 00-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 01.171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+                        {tBookViaTelegram}
+                      </a>
+                    )}
+                  </div>
+                </section>
+              );
+            })()}
+
+          </form>
+        </div>
+
+        <!-- ── Price Summary (2/5) ─────────────────────────────────────── -->
+        <div class="lg:col-span-2">
+          <div class="bg-white border border-gray-200 rounded-2xl p-6 sticky top-24 space-y-4">
+            <h2 class="font-semibold text-gray-900">{t(lang, 'book.price_summary')}</h2>
+
+            <!-- Stay details -->
+            <div class="space-y-2 text-sm text-gray-600">
+              <div class="flex justify-between">
+                <span>{t(lang, 'success.prop')}</span>
+                <span class="font-medium text-gray-900 text-right max-w-[160px] truncate">{listing.title}</span>
+              </div>
+              <div class="flex justify-between">
+                <span>{t(lang, 'listing.check_in')}</span>
+                <span class="font-medium text-gray-900">{fmtDate(checkIn)}</span>
+              </div>
+              <div class="flex justify-between">
+                <span>{t(lang, 'listing.check_out')}</span>
+                <span class="font-medium text-gray-900">{fmtDate(checkOut)}</span>
+              </div>
+              <div class="flex justify-between">
+                <span>{t(lang, 'listing.guests')}</span>
+                <span class="font-medium text-gray-900">{guests}</span>
+              </div>
+            </div>
+
+            <!-- Price breakdown -->
+            <div class="border-t border-gray-100 pt-4 space-y-2 text-sm">
+              <div class="flex justify-between text-gray-600">
+                <span>{formatPrice(price.basePrice)} × {price.nights} {t(lang, 'listing.nights')}</span>
+                <span>{formatPrice(price.baseTotal)}</span>
+              </div>
+              {price.extraGuestFee > 0 && (
+                <div class="flex justify-between text-gray-600">
+                  <span>{t(lang, 'book.extra_guests_fee')}</span>
+                  <span>{formatPrice(price.extraGuestFee)}</span>
+                </div>
+              )}
+              <div class="flex justify-between text-gray-600">
+                <span>{t(lang, 'listing.cleaning_fee')}</span>
+                <span>{formatPrice(price.cleaningFee)}</span>
+              </div>
+              {price.couponDiscount > 0 && (
+                <div class="flex justify-between text-emerald-600 font-medium">
+                  <span>{t(lang, 'book.discount_label')} ({coupon})</span>
+                  <span>-{formatPrice(price.couponDiscount)}</span>
+                </div>
+              )}
+              <div class="flex justify-between font-bold text-gray-900 pt-3 border-t border-gray-100 text-base">
+                <span>{t(lang, 'listing.total')}</span>
+                <span>{formatPrice(price.total, price.currency)}</span>
+              </div>
+            </div>
+
+            <!-- Trust badges -->
+            <div class="flex flex-col gap-2 pt-2 border-t border-gray-100">
+              <div class="flex items-center gap-2 text-xs text-gray-400">
+                <svg class="w-4 h-4 text-[#635BFF]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                {t(lang, 'book.stripe_secured')}
+              </div>
+              <div class="flex items-center gap-2 text-xs text-gray-400">
+                <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
+                {t(lang, 'book.best_rate')}
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    )}
+  </div>
+</BaseLayout>
+
+<script define:vars={{ stripeAvailable, telegramDirectAvailable, bankTransferAvailable, offersDeposit, offerFullPayment, depositAmount, remainingAmount }}>
+  // ── Helpers ─────────────────────────────────────────────────────────────
+  function fmtAmt(n) { return '€' + n.toFixed(0); }
+
+  function getPaymentMethod() {
+    var checked = document.querySelector('input[name="payment_method"]:checked');
+    if (checked) return checked.value;
+    if (stripeAvailable) return 'stripe';
+    if (telegramDirectAvailable) return 'telegram_direct';
+    if (bankTransferAvailable) return 'bank_transfer';
+    return 'telegram_direct'; // fallback
+  }
+  function getPaymentPlan() {
+    var checked = document.querySelector('input[name="plan_select"]:checked');
+    if (checked) return checked.value;
+    // Deposit-only mode uses a hidden input (not a radio), check that too
+    var hidden = document.querySelector('input[name="plan_select"][type="hidden"]');
+    return hidden ? hidden.value : 'full';
+  }
+
+  // ── Update submit button label ──────────────────────────────────────────
+  function updateSubmitBtn() {
+    var submitBtn = document.getElementById('submit-btn');
+    var noteEl    = document.getElementById('payment-note');
+    if (!submitBtn) return;
+
+    var method = getPaymentMethod();
+    var plan   = getPaymentPlan();
+    var isStripe  = method === 'stripe';
+    var isTD      = method === 'telegram_direct';
+    var isDeposit = offersDeposit && plan === 'deposit';
+
+    if (isDeposit && isTD) {
+      submitBtn.textContent = 'Send Direct Booking Request (Deposit) — Free';
+    } else if (isDeposit) {
+      submitBtn.textContent = isStripe
+        ? ('Pay Deposit — ' + fmtAmt(depositAmount))
+        : ('Reserve with Deposit — ' + fmtAmt(depositAmount));
+    } else if (isTD) {
+      submitBtn.textContent = 'Send Direct Booking Request — Free';
+    } else {
+      submitBtn.textContent = isStripe
+        ? (submitBtn.dataset.labelStripe || 'Confirm & Pay')
+        : (submitBtn.dataset.labelBank   || 'Request to Book');
+    }
+
+    if (noteEl) {
+      if (isDeposit) {
+        noteEl.textContent = 'Deposit ' + fmtAmt(depositAmount) + ' now · ' + fmtAmt(remainingAmount) + ' remaining due on arrival';
+      } else if (isTD && isDeposit) {
+        noteEl.textContent = 'Deposit ' + fmtAmt(depositAmount) + ' · Remaining ' + fmtAmt(remainingAmount) + ' due on arrival · No platform fees';
+      } else if (isTD) {
+        noteEl.textContent = 'No platform fee · Owner confirms via Telegram · Pay directly';
+      } else {
+        noteEl.textContent = isStripe
+          ? (noteEl.dataset.stripe || '')
+          : (noteEl.dataset.bank   || '');
+      }
+    }
+  }
+
+  const optStripe   = document.getElementById('opt-stripe');
+  const optTelegram = document.getElementById('opt-telegram');
+  const optBank     = document.getElementById('opt-bank');
+  const submitBtn   = document.getElementById('submit-btn');
+  const noteEl      = document.getElementById('payment-note');
+
+  if (submitBtn) {
+    submitBtn.setAttribute('data-label-stripe', (submitBtn.textContent || '').trim() || 'Confirm & Pay');
+    submitBtn.setAttribute('data-label-bank', 'Request to Book');
+  }
+
+  updateSubmitBtn();
+
+  // ── Payment method toggle ───────────────────────────────────────────────
+  document.querySelectorAll('input[name="payment_method"]').forEach(function(radio) {
+    radio.addEventListener('change', function() {
+      var v = radio.value;
+      optStripe   && optStripe.classList.toggle('border-[#1a1a2e]',   v === 'stripe');
+      optStripe   && optStripe.classList.toggle('border-gray-200',    v !== 'stripe');
+      optTelegram && optTelegram.classList.toggle('border-[#1a1a2e]', v === 'telegram_direct');
+      optTelegram && optTelegram.classList.toggle('border-gray-200',  v !== 'telegram_direct');
+      optBank     && optBank.classList.toggle('border-[#1a1a2e]',     v === 'bank_transfer');
+      optBank     && optBank.classList.toggle('border-gray-200',      v !== 'bank_transfer');
+      updateSubmitBtn();
+    });
+  });
+
+  // ── Payment plan toggle ─────────────────────────────────────────────────
+  // If deposit-only (no full payment), force hidden field to 'deposit' immediately
+  if (offersDeposit && !offerFullPayment) {
+    var hidden = document.getElementById('payment_type_hidden');
+    if (hidden) hidden.value = 'deposit';
+    updateSubmitBtn();
+  }
+
+  if (offersDeposit && offerFullPayment) {
+    var planFull    = document.getElementById('plan-full');
+    var planDeposit = document.getElementById('plan-deposit');
+
+    document.querySelectorAll('input[name="plan_select"]').forEach(function(radio) {
+      radio.addEventListener('change', function() {
+        var isDeposit = radio.value === 'deposit';
+        // Update hidden field
+        var hidden = document.getElementById('payment_type_hidden');
+        if (hidden) hidden.value = isDeposit ? 'deposit' : 'full';
+        // Visual toggle
+        planFull    && planFull.classList.toggle('border-[#1a1a2e]', !isDeposit);
+        planFull    && planFull.classList.toggle('border-gray-200',   isDeposit);
+        planDeposit && planDeposit.classList.toggle('border-[#1a1a2e]', isDeposit);
+        planDeposit && planDeposit.classList.toggle('border-gray-200',  !isDeposit);
+        updateSubmitBtn();
+      });
+    });
+  }
+
+  // ── Combine dial code + number into hidden guest_phone field ────────────
+  function syncPhone() {
+    var dialCode = document.getElementById('dial_code');
+    var phoneNum = document.getElementById('phone_number');
+    var combined = document.getElementById('guest_phone_combined');
+    if (!dialCode || !phoneNum || !combined) return;
+    var num = phoneNum.value.replace(/\D/g, '');
+    combined.value = num ? (dialCode.value + num) : '';
+  }
+  document.getElementById('dial_code') && document.getElementById('dial_code').addEventListener('change', syncPhone);
+  document.getElementById('phone_number') && document.getElementById('phone_number').addEventListener('input', syncPhone);
+
+  // ── Messaging book buttons — compose booking message from form fields ────
+  var msgWrap = document.getElementById('msg-book-buttons');
+  if (msgWrap) {
+    var mPhone      = msgWrap.dataset.phone;
+    var mTitle      = msgWrap.dataset.listingTitle;
+    var mCheckIn    = msgWrap.dataset.checkIn;
+    var mCheckOut   = msgWrap.dataset.checkOut;
+    var mGuests     = msgWrap.dataset.guests;
+    var mTotal      = msgWrap.dataset.total;
+    var mNights     = msgWrap.dataset.nights;
+    var hasWa       = msgWrap.dataset.whatsapp === 'true';
+    var hasViber    = msgWrap.dataset.viber === 'true';
+    var hasTg       = msgWrap.dataset.telegram === 'true';
+
+    function buildBookingMsg() {
+      var nameEl = document.querySelector('input[name="guest_name"]');
+      var emailEl = document.querySelector('input[name="guest_email"]');
+      var msgEl = document.querySelector('textarea[name="guest_message"]');
+      var guestName = nameEl ? nameEl.value.trim() : '';
+      var guestEmail = emailEl ? emailEl.value.trim() : '';
+      var guestMsg = msgEl ? msgEl.value.trim() : '';
+      var plan = getPaymentPlan();
+      var planText = plan === 'deposit' ? 'Deposit' : 'Full payment';
+
+      var lines = [
+        'Hi! I would like to book:',
+        '',
+        'Property: ' + mTitle,
+        'Check-in: ' + mCheckIn,
+        'Check-out: ' + mCheckOut,
+        'Nights: ' + mNights,
+        'Guests: ' + mGuests,
+        'Total: ' + mTotal,
+        'Payment plan: ' + planText,
+      ];
+      if (guestName) lines.push('Name: ' + guestName);
+      if (guestEmail) lines.push('Email: ' + guestEmail);
+      if (guestMsg) lines.push('', 'Message: ' + guestMsg);
+      lines.push('', 'Looking forward to your confirmation!');
+      return lines.join('\n');
+    }
+
+    function updateMsgLinks() {
+      var msg = buildBookingMsg();
+      var encoded = encodeURIComponent(msg);
+      if (hasWa) {
+        var waBtn = document.getElementById('wa-book-btn');
+        if (waBtn) waBtn.href = 'https://wa.me/' + mPhone + '?text=' + encoded;
+      }
+      if (hasViber) {
+        var vBtn = document.getElementById('viber-book-btn');
+        if (vBtn) vBtn.href = 'viber://chat?number=%2B' + mPhone;
+      }
+      if (hasTg) {
+        var tgBtn = document.getElementById('tg-book-btn');
+        if (tgBtn) tgBtn.href = 'https://t.me/+' + mPhone + '?text=' + encoded;
+      }
+    }
+
+    // Viber: copy message to clipboard then open chat
+    if (hasViber) {
+      var vBtn = document.getElementById('viber-book-btn');
+      if (vBtn) {
+        vBtn.addEventListener('click', function(e) {
+          var msg = buildBookingMsg();
+          navigator.clipboard.writeText(msg).then(function() {
+            var toast = document.createElement('div');
+            toast.textContent = 'Booking details copied! Paste them in Viber.';
+            toast.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1a1a2e;color:#fff;padding:12px 20px;border-radius:12px;font-size:13px;font-weight:600;z-index:9999;box-shadow:0 4px 20px rgba(0,0,0,.2)';
+            document.body.appendChild(toast);
+            setTimeout(function() { toast.remove(); }, 3500);
+          });
+        });
+      }
+    }
+
+    // Update links when form fields change
+    document.querySelectorAll('#booking-form input, #booking-form textarea, #booking-form select').forEach(function(el) {
+      el.addEventListener('input', updateMsgLinks);
+      el.addEventListener('change', updateMsgLinks);
+    });
+    // Initial build
+    updateMsgLinks();
+  }
+
+  // ── Form submit ──────────────────────────────────────────────────────────
+  const form     = document.getElementById('booking-form');
+  const errorDiv = document.getElementById('booking-error');
+
+  form && form.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    if (!submitBtn) return;
+    const originalText = submitBtn.textContent || 'Processing…';
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Processing…';
+    if (errorDiv) errorDiv.classList.add('hidden');
+
+    const formData = new FormData(form);
+    const body = Object.fromEntries(formData);
+
+    // Cast numeric fields
+    ['guests_adults','guests_children','guests_infants','guests_pets'].forEach(function(k) {
+      body[k] = parseInt(body[k]) || 0;
+    });
+
+    try {
+      const res = await fetch('/api/bookings/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? 'Booking failed');
+
+      const verifySuffix = data.verificationRequired ? '&verify=1' : '';
+      if (data.checkoutUrl) {
+        window.location.href = data.checkoutUrl;
+      } else if (data.paymentMethod === 'telegram_direct') {
+        window.location.href = `/book/success?id=${data.bookingId}&pm=telegram${verifySuffix}`;
+      } else {
+        window.location.href = `/book/success?id=${data.bookingId}&pm=bank${verifySuffix}`;
+      }
+    } catch (err) {
+      if (errorDiv) {
+        errorDiv.textContent = (err && err.message) || 'Something went wrong. Please try again.';
+        errorDiv.classList.remove('hidden');
+      }
+      submitBtn.disabled = false;
+      submitBtn.textContent = originalText;
+    }
+  });
+
+
+</script>
+
+{!isLoggedIn && (
+  <script is:inline define:vars={{ supabaseUrl, supabaseAnonKey, fbAppId }}>
+    // Google login
+    var googleBtn = document.getElementById('google-login-btn');
+    if (googleBtn) {
+      googleBtn.addEventListener('click', async function() {
+        var mod = await import('https://esm.sh/@supabase/supabase-js@2');
+        var supabase = mod.createClient(supabaseUrl, supabaseAnonKey);
+        await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: { redirectTo: window.location.href },
+        });
+      });
+    }
+
+    // Facebook login
+    if (fbAppId) {
+      window.fbAsyncInit = function() {
+        FB.init({ appId: fbAppId, cookie: true, xfbml: false, version: 'v19.0' });
+      };
+      (function(d, s, id) {
+        var js, fjs = d.getElementsByTagName(s)[0];
+        if (d.getElementById(id)) return;
+        js = d.createElement(s); js.id = id;
+        js.src = 'https://connect.facebook.net/en_US/sdk.js';
+        fjs.parentNode.insertBefore(js, fjs);
+      }(document, 'script', 'facebook-jssdk'));
+
+      var fbBtn = document.getElementById('fb-login-btn');
+      if (fbBtn) {
+        fbBtn.addEventListener('click', function() {
+          if (typeof FB === 'undefined') return alert('Facebook SDK not loaded');
+          FB.login(async function(response) {
+            if (response.authResponse && response.authResponse.accessToken) {
+              var res = await fetch('/api/auth/facebook-token', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ access_token: response.authResponse.accessToken }),
+              });
+              if (res.ok) window.location.reload();
+              else alert('Facebook login failed');
+            }
+          }, { scope: 'public_profile,email' });
+        });
+      }
+    }
+  </script>
+)}

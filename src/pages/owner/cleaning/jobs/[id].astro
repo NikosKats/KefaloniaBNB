@@ -1,0 +1,375 @@
+---
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../../lib/supabase.ts';
+
+if (!Astro.locals.session) return Astro.redirect('/admin/login');
+const userId = Astro.locals.session.user.id;
+const { id } = Astro.params;
+const paid = Astro.url.searchParams.get('paid') === '1';
+const service = getServiceClient();
+
+const { data: job } = await service
+  .from('cleaning_jobs')
+  .select('*, listings(title,city), cleaner_profiles(bio, user_id)')
+  .eq('id', id!)
+  .eq('owner_id', userId)
+  .single();
+
+if (!job) return Astro.redirect('/owner/cleaning');
+
+const cleanerUserId = (job as any).cleaner_profiles?.user_id;
+const { data: cleanerProfile } = cleanerUserId
+  ? await service.from('profiles').select('full_name').eq('id', cleanerUserId).single()
+  : { data: null };
+
+const { data: payment } = await service
+  .from('cleaning_payments')
+  .select('*')
+  .eq('job_id', id!)
+  .single();
+
+const { data: checklist } = await service
+  .from('job_checklist_items')
+  .select('*')
+  .eq('job_id', id!)
+  .order('sort_order');
+
+const { data: photos } = await service
+  .from('job_photos')
+  .select('*')
+  .eq('job_id', id!)
+  .order('created_at');
+
+const isPaid = payment?.status === 'paid';
+const approved = Astro.url.searchParams.get('approved') === '1';
+const beforePhotos = (photos ?? []).filter((p: any) => p.phase === 'before');
+const afterPhotos = (photos ?? []).filter((p: any) => p.phase === 'after');
+
+const statusColors: Record<string, string> = {
+  scheduled: 'bg-blue-100 text-blue-800',
+  started: 'bg-yellow-100 text-yellow-800',
+  completed: 'bg-purple-100 text-purple-800',
+  approved: 'bg-emerald-100 text-emerald-800',
+  disputed: 'bg-red-100 text-red-800',
+  cancelled: 'bg-gray-100 text-gray-600',
+};
+---
+
+<AdminLayout title={`Job — ${(job as any).listings?.title}`}>
+  <div class="max-w-2xl mx-auto space-y-6">
+    {paid && (
+      <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-sm text-emerald-700 font-medium">
+        Payment received! The cleaner has been notified.
+      </div>
+    )}
+    {approved && (
+      <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-4 text-sm text-emerald-700 font-medium" id="approved-banner">
+        Payment successful! The job is being approved and the cleaner's payout is on its way.
+        <span class="block text-xs text-emerald-600 mt-1">This page will refresh shortly…</span>
+      </div>
+    )}
+
+    <div class="flex items-start justify-between">
+      <div>
+        <h1 class="text-xl font-bold text-gray-900">{(job as any).listings?.title}</h1>
+        <p class="text-sm text-gray-500">{(job as any).listings?.city} · {job.scheduled_date} at {job.scheduled_time}</p>
+        <p class="text-sm text-gray-500 mt-0.5">Cleaner: <strong>{cleanerProfile?.full_name ?? '—'}</strong></p>
+      </div>
+      <span class={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[job.status]}`}>{job.status}</span>
+    </div>
+
+    <!-- Payment Section -->
+    {!isPaid && job.status === 'scheduled' && (
+      <div class="bg-amber-50 border border-amber-200 rounded-2xl p-6">
+        <h3 class="font-semibold text-gray-900 mb-1">Payment Required</h3>
+        <p class="text-sm text-gray-600 mb-4">Pay <strong>€{job.agreed_price}</strong> to confirm the cleaning.</p>
+        <button id="pay-btn" class="bg-[#1a1a2e] text-white font-semibold px-6 py-3 rounded-xl hover:bg-[#2d2d4e] transition-colors text-sm">
+          Pay €{job.agreed_price}
+        </button>
+      </div>
+    )}
+
+    {isPaid && (
+      <div class="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-3">
+        <span class="text-emerald-500 text-xl">✓</span>
+        <div>
+          <p class="text-sm font-medium text-gray-900">Payment confirmed</p>
+          <p class="text-xs text-gray-500">€{payment?.amount} paid on {payment?.paid_at ? new Date(payment.paid_at).toLocaleDateString() : '—'}</p>
+        </div>
+      </div>
+    )}
+
+    <!-- Approve Button -->
+    {job.status === 'completed' && (
+      <div class="bg-purple-50 border border-purple-200 rounded-2xl p-6">
+        <h3 class="font-semibold text-gray-900 mb-1">Review & Approve</h3>
+        <p class="text-sm text-gray-600 mb-4">
+          {isPaid
+            ? 'Payment already received. Approve to release the cleaner\'s payout.'
+            : `The cleaner has marked this job complete. Click below to pay €${job.agreed_price} and release the payout to the cleaner.`}
+        </p>
+        <div class="flex gap-3">
+          <button id="approve-btn" class="bg-emerald-600 text-white font-semibold px-6 py-3 rounded-xl hover:bg-emerald-700 transition-colors text-sm">
+            {isPaid ? 'Approve & Release Payout' : `Pay €${job.agreed_price} & Approve`}
+          </button>
+          <button id="dispute-btn" class="border border-red-300 text-red-600 font-semibold px-6 py-3 rounded-xl hover:bg-red-50 transition-colors text-sm">
+            Raise Dispute
+          </button>
+        </div>
+      </div>
+    )}
+
+    <!-- Checklist -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="text-sm font-semibold text-gray-700">Cleaning Checklist</h3>
+        <span class="text-xs text-gray-400">{(checklist ?? []).filter((i: any) => i.is_done).length} / {(checklist ?? []).length} done</span>
+      </div>
+      <ul class="space-y-2 mb-4" id="checklist-list">
+        {(checklist ?? []).map((item: any) => (
+          <li class="flex items-center gap-3 text-sm group" data-item-id={item.id}>
+            <span class={`w-5 h-5 rounded flex-shrink-0 flex items-center justify-center text-xs ${item.is_done ? 'bg-emerald-500 text-white' : 'border-2 border-gray-200'}`}>
+              {item.is_done ? '✓' : ''}
+            </span>
+            <span class={`flex-1 ${item.is_done ? 'text-gray-400 line-through' : 'text-gray-700'}`}>{item.label}</span>
+            {job.status === 'scheduled' && (
+              <button
+                class="delete-item-btn opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-600 text-xs transition-opacity"
+                data-item-id={item.id}
+                type="button"
+              >✕</button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {job.status === 'scheduled' && (
+        <div class="flex gap-2 mt-2">
+          <input
+            id="new-item-input"
+            type="text"
+            placeholder="Add checklist item…"
+            class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/30"
+          />
+          <button
+            id="add-item-btn"
+            type="button"
+            class="bg-[#1a1a2e] text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-[#2d2d4e] transition-colors"
+          >Add</button>
+        </div>
+      )}
+      {job.status !== 'scheduled' && (checklist ?? []).length === 0 && (
+        <p class="text-sm text-gray-400">No checklist items.</p>
+      )}
+    </div>
+
+    <!-- Photos -->
+    {(photos ?? []).length > 0 && (
+      <div class="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">
+        <h3 class="text-sm font-semibold text-gray-700">Photos</h3>
+        {beforePhotos.length > 0 && (
+          <div>
+            <p class="text-xs text-gray-500 mb-2 font-medium">Before</p>
+            <div class="grid grid-cols-3 gap-2">
+              {beforePhotos.map((p: any) => (
+                <img src={p.url} alt="Before" class="w-full aspect-square object-cover rounded-xl" loading="lazy" />
+              ))}
+            </div>
+          </div>
+        )}
+        {afterPhotos.length > 0 && (
+          <div>
+            <p class="text-xs text-gray-500 mb-2 font-medium">After</p>
+            <div class="grid grid-cols-3 gap-2">
+              {afterPhotos.map((p: any) => (
+                <img src={p.url} alt="After" class="w-full aspect-square object-cover rounded-xl" loading="lazy" />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    )}
+
+    <!-- Dispute form (hidden) -->
+    <div id="dispute-form" class="hidden bg-red-50 border border-red-200 rounded-2xl p-6">
+      <h3 class="font-semibold text-red-700 mb-3">Raise a Dispute</h3>
+      <textarea id="dispute-reason" rows="4" placeholder="Describe the issue in detail…"
+        class="w-full border border-red-200 rounded-xl p-3 text-sm focus:ring-2 focus:ring-red-300 outline-none resize-none mb-3"></textarea>
+      <div class="flex gap-2">
+        <button id="confirm-dispute-btn" class="bg-red-600 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-red-700">Submit Dispute</button>
+        <button id="cancel-dispute-btn" class="text-sm text-gray-500 px-4 py-2 rounded-xl hover:bg-gray-100">Cancel</button>
+      </div>
+    </div>
+
+    <!-- Cancel Job -->
+    {job.status === 'scheduled' && (
+      <div class="border border-red-200 rounded-2xl p-4">
+        <p class="text-xs text-gray-500 mb-2">Cancel this job if the cleaning is no longer needed. The cleaner will be notified.</p>
+        <button id="cancel-job-btn" class="text-sm font-medium text-red-600 hover:text-red-800 border border-red-300 px-4 py-2 rounded-xl hover:bg-red-50 transition-colors">
+          Cancel Job
+        </button>
+      </div>
+    )}
+
+    <div class="pt-2">
+      <a href="/owner/cleaning" class="text-sm text-gray-400 hover:text-gray-600">← Back to My Cleaning</a>
+    </div>
+  </div>
+</AdminLayout>
+
+<script define:vars={{ jobId: job.id, isPaid, approved }}>
+  // Auto-reload after Stripe redirect to pick up webhook-driven status change
+  if (approved) {
+    setTimeout(() => {
+      window.location.replace(window.location.pathname); // strip query params
+    }, 4000);
+  }
+
+  document.getElementById('pay-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('pay-btn');
+    btn.disabled = true;
+    btn.textContent = '…';
+    const res = await fetch(`/api/cleaning/jobs/${jobId}/checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    if (res.ok) {
+      const { url } = await res.json();
+      window.location.href = url;
+    } else {
+      const d = await res.json();
+      alert(d.error ?? 'Payment failed');
+      btn.disabled = false;
+      btn.textContent = `Pay`;
+    }
+  });
+
+  document.getElementById('approve-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('approve-btn');
+    btn.disabled = true;
+
+    if (isPaid) {
+      // Already paid — just approve directly and payout
+      btn.textContent = 'Approving…';
+      const res = await fetch(`/api/cleaning/jobs/${jobId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'approved' }),
+      });
+      if (res.ok) window.location.reload();
+      else {
+        const d = await res.json();
+        alert(d.error ?? 'Failed');
+        btn.disabled = false;
+        btn.textContent = 'Approve & Release Payout';
+      }
+    } else {
+      // Not yet paid — redirect to Stripe Checkout; webhook will auto-approve on success
+      btn.textContent = 'Redirecting to payment…';
+      const res = await fetch(`/api/cleaning/jobs/${jobId}/checkout`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (res.ok) {
+        const { url } = await res.json();
+        window.location.href = url;
+      } else {
+        const d = await res.json();
+        alert(d.error ?? 'Payment failed');
+        btn.disabled = false;
+        btn.textContent = `Pay & Approve`;
+      }
+    }
+  });
+
+  document.getElementById('dispute-btn')?.addEventListener('click', () => {
+    document.getElementById('dispute-form').classList.remove('hidden');
+  });
+
+  document.getElementById('cancel-dispute-btn')?.addEventListener('click', () => {
+    document.getElementById('dispute-form').classList.add('hidden');
+  });
+
+  // Add checklist item
+  document.getElementById('add-item-btn')?.addEventListener('click', async () => {
+    const input = document.getElementById('new-item-input');
+    const label = input.value.trim();
+    if (!label) return;
+    const btn = document.getElementById('add-item-btn');
+    btn.disabled = true;
+    const res = await fetch(`/api/cleaning/jobs/${jobId}/checklist`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ label }),
+    });
+    if (res.ok) {
+      window.location.reload();
+    } else {
+      const d = await res.json();
+      alert(d.error ?? 'Failed to add item');
+      btn.disabled = false;
+    }
+  });
+  document.getElementById('new-item-input')?.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('add-item-btn')?.click();
+  });
+
+  // Delete checklist item
+  document.querySelectorAll('.delete-item-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const itemId = btn.dataset.itemId;
+      btn.disabled = true;
+      const res = await fetch(`/api/cleaning/jobs/${jobId}/checklist`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_id: itemId }),
+      });
+      if (res.ok) {
+        btn.closest('li')?.remove();
+      } else {
+        btn.disabled = false;
+        alert('Failed to remove item');
+      }
+    });
+  });
+
+  document.getElementById('confirm-dispute-btn')?.addEventListener('click', async () => {
+    const reason = document.getElementById('dispute-reason').value.trim();
+    if (!reason || reason.length < 10) { alert('Please describe the issue (min 10 chars)'); return; }
+    const btn = document.getElementById('confirm-dispute-btn');
+    btn.disabled = true;
+    btn.textContent = 'Submitting…';
+    const res = await fetch(`/api/cleaning/jobs/${jobId}/dispute`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ reason }),
+    });
+    if (res.ok) window.location.reload();
+    else {
+      const d = await res.json();
+      alert(d.error ?? 'Failed');
+      btn.disabled = false;
+      btn.textContent = 'Submit Dispute';
+    }
+  });
+
+  document.getElementById('cancel-job-btn')?.addEventListener('click', async () => {
+    if (!confirm('Cancel this cleaning job? The cleaner will be notified.')) return;
+    const btn = document.getElementById('cancel-job-btn');
+    btn.disabled = true;
+    btn.textContent = 'Cancelling…';
+    const res = await fetch(`/api/cleaning/jobs/${jobId}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status: 'cancelled' }),
+    });
+    if (res.ok) window.location.href = '/owner/cleaning';
+    else {
+      const d = await res.json();
+      alert(d.error ?? 'Failed to cancel job');
+      btn.disabled = false;
+      btn.textContent = 'Cancel Job';
+    }
+  });
+</script>

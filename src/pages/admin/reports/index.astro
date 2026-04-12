@@ -1,0 +1,137 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+const service = getServiceClient();
+const statusFilter = Astro.url.searchParams.get('status') ?? '';
+
+let query = service
+  .from('reports')
+  .select('*')
+  .order('created_at', { ascending: false })
+  .limit(100);
+
+if (statusFilter && ['open', 'in_progress', 'resolved', 'closed'].includes(statusFilter)) {
+  query = query.eq('status', statusFilter);
+}
+
+const { data: reports } = await query;
+
+const statusColors: Record<string, string> = {
+  open: 'bg-red-100 text-red-700',
+  in_progress: 'bg-amber-100 text-amber-700',
+  resolved: 'bg-green-100 text-green-700',
+  closed: 'bg-gray-100 text-gray-600',
+};
+
+const severityColors: Record<string, string> = {
+  low: 'text-gray-400',
+  medium: 'text-amber-500',
+  high: 'text-orange-500',
+  critical: 'text-red-600',
+};
+
+const categoryLabels: Record<string, string> = {
+  road_damage: '🛣️ Road Damage', water_supply: '💧 Water Supply', electricity: '⚡ Electricity',
+  waste: '🗑️ Waste', street_lighting: '💡 Street Lighting', stray_animals: '🐕 Stray Animals',
+  noise: '🔊 Noise', flooding: '🌊 Flooding', other: '📋 Other',
+};
+
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+
+<AdminLayout title="Community Reports">
+  <div class="space-y-6">
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl font-bold text-white">Community Reports</h1>
+      <span class="text-sm text-gray-400">{(reports ?? []).length} reports</span>
+    </div>
+
+    <!-- Status filter -->
+    <div class="flex flex-wrap gap-2">
+      {[
+        { value: '', label: 'All' },
+        { value: 'open', label: 'Open' },
+        { value: 'in_progress', label: 'In Progress' },
+        { value: 'resolved', label: 'Resolved' },
+        { value: 'closed', label: 'Closed' },
+      ].map(f => (
+        <a href={f.value ? `?status=${f.value}` : '/admin/reports'}
+          class={`px-3 py-1.5 rounded-lg text-sm font-medium ${statusFilter === f.value || (!statusFilter && !f.value) ? 'bg-white/20 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}>
+          {f.label}
+        </a>
+      ))}
+    </div>
+
+    {(!reports || reports.length === 0) ? (
+      <div class="text-center py-16 text-gray-500">
+        <p class="text-4xl mb-2">📋</p>
+        <p>No reports found</p>
+      </div>
+    ) : (
+      <div class="space-y-3">
+        {(reports ?? []).map((r: any) => (
+          <div class="bg-white/5 rounded-xl border border-white/10 p-4 report-row" data-id={r.id}>
+            <div class="flex items-start justify-between gap-4">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 mb-1">
+                  <span class={`text-sm font-bold ${severityColors[r.severity] ?? ''}`}>●</span>
+                  <h3 class="font-semibold text-white truncate">{r.title}</h3>
+                </div>
+                <p class="text-sm text-gray-400 line-clamp-2 mb-2">{r.description}</p>
+                <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                  <span>{categoryLabels[r.category] ?? r.category}</span>
+                  {r.location && <span>📍 {r.location}</span>}
+                  {r.reporter_name && <span>👤 {r.reporter_name}</span>}
+                  {r.reporter_email && <span>✉️ {r.reporter_email}</span>}
+                  <span>{new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                </div>
+                {r.admin_notes && <p class="text-xs text-gray-500 mt-2 bg-white/5 p-2 rounded">Admin: {r.admin_notes}</p>}
+              </div>
+              <div class="flex flex-col items-end gap-2 flex-shrink-0">
+                <span class={`px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[r.status] ?? ''}`}>{r.status.replace('_', ' ')}</span>
+                <select class="status-select bg-white/10 text-white text-xs rounded-lg px-2 py-1 border border-white/20 outline-none" data-id={r.id}>
+                  <option value="open" selected={r.status === 'open'}>Open</option>
+                  <option value="in_progress" selected={r.status === 'in_progress'}>In Progress</option>
+                  <option value="resolved" selected={r.status === 'resolved'}>Resolved</option>
+                  <option value="closed" selected={r.status === 'closed'}>Closed</option>
+                </select>
+                <button class="delete-btn text-xs text-red-400 hover:text-red-300" data-id={r.id}>Delete</button>
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+</AdminLayout>
+
+<script>
+  document.querySelectorAll('.status-select').forEach(sel => {
+    sel.addEventListener('change', async (e) => {
+      const id = (sel as HTMLSelectElement).dataset.id;
+      const status = (sel as HTMLSelectElement).value;
+      try {
+        const res = await fetch(`/api/admin/reports/${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ status }),
+        });
+        if (res.ok) location.reload();
+        else alert('Failed to update');
+      } catch { alert('Error'); }
+    });
+  });
+
+  document.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete this report?')) return;
+      const id = (btn as HTMLElement).dataset.id;
+      try {
+        const res = await fetch(`/api/admin/reports/${id}`, { method: 'DELETE' });
+        if (res.ok) (btn as HTMLElement).closest('.report-row')?.remove();
+        else alert('Failed');
+      } catch { alert('Error'); }
+    });
+  });
+</script>

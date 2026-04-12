@@ -1,0 +1,211 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getServiceClient } from '../lib/supabase.ts';
+
+const token = Astro.url.searchParams.get('token');
+
+let booking: any = null;
+let listing: any = null;
+let error: string | null = null;
+let submitted = Astro.url.searchParams.get('done') === '1';
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+if (!token) {
+  error = 'no_token';
+} else {
+  const sb = getServiceClient();
+  const { data, error: dbErr } = await sb
+    .from('bookings')
+    .select(`
+      id, status, guest_name, check_in, check_out,
+      listing:listings(id, title, listing_images(url, is_cover, sort_order))
+    `)
+    .eq('review_token', token)
+    .single();
+
+  if (dbErr || !data) {
+    error = 'not_found';
+  } else {
+    booking = data;
+    listing = data.listing;
+    if (listing?.listing_images) {
+      listing.cover_image = (listing.listing_images.find((i: any) => i.is_cover) ?? listing.listing_images[0])?.url ?? null;
+    }
+    // Check if already reviewed
+    const { data: existing } = await (sb)
+      .from('reviews')
+      .select('id')
+      .eq('booking_id', data.id)
+      .maybeSingle();
+    if (existing) error = 'already_reviewed';
+  }
+}
+---
+
+<BaseLayout
+  title="Leave a Review — KefaloniaBNB"
+  description="Share your experience at KefaloniaBNB."
+>
+  <div class="max-w-lg mx-auto px-4 sm:px-6 py-16">
+
+    {error === 'no_token' && (
+      <div class="text-center py-20">
+        <p class="text-5xl mb-4">🔑</p>
+        <h1 class="text-2xl font-bold text-gray-900 mb-2">{isEl ? 'Ο σύνδεσμος δεν είναι έγκυρος' : isBg ? 'Линкът не е валиден' : isSr ? 'Линк није важећи' : isTr ? 'Bağlantı geçerli değil' : isRo ? 'Link invalid' : 'Link not valid'}</h1>
+        <p class="text-gray-500">{isEl ? 'Ο σύνδεσμος κριτικής φαίνεται ελλιπής. Χρησιμοποιήστε τον σύνδεσμο από το email μετά τη διαμονή σας.' : isBg ? 'Линкът за отзив изглежда непълен. Моля, използвайте линка от имейла след вашия престой.' : isSr ? 'Линк за рецензију изгледа непотпун. Молимо користите линк из имејла након вашег боравка.' : isTr ? 'Değerlendirme bağlantısı eksik görünüyor. Lütfen konaklama sonrası e-postanızdaki bağlantıyı kullanın.' : isRo ? 'Linkul de recenzie pare incomplet. Vă rugăm să folosiți linkul din emailul de după sejur.' : 'The review link appears to be incomplete. Please use the link from your post-stay email.'}</p>
+      </div>
+    )}
+
+    {error === 'not_found' && (
+      <div class="text-center py-20">
+        <p class="text-5xl mb-4">🔍</p>
+        <h1 class="text-2xl font-bold text-gray-900 mb-2">{isEl ? 'Ο σύνδεσμος δεν βρέθηκε' : isBg ? 'Линкът не е намерен' : isSr ? 'Линк није пронађен' : isTr ? 'Bağlantı bulunamadı' : isRo ? 'Link negăsit' : 'Link not found'}</h1>
+        <p class="text-gray-500">{isEl ? 'Αυτός ο σύνδεσμος κριτικής έχει λήξει ή δεν είναι έγκυρος. Κάθε σύνδεσμος μπορεί να χρησιμοποιηθεί μόνο μία φορά.' : isBg ? 'Този линк за отзив е изтекъл или е невалиден. Всеки линк може да се използва само веднъж.' : isSr ? 'Овај линк за рецензију је истекао или је неважећи. Сваки линк може да се користи самоједном.' : isTr ? 'Bu değerlendirme bağlantısının süresi dolmuş veya geçersiz. Her bağlantı yalnızca bir kez kullanılabilir.' : isRo ? 'Acest link de recenzie a expirat sau este invalid. Fiecare link poate fi folosit o singură dată.' : 'This review link has expired or is invalid. Each link can only be used once.'}</p>
+      </div>
+    )}
+
+    {error === 'already_reviewed' && (
+      <div class="text-center py-20">
+        <p class="text-5xl mb-4">✅</p>
+        <h1 class="text-2xl font-bold text-gray-900 mb-2">{isEl ? 'Έχετε ήδη υποβάλει κριτική' : isBg ? 'Вече сте написали отзив' : isSr ? 'Већ сте оставили рецензију' : isTr ? 'Zaten değerlendirdiniz' : isRo ? 'Deja recenzat' : 'Already reviewed'}</h1>
+        <p class="text-gray-500">{isEl ? 'Έχετε ήδη υποβάλει κριτική για αυτή τη διαμονή. Ευχαριστούμε!' : isBg ? 'Вече сте изпратили отзив за този престой. Благодарим ви!' : isSr ? 'Већ сте послали рецензију за овај боравак. Хвала вам!' : isTr ? 'Bu konaklama için zaten bir değerlendirme gönderdiniz. Teşekkürler!' : isRo ? 'Ați trimis deja o recenzie pentru acest sejur. Vă mulțumim!' : "You've already submitted a review for this stay. Thank you!"}</p>
+      </div>
+    )}
+
+    {submitted && (
+      <div class="text-center py-20">
+        <p class="text-5xl mb-4">🙏</p>
+        <h1 class="text-2xl font-bold text-gray-900 mb-2">{isEl ? 'Ευχαριστούμε για την κριτική σας!' : isBg ? 'Благодарим ви за отзива!' : isSr ? 'Хвала вам на рецензији!' : isTr ? 'Değerlendirmeniz için teşekkürler!' : isRo ? 'Vă mulțumim pentru recenzie!' : 'Thank you for your review!'}</h1>
+        <p class="text-gray-500 mb-6">{isEl ? 'Η κριτική σας υποβλήθηκε και θα εμφανιστεί στον ιστότοπό μας μόλις εγκριθεί.' : isBg ? 'Вашият отзив беше изпратен и ще се появи на сайта ни след одобрение.' : isSr ? 'Ваша рецензија је послата и појавиће се на нашем сајту након одобрења.' : isTr ? 'Değerlendirmeniz gönderildi ve onaylandıktan sonra sitemizde görünecek.' : isRo ? 'Recenzia dumneavoastră a fost trimisă și va apărea pe site-ul nostru odată aprobată.' : 'Your review has been submitted and will appear on our site once approved.'}</p>
+        <a href="/" class="inline-block bg-[#1a1a2e] text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">{isEl ? 'Επιστροφή στην Αρχική' : isBg ? 'Обратно към началната страница' : isSr ? 'Назад на почетну страницу' : isTr ? 'Ana Sayfaya Dön' : isRo ? 'Înapoi la Pagina Principală' : 'Back to Homepage'}</a>
+      </div>
+    )}
+
+    {booking && !submitted && !error && (
+      <div class="space-y-6">
+        <div class="text-center">
+          <p class="text-4xl mb-3">⭐</p>
+          <h1 class="text-2xl font-bold text-gray-900">{isEl ? 'Πώς ήταν η διαμονή σας;' : isBg ? 'Как беше престоят ви?' : isSr ? 'Оцените ваш боравак' : isTr ? 'Konaklamanızı derecelendirin' : isRo ? 'Cum a fost sejurul dumneavoastră?' : 'How was your stay?'}</h1>
+          {listing && <p class="text-gray-500 mt-1">{listing.title}</p>}
+        </div>
+
+        {listing?.cover_image && (
+          <img src={listing.cover_image} alt={listing.title} class="w-full h-40 object-cover rounded-2xl" />
+        )}
+
+        <div class="bg-white rounded-2xl border border-gray-100 p-6">
+          <form id="review-form" class="space-y-5">
+
+            <!-- Star rating -->
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-3">{isEl ? 'Η βαθμολογία σας' : isBg ? 'Вашата оценка' : isSr ? 'Ваша оцена' : isTr ? 'Puanınız' : isRo ? 'Evaluarea dumneavoastră' : 'Your rating'} <span class="text-red-500">*</span></label>
+              <div class="flex gap-2" id="stars">
+                {[1, 2, 3, 4, 5].map(n => (
+                  <button
+                    type="button"
+                    data-star={n}
+                    class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors focus:outline-none"
+                    aria-label={`${n} star${n > 1 ? 's' : ''}`}
+                  >★</button>
+                ))}
+              </div>
+              <input type="hidden" id="rating-input" name="rating" value="" required />
+              <p id="rating-error" class="text-xs text-red-500 mt-1 hidden">Please select a rating.</p>
+            </div>
+
+            <!-- Review body -->
+            <div>
+              <label for="review-body" class="block text-sm font-medium text-gray-700 mb-1">{isEl ? 'Η κριτική σας' : isBg ? 'Вашият отзив' : isSr ? 'Ваша рецензија' : isTr ? 'Değerlendirmeniz' : isRo ? 'Recenzia dumneavoastră' : 'Your review'} <span class="text-gray-400 font-normal">({isEl ? 'προαιρετικό' : isBg ? 'по желание' : isSr ? 'опционо' : isTr ? 'isteğe bağlı' : isRo ? 'opțional' : 'optional'})</span></label>
+              <textarea
+                id="review-body"
+                name="body"
+                rows="4"
+                placeholder={isEl ? 'Πείτε στους μελλοντικούς επισκέπτες για την εμπειρία σας — το ακίνητο, τη τοποθεσία, το check-in…' : isBg ? 'Разкажете на бъдещите гости за вашия опит — имотът, местоположението, настаняването…' : isSr ? 'Реците будућим гостима о вашем искуству — смештај, локација, пријава…' : isTr ? 'Gelecekteki misafirlere deneyiminizi anlatın — mülk, konum, giriş…' : isRo ? 'Spuneți viitorilor oaspeți despre experiența dumneavoastră — proprietatea, locația, check-in-ul…' : 'Tell future guests about your experience — the property, the location, check-in…'}
+                class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none resize-none"
+              ></textarea>
+            </div>
+
+            <p id="submit-error" class="text-sm text-red-600 hidden"></p>
+
+            <button
+              type="submit"
+              class="w-full bg-[#c9a96e] text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-opacity"
+            >
+              {isEl ? 'Υποβολή Κριτικής' : isBg ? 'Изпрати отзив' : isSr ? 'Пошаљи рецензију' : isTr ? 'Değerlendirmeyi Gönder' : isRo ? 'Trimite Recenzia' : 'Submit Review'}
+            </button>
+          </form>
+        </div>
+
+        <p class="text-center text-xs text-gray-400">{isEl ? 'Η κριτική σας θα εμφανιστεί στον ιστότοπό μας μετά από σύντομο έλεγχο (συνήθως εντός 24 ωρών).' : isBg ? 'Вашият отзив ще се появи на сайта ни след кратка проверка (обикновено в рамките на 24 часа).' : isSr ? 'Ваша рецензија ће бити видљива на нашем сајту након кратке провере (обично у року од 24 сата).' : isTr ? 'Değerlendirmeniz, kısa bir incelemeden sonra sitemizde görünecek (genellikle 24 saat içinde).' : isRo ? 'Recenzia dumneavoastră va fi vizibilă pe site-ul nostru după o verificare rapidă de moderare (de obicei în 24 de ore).' : 'Your review will be visible on our site after a quick moderation check (usually within 24 hours).'}</p>
+      </div>
+    )}
+  </div>
+</BaseLayout>
+
+{booking && !submitted && !error && (
+  <script define:vars={{ token }}>
+    let selectedRating = 0;
+
+    const stars = document.querySelectorAll('.star-btn');
+    const ratingInput = document.getElementById('rating-input');
+    const ratingError = document.getElementById('rating-error');
+
+    function updateStars(n) {
+      stars.forEach((btn) => {
+        const s = Number(btn.dataset.star);
+        btn.classList.toggle('text-yellow-400', s <= n);
+        btn.classList.toggle('text-gray-300', s > n);
+      });
+    }
+
+    stars.forEach((btn) => {
+      btn.addEventListener('mouseenter', () => updateStars(Number(btn.dataset.star)));
+      btn.addEventListener('mouseleave', () => updateStars(selectedRating));
+      btn.addEventListener('click', () => {
+        selectedRating = Number(btn.dataset.star);
+        ratingInput.value = String(selectedRating);
+        updateStars(selectedRating);
+        ratingError.classList.add('hidden');
+      });
+    });
+
+    document.getElementById('review-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+
+      if (!selectedRating) {
+        ratingError.classList.remove('hidden');
+        return;
+      }
+
+      const body = document.getElementById('review-body').value;
+      const submitBtn = e.target.querySelector('button[type="submit"]');
+      const submitError = document.getElementById('submit-error');
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Submitting…';
+
+      const res = await fetch('/api/reviews/guest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ review_token: token, rating: selectedRating, body }),
+      });
+
+      if (res.ok) {
+        window.location.href = `/review?token=${token}&done=1`;
+      } else {
+        const data = await res.json().catch(() => ({}));
+        submitError.textContent = data.error === 'already_reviewed'
+          ? 'You have already submitted a review for this stay.'
+          : 'Something went wrong. Please try again.';
+        submitError.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Submit Review';
+      }
+    });
+  </script>
+)}

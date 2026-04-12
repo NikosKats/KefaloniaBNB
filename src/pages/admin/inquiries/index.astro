@@ -1,0 +1,143 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+const profile = Astro.locals.profile!;
+if (!profile) return Astro.redirect('/admin/login');
+
+const service = getServiceClient();
+
+// Mark all 'new' inquiries as 'replied' on page load (seen = read)
+// We do this after fetching so we still render them as "new" on this visit
+const { data: inquiries } = await service
+  .from('inquiries')
+  .select('*, listings(title,slug)')
+  .order('created_at', { ascending: false });
+
+// Mark new ones as seen
+await service
+  .from('inquiries')
+  .update({ status: 'replied' })
+  .eq('status', 'new');
+
+const all = inquiries ?? [];
+
+const statusBadge: Record<string, string> = {
+  new:       'bg-blue-100 text-blue-700',
+  replied:   'bg-gray-100 text-gray-500',
+  converted: 'bg-emerald-100 text-emerald-700',
+  spam:      'bg-red-100 text-red-500',
+};
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+function fmtDay(d: string) {
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+---
+
+<AdminLayout title="Inquiries">
+
+  <div class="flex items-center justify-between mb-6">
+    <p class="text-sm text-gray-500">{all.length} total inquir{all.length !== 1 ? 'ies' : 'y'}</p>
+  </div>
+
+  {all.length === 0 ? (
+    <div class="text-center py-20 text-gray-400">
+      <p class="text-4xl mb-3">📬</p>
+      <p class="font-medium">No inquiries yet</p>
+    </div>
+  ) : (
+    <div class="space-y-3">
+      {all.map((inq: any) => (
+        <div class={`bg-white rounded-2xl border overflow-hidden ${inq.status === 'new' ? 'border-blue-200' : 'border-gray-100'}`}>
+          <div class="p-5">
+            <div class="flex items-start justify-between gap-4 flex-wrap">
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap mb-1">
+                  <p class="font-semibold text-gray-900">{inq.name}</p>
+                  <span class={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge[inq.status] ?? statusBadge.replied}`}>
+                    {inq.status}
+                  </span>
+                </div>
+                <div class="flex flex-wrap gap-x-4 gap-y-0.5 text-sm text-gray-500 mb-2">
+                  <a href={`mailto:${inq.email}`} class="hover:text-[#1a1a2e] transition-colors">{inq.email}</a>
+                  {inq.phone && <a href={`tel:${inq.phone}`} class="hover:text-[#1a1a2e] transition-colors">{inq.phone}</a>}
+                </div>
+                {inq.listings && (
+                  <p class="text-xs text-gray-400 mb-2">
+                    Property: <a href={`/admin/listings/${inq.listing_id}`} class="text-[#1a1a2e] hover:underline">{inq.listings.title}</a>
+                  </p>
+                )}
+                {(inq.check_in || inq.guests) && (
+                  <div class="flex flex-wrap gap-3 text-xs text-gray-500 mb-3">
+                    {inq.check_in && <span>📅 {fmtDay(inq.check_in)} → {inq.check_out ? fmtDay(inq.check_out) : '?'}</span>}
+                    {inq.guests && <span>👥 {inq.guests} guest{inq.guests !== 1 ? 's' : ''}</span>}
+                  </div>
+                )}
+                <p class="text-sm text-gray-700 whitespace-pre-wrap">{inq.message}</p>
+              </div>
+              <div class="shrink-0 text-right">
+                <p class="text-xs text-gray-400">{fmtDate(inq.created_at)}</p>
+                <div class="flex gap-2 mt-2 justify-end flex-wrap">
+                  <a href={`mailto:${inq.email}?subject=Re: your inquiry`}
+                    class="text-xs font-medium text-white bg-[#1a1a2e] hover:bg-[#2d2d4e] px-3 py-1.5 rounded-lg transition-colors">
+                    Reply
+                  </a>
+                  <button
+                    class="mark-spam-btn text-xs text-gray-400 hover:text-red-500 border border-gray-200 px-3 py-1.5 rounded-lg transition-colors"
+                    data-id={inq.id}>
+                    Spam
+                  </button>
+                  <button
+                    class="mark-converted-btn text-xs text-gray-400 hover:text-emerald-600 border border-gray-200 px-3 py-1.5 rounded-lg transition-colors"
+                    data-id={inq.id}>
+                    Converted
+                  </button>
+                  <button
+                    class="delete-inq-btn text-xs text-gray-400 hover:text-red-600 border border-gray-200 hover:border-red-200 px-3 py-1.5 rounded-lg transition-colors"
+                    data-id={inq.id}
+                    title="Delete inquiry">
+                    🗑
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</AdminLayout>
+
+<script>
+  async function updateStatus(id: string, status: string) {
+    await fetch('/api/admin/inquiries/status', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, status }),
+    });
+    window.location.reload();
+  }
+
+  document.querySelectorAll('.mark-spam-btn').forEach((btn) => {
+    btn.addEventListener('click', () => updateStatus((btn as HTMLElement).dataset.id!, 'spam'));
+  });
+  document.querySelectorAll('.mark-converted-btn').forEach((btn) => {
+    btn.addEventListener('click', () => updateStatus((btn as HTMLElement).dataset.id!, 'converted'));
+  });
+
+  document.querySelectorAll('.delete-inq-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete this inquiry? This cannot be undone.')) return;
+      const id = (btn as HTMLElement).dataset.id!;
+      await fetch('/api/admin/inquiries/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      window.location.reload();
+    });
+  });
+</script>

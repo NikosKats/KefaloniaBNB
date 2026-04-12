@@ -1,0 +1,478 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+const isLoggedIn = !!Astro.locals.session;
+const currentUserId = Astro.locals.session?.user?.id ?? null;
+
+const service = getServiceClient();
+const { id } = Astro.params;
+
+const { data: post } = await service
+  .from('community_posts')
+  .select('*, profiles:author_id(avatar_url, role)')
+  .eq('id', id)
+  .eq('is_hidden', false)
+  .single();
+
+if (!post) {
+  return Astro.redirect('/community/board');
+}
+
+const { data: comments } = await service
+  .from('community_comments')
+  .select('*, profiles:author_id(avatar_url, role)')
+  .eq('post_id', id)
+  .eq('is_hidden', false)
+  .order('created_at', { ascending: true });
+
+// Check if user liked this post
+let isLiked = false;
+if (currentUserId) {
+  const { data: like } = await service
+    .from('community_likes')
+    .select('id')
+    .eq('user_id', currentUserId)
+    .eq('post_id', id)
+    .maybeSingle();
+  isLiked = !!like;
+}
+
+// User's liked comment IDs
+let likedCommentIds: Set<string> = new Set();
+if (currentUserId && comments?.length) {
+  const { data: cLikes } = await service
+    .from('community_likes')
+    .select('comment_id')
+    .eq('user_id', currentUserId)
+    .in('comment_id', comments.map(c => c.id));
+  for (const l of cLikes ?? []) {
+    if (l.comment_id) likedCommentIds.add(l.comment_id);
+  }
+}
+
+let userName = '';
+let userAvatar = '';
+if (currentUserId) {
+  const { data: prof } = await service.from('profiles').select('full_name, avatar_url').eq('id', currentUserId).single();
+  userName = prof?.full_name ?? '';
+  userAvatar = prof?.avatar_url ?? '';
+}
+
+const categoryLabels: Record<string, string> = {
+  general: '💬', tips: '💡', questions: '❓', events: '🎉',
+  for_sale: '🏷️', lost_found: '🔍', recommendations: '⭐', photos: '📸',
+};
+
+function getTimeSince(date: Date): string {
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return isEl ? 'μόλις τώρα' : isBg ? 'току-що' : isSr ? 'upravo' : isTr ? 'az önce' : isRo ? 'chiar acum' : 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}${isEl ? 'λ' : isBg ? 'м' : isSr ? 'm' : isTr ? 'd' : isRo ? 'm' : 'm'}`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}${isEl ? 'ω' : isBg ? 'ч' : isSr ? 'č' : isTr ? 's' : isRo ? 'h' : 'h'}`;
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days}${isEl ? 'μ' : isBg ? 'д' : isSr ? 'd' : isTr ? 'g' : isRo ? 'd' : 'd'}`;
+  return date.toLocaleDateString();
+}
+
+const isAuthor = post.author_id === currentUserId;
+
+const roleBadges: Record<string, { label: string; color: string }> = {
+  super_admin: { label: isEl ? 'Διαχειριστής' : isBg ? 'Админ' : isSr ? 'Admin' : isTr ? 'Yönetici' : isRo ? 'Admin' : 'Admin', color: 'bg-red-100 text-red-700' },
+  admin: { label: isEl ? 'Διαχειριστής' : isBg ? 'Админ' : isSr ? 'Admin' : isTr ? 'Yönetici' : isRo ? 'Admin' : 'Admin', color: 'bg-red-100 text-red-700' },
+  property_owner: { label: isEl ? 'Ιδιοκτήτης' : isBg ? 'Собственик' : isSr ? 'Vlasnik' : isTr ? 'Mal Sahibi' : isRo ? 'Proprietar' : 'Owner', color: 'bg-blue-100 text-blue-700' },
+  restaurant_owner: { label: isEl ? 'Εστιάτορας' : isBg ? 'Ресторант' : isSr ? 'Restoran' : isTr ? 'Restoran' : isRo ? 'Restaurant' : 'Restaurant', color: 'bg-amber-100 text-amber-700' },
+};
+---
+
+<BaseLayout
+  title={`${post.author_name} — Keramoti Community`}
+  description={post.body?.slice(0, 160)}
+>
+  <section class="bg-[#1a1a2e] py-8">
+    <div class="max-w-2xl mx-auto px-4">
+      <a href="/community/board" class="text-gray-400 hover:text-white text-sm">← {isEl ? 'Πίσω στην κοινότητα' : isBg ? 'Назад към общността' : isSr ? 'Nazad na zajednicu' : isTr ? 'Topluluğa dön' : isRo ? 'Înapoi la comunitate' : 'Back to community'}</a>
+    </div>
+  </section>
+
+  <section class="max-w-2xl mx-auto px-4 py-6">
+    {/* Post */}
+    <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm" id="main-post" data-id={post.id}>
+      <div class="px-5 pt-5 pb-3 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <a href={`/community/member/${post.author_id}`} class="w-10 h-10 rounded-full bg-gradient-to-br from-[#1a1a2e] to-[#2d2d4e] flex items-center justify-center text-white text-sm font-bold overflow-hidden flex-shrink-0">
+            {post.profiles?.avatar_url ? (
+              <img src={post.profiles.avatar_url} alt="" class="w-full h-full object-cover" />
+            ) : (
+              post.author_name?.[0]?.toUpperCase() ?? '?'
+            )}
+          </a>
+          <div>
+            <div class="flex items-center gap-1.5">
+              <a href={`/community/member/${post.author_id}`} class="text-sm font-semibold text-gray-900 hover:underline">{post.author_name}</a>
+              {post.profiles?.role && roleBadges[post.profiles.role] && (
+                <span class={`text-[9px] font-semibold px-1.5 py-0.5 rounded-full ${roleBadges[post.profiles.role].color}`}>{roleBadges[post.profiles.role].label}</span>
+              )}
+            </div>
+            <p class="text-xs text-gray-400">{getTimeSince(new Date(post.created_at))} · {categoryLabels[post.category] ?? ''} {post.category}</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-1">
+          {isAuthor && (
+            <button id="delete-post-btn" class="text-gray-400 hover:text-red-500 p-1" title="Delete">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            </button>
+          )}
+          {isLoggedIn && !isAuthor && (
+            <button id="report-post-btn" class="text-gray-400 hover:text-orange-500 p-1" title="Report">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2z"/></svg>
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div class="px-5 pb-4">
+        {post.title && <h2 class="text-lg font-bold text-gray-900 mb-2">{post.title}</h2>}
+        <p class="text-sm text-gray-700 whitespace-pre-line">{post.body}</p>
+      </div>
+
+      {post.photo_urls?.length > 0 && (
+        <div class={`${post.photo_urls.length === 1 ? '' : 'grid grid-cols-2 gap-0.5'}`}>
+          {post.photo_urls.map((url: string, idx: number) => (
+            <img src={url} alt="" class={`w-full object-cover cursor-pointer lightbox-trigger ${post.photo_urls.length === 1 ? 'max-h-[500px]' : 'aspect-square'}`} loading="lazy" data-photos={JSON.stringify(post.photo_urls)} data-index={idx} />
+          ))}
+        </div>
+      )}
+
+      {/* Like + share bar */}
+      <div class="px-5 py-3 border-t border-gray-50 flex items-center gap-5">
+        <button id="like-post-btn" class={`flex items-center gap-1.5 text-xs font-medium transition-colors ${isLiked ? 'text-red-500' : 'text-gray-500 hover:text-red-500'}`} data-liked={isLiked}>
+          <svg class="w-4 h-4" fill={isLiked ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"/></svg>
+          <span id="like-count">{post.like_count || ''}</span>
+        </button>
+        <span class="text-xs text-gray-400">{(comments ?? []).length} {isEl ? 'σχόλια' : isBg ? 'коментара' : isSr ? 'komentara' : isTr ? 'yorum' : isRo ? 'comentarii' : 'comments'}</span>
+        <div class="flex items-center gap-2 ml-auto">
+          <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(Astro.url.href)}`} target="_blank" rel="noopener" class="w-8 h-8 rounded-full bg-[#1877F2]/10 text-[#1877F2] flex items-center justify-center hover:bg-[#1877F2]/20 transition-colors" title="Facebook">
+            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+          </a>
+          <a href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(Astro.url.href)}&text=${encodeURIComponent(post.title || post.body?.slice(0, 80) || 'Keramoti Community')}`} target="_blank" rel="noopener" class="w-8 h-8 rounded-full bg-black/5 text-gray-800 flex items-center justify-center hover:bg-black/10 transition-colors" title="X / Twitter">
+            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          </a>
+          <a href={`https://wa.me/?text=${encodeURIComponent((post.title || post.body?.slice(0, 80) || 'Check this out') + ' ' + Astro.url.href)}`} target="_blank" rel="noopener" class="w-8 h-8 rounded-full bg-[#25D366]/10 text-[#25D366] flex items-center justify-center hover:bg-[#25D366]/20 transition-colors" title="WhatsApp">
+            <svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492l4.625-1.47A11.94 11.94 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818c-2.168 0-4.178-.577-5.923-1.586l-.424-.254-2.742.872.87-2.649-.277-.44A9.782 9.782 0 012.182 12c0-5.422 4.396-9.818 9.818-9.818 5.422 0 9.818 4.396 9.818 9.818 0 5.422-4.396 9.818-9.818 9.818z"/></svg>
+          </a>
+          <button id="copy-link-btn" class="w-8 h-8 rounded-full bg-gray-100 text-gray-500 flex items-center justify-center hover:bg-gray-200 transition-colors" title={isEl ? 'Αντιγραφή συνδέσμου' : isBg ? 'Копиране на линк' : isSr ? 'Kopiraj link' : isTr ? 'Bağlantıyı kopyala' : isRo ? 'Copiază linkul' : 'Copy link'}>
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m9.86-2.44a4.5 4.5 0 0 0-1.242-7.244l-4.5-4.5a4.5 4.5 0 0 0-6.364 6.364L5.25 9.56" /></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    {/* Comments */}
+    <div class="mt-4 space-y-3" id="comments-list">
+      {(comments ?? []).map((c: any) => {
+        const cLiked = likedCommentIds.has(c.id);
+        return (
+        <div class="flex gap-3 comment-row" data-id={c.id}>
+          <a href={`/community/member/${c.author_id}`} class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-xs font-bold text-gray-600 flex-shrink-0 mt-0.5 overflow-hidden">
+            {c.profiles?.avatar_url ? (
+              <img src={c.profiles.avatar_url} alt="" class="w-full h-full object-cover" />
+            ) : (
+              c.author_name?.[0]?.toUpperCase() ?? '?'
+            )}
+          </a>
+          <div class="flex-1 min-w-0">
+            <div class="bg-gray-50 rounded-xl px-3.5 py-2.5">
+              <div class="flex items-center gap-1.5">
+                <p class="text-xs font-semibold text-gray-900">{c.author_name}</p>
+                {c.profiles?.role && roleBadges[c.profiles.role] && (
+                  <span class={`text-[8px] font-semibold px-1 py-0.5 rounded-full ${roleBadges[c.profiles.role].color}`}>{roleBadges[c.profiles.role].label}</span>
+                )}
+              </div>
+              <p class="text-sm text-gray-700 mt-0.5 whitespace-pre-line">{c.body}</p>
+              {c.photo_url && (
+                <img src={c.photo_url} alt="" class="mt-2 rounded-lg max-h-48 object-cover" loading="lazy" />
+              )}
+            </div>
+            <div class="flex items-center gap-3 mt-1 px-1">
+              <span class="text-[11px] text-gray-400">{getTimeSince(new Date(c.created_at))}</span>
+              <button class="like-comment-btn text-[11px] font-medium transition-colors {cLiked ? 'text-red-500' : 'text-gray-400 hover:text-red-500'}" data-id={c.id} data-liked={cLiked}>
+                {cLiked ? '♥' : '♡'} {c.like_count || ''}
+              </button>
+              {isLoggedIn && c.author_id !== currentUserId && (
+                <button class="report-comment-btn text-[11px] text-gray-400 hover:text-orange-500" data-id={c.id}>
+                  {isEl ? 'Αναφορά' : isBg ? 'Докладвай' : isSr ? 'Prijavi' : isTr ? 'Bildir' : isRo ? 'Raportează' : 'Report'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+        );
+      })}
+    </div>
+
+    {/* Comment composer */}
+    {isLoggedIn ? (
+      <div class="mt-4 flex gap-3 items-start">
+        <div class="w-8 h-8 rounded-full bg-[#1a1a2e] flex items-center justify-center text-white text-xs font-bold flex-shrink-0 overflow-hidden">
+          {userAvatar ? (
+            <img src={userAvatar} alt="" class="w-full h-full object-cover" />
+          ) : (
+            userName ? userName[0].toUpperCase() : '?'
+          )}
+        </div>
+        <form id="comment-form" class="flex-1">
+          <div class="bg-gray-50 rounded-xl px-3.5 py-2.5">
+            <textarea
+              name="body"
+              rows="2"
+              placeholder={isEl ? 'Γράψε σχόλιο...' : isBg ? 'Напишете коментар...' : isSr ? 'Napiši komentar...' : isTr ? 'Bir yorum yazın...' : isRo ? 'Scrie un comentariu...' : 'Write a comment...'}
+              required
+              class="w-full text-sm text-gray-800 placeholder-gray-400 outline-none resize-none bg-transparent"
+            ></textarea>
+          </div>
+          <div class="flex items-center justify-between mt-2">
+            <label class="cursor-pointer text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1">
+              📷 {isEl ? 'Φωτο' : isBg ? 'Снимка' : isSr ? 'Foto' : isTr ? 'Fotoğraf' : isRo ? 'Foto' : 'Photo'}
+              <input type="file" accept="image/jpeg,image/png,image/webp,image/avif" class="hidden" id="comment-photo-input" />
+            </label>
+            <button type="submit" class="bg-[#1a1a2e] text-white px-4 py-1.5 rounded-full text-xs font-semibold hover:bg-[#2d2d4e]">
+              {isEl ? 'Σχόλιο' : isBg ? 'Коментар' : isSr ? 'Komentar' : isTr ? 'Yorum' : isRo ? 'Comentariu' : 'Comment'}
+            </button>
+          </div>
+          <div id="comment-photo-preview" class="hidden mt-2"></div>
+          <p id="comment-msg" class="text-xs mt-1 hidden"></p>
+        </form>
+      </div>
+    ) : (
+      <div class="mt-4 text-center py-4">
+        <a href="/community/join" class="text-sm text-[#1a1a2e] font-semibold hover:underline">
+          {isEl ? 'Συνδέσου για να σχολιάσεις' : isBg ? 'Влезте, за да коментирате' : isSr ? 'Prijavite se da komentarišete' : isTr ? 'Yorum yapmak için giriş yapın' : isRo ? 'Autentifică-te pentru a comenta' : 'Log in to comment'}
+        </a>
+      </div>
+    )}
+  </section>
+
+  <div id="i18n-data" class="hidden"
+    data-delete-post={isEl ? 'Διαγραφή αυτής της δημοσίευσης;' : isBg ? 'Изтриване на тази публикация?' : isSr ? 'Obrisati ovu objavu?' : isTr ? 'Bu gönderi silinsin mi?' : isRo ? 'Ștergi această postare?' : 'Delete this post?'}
+    data-report-prompt={isEl ? 'Γιατί αναφέρετε αυτή τη δημοσίευση;' : isBg ? 'Защо докладвате тази публикация?' : isSr ? 'Zašto prijavljujete ovu objavu?' : isTr ? 'Bu gönderiyi neden bildiriyorsunuz?' : isRo ? 'De ce raportezi această postare?' : 'Why are you reporting this post?'}
+    data-report-comment-prompt={isEl ? 'Γιατί αναφέρετε αυτό το σχόλιο;' : isBg ? 'Защо докладвате този коментар?' : isSr ? 'Zašto prijavljujete ovaj komentar?' : isTr ? 'Bu yorumu neden bildiriyorsunuz?' : isRo ? 'De ce raportezi acest comentariu?' : 'Why are you reporting this comment?'}
+    data-report-thanks={isEl ? 'Η αναφορά υποβλήθηκε. Ευχαριστούμε.' : isBg ? 'Докладът е изпратен. Благодарим.' : isSr ? 'Prijava poslata. Hvala.' : isTr ? 'Bildirim gönderildi. Teşekkürler.' : isRo ? 'Raport trimis. Mulțumim.' : 'Report submitted. Thank you.'}
+    data-failed={isEl ? 'Αποτυχία' : isBg ? 'Грешка' : isSr ? 'Neuspeh' : isTr ? 'Başarısız' : isRo ? 'Eșuat' : 'Failed'}
+    data-network-error={isEl ? 'Σφάλμα δικτύου' : isBg ? 'Мрежова грешка' : isSr ? 'Mrežna greška' : isTr ? 'Ağ hatası' : isRo ? 'Eroare de rețea' : 'Network error'}
+  ></div>
+
+  <!-- Photo lightbox -->
+  <div id="lightbox" class="hidden fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" role="dialog">
+    <button id="lb-close" class="absolute top-4 right-4 text-white/70 hover:text-white text-3xl z-10">&times;</button>
+    <button id="lb-prev" class="absolute left-4 text-white/70 hover:text-white text-4xl z-10 hidden">&#8249;</button>
+    <button id="lb-next" class="absolute right-4 text-white/70 hover:text-white text-4xl z-10 hidden">&#8250;</button>
+    <img id="lb-img" src="" alt="" class="max-w-full max-h-[90vh] object-contain rounded-lg" />
+  </div>
+</BaseLayout>
+
+<script define:vars={{ postId: post.id }}>
+  window.__postId = postId;
+</script>
+<script>
+  const postId = (window as any).__postId;
+  const _i18n = document.getElementById('i18n-data')?.dataset ?? {};
+
+  // Like post
+  document.getElementById('like-post-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('like-post-btn')!;
+    const wasLiked = btn.dataset.liked === 'true';
+    const countEl = document.getElementById('like-count')!;
+    const svg = btn.querySelector('svg')!;
+
+    try {
+      const res = await fetch('/api/community/posts/like', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ post_id: postId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        btn.dataset.liked = String(data.liked);
+        const current = parseInt(countEl.textContent || '0');
+        countEl.textContent = String(data.liked ? current + 1 : Math.max(0, current - 1)) || '';
+        btn.classList.toggle('text-red-500', data.liked);
+        btn.classList.toggle('text-gray-500', !data.liked);
+        svg.setAttribute('fill', data.liked ? 'currentColor' : 'none');
+      }
+    } catch {}
+  });
+
+  // Delete post
+  document.getElementById('delete-post-btn')?.addEventListener('click', async () => {
+    if (!confirm(_i18n.deletePost || 'Delete this post?')) return;
+    const res = await fetch(`/api/community/posts/${postId}`, { method: 'DELETE' });
+    if (res.ok) window.location.href = '/community/board';
+  });
+
+  // Report post
+  document.getElementById('report-post-btn')?.addEventListener('click', async () => {
+    const reason = prompt(_i18n.reportPrompt || 'Why are you reporting this post?');
+    if (!reason?.trim()) return;
+    await fetch('/api/community/posts/report', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ post_id: postId, reason: reason.trim() }),
+    });
+    alert(_i18n.reportThanks || 'Report submitted. Thank you.');
+  });
+
+  // Comment photo upload
+  let commentPhotoUrl = '';
+  document.getElementById('comment-photo-input')?.addEventListener('change', async (e) => {
+    const file = (e.target as HTMLInputElement).files?.[0];
+    if (!file) return;
+    const preview = document.getElementById('comment-photo-preview')!;
+    preview.classList.remove('hidden');
+    preview.innerHTML = '<span class="text-xs text-gray-400">Uploading...</span>';
+
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      const res = await fetch('/api/community/upload', { method: 'POST', body: fd });
+      const data = await res.json();
+      if (res.ok) {
+        commentPhotoUrl = data.url;
+        preview.innerHTML = `<img src="${data.url}" class="h-20 rounded-lg object-cover" />`;
+      } else {
+        preview.innerHTML = '<span class="text-xs text-red-500">Upload failed</span>';
+      }
+    } catch {
+      preview.innerHTML = '<span class="text-xs text-red-500">Error</span>';
+    }
+  });
+
+  // Submit comment
+  document.getElementById('comment-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target as HTMLFormElement;
+    const fd = new FormData(form);
+    const msg = document.getElementById('comment-msg')!;
+    const body = (fd.get('body') as string)?.trim();
+    if (!body) return;
+
+    try {
+      const res = await fetch('/api/community/comments', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          post_id: postId,
+          body,
+          photo_url: commentPhotoUrl || null,
+        }),
+      });
+      if (res.ok) {
+        location.reload();
+      } else {
+        const data = await res.json();
+        msg.textContent = data.error || _i18n.failed || 'Failed';
+        msg.className = 'text-xs mt-1 text-red-600';
+      }
+    } catch {
+      msg.textContent = _i18n.networkError || 'Network error';
+      msg.className = 'text-xs mt-1 text-red-600';
+    }
+  });
+
+  // Like comment
+  document.querySelectorAll('.like-comment-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const cid = (btn as HTMLElement).dataset.id;
+      try {
+        const res = await fetch('/api/community/comments/like', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ comment_id: cid }),
+        });
+        if (res.ok) {
+          const data = await res.json();
+          (btn as HTMLElement).dataset.liked = String(data.liked);
+          // Quick update text
+          const current = parseInt(btn.textContent?.replace(/[^0-9]/g, '') || '0');
+          const newCount = data.liked ? current + 1 : Math.max(0, current - 1);
+          btn.textContent = `${data.liked ? '♥' : '♡'} ${newCount || ''}`;
+          btn.classList.toggle('text-red-500', data.liked);
+          btn.classList.toggle('text-gray-400', !data.liked);
+        }
+      } catch {}
+    });
+  });
+
+  // Report comment
+  document.querySelectorAll('.report-comment-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const reason = prompt(_i18n.reportCommentPrompt || 'Why are you reporting this comment?');
+      if (!reason?.trim()) return;
+      const cid = (btn as HTMLElement).dataset.id;
+      await fetch('/api/community/posts/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comment_id: cid, reason: reason.trim() }),
+      });
+      alert(_i18n.reportThanks || 'Report submitted. Thank you.');
+    });
+  });
+
+  // Copy link
+  document.getElementById('copy-link-btn')?.addEventListener('click', () => {
+    navigator.clipboard.writeText(window.location.href).then(() => {
+      const btn = document.getElementById('copy-link-btn')!;
+      btn.classList.add('bg-green-100', 'text-green-600');
+      setTimeout(() => btn.classList.remove('bg-green-100', 'text-green-600'), 2000);
+    });
+  });
+
+  // Photo lightbox
+  const lightbox = document.getElementById('lightbox')!;
+  const lbImg = document.getElementById('lb-img') as HTMLImageElement;
+  const lbPrev = document.getElementById('lb-prev')!;
+  const lbNext = document.getElementById('lb-next')!;
+  let lbPhotos: string[] = [];
+  let lbIndex = 0;
+
+  function lbShow(photos: string[], index: number) {
+    lbPhotos = photos;
+    lbIndex = index;
+    lbImg.src = photos[index];
+    lbPrev.classList.toggle('hidden', photos.length <= 1);
+    lbNext.classList.toggle('hidden', photos.length <= 1);
+    lightbox.classList.remove('hidden');
+    document.body.style.overflow = 'hidden';
+  }
+  function lbHide() {
+    lightbox.classList.add('hidden');
+    document.body.style.overflow = '';
+  }
+
+  document.querySelectorAll('.lightbox-trigger').forEach(img => {
+    img.addEventListener('click', () => {
+      const el = img as HTMLElement;
+      const photos = JSON.parse(el.dataset.photos || '[]');
+      const idx = parseInt(el.dataset.index || '0');
+      lbShow(photos, idx);
+    });
+  });
+
+  document.getElementById('lb-close')?.addEventListener('click', lbHide);
+  lightbox.addEventListener('click', (e) => { if (e.target === lightbox) lbHide(); });
+  lbPrev.addEventListener('click', () => { lbIndex = (lbIndex - 1 + lbPhotos.length) % lbPhotos.length; lbImg.src = lbPhotos[lbIndex]; });
+  lbNext.addEventListener('click', () => { lbIndex = (lbIndex + 1) % lbPhotos.length; lbImg.src = lbPhotos[lbIndex]; });
+  document.addEventListener('keydown', (e) => {
+    if (lightbox.classList.contains('hidden')) return;
+    if (e.key === 'Escape') lbHide();
+    if (e.key === 'ArrowLeft') lbPrev.click();
+    if (e.key === 'ArrowRight') lbNext.click();
+  });
+</script>

@@ -1,0 +1,122 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isBg = lang === 'bg';
+const isEl = lang === 'el';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const t = {
+  myAccount: isEl ? 'Ο Λογαριασμός μου' : isBg ? 'Моят акаунт' : isSr ? 'Мој налог' : isTr ? 'Hesabım' : isRo ? 'Contul Meu' : 'My Account',
+  bookings: isEl ? 'Κρατήσεις' : isBg ? 'Резервации настаняване' : isSr ? 'Букирања' : isTr ? 'Rezervasyonlar' : isRo ? 'Rezervări' : 'Bookings',
+  reservations: isEl ? 'Κρατήσεις εστιατορίου' : isBg ? 'Резервации' : isSr ? 'Резервације' : isTr ? 'Restoran Rezervasyonları' : isRo ? 'Rezervări restaurant' : 'Reservations',
+  friends: isEl ? 'Φίλοι' : isBg ? 'Приятели' : isSr ? 'Пријатељи' : isTr ? 'Arkadaşlar' : isRo ? 'Prieteni' : 'Friends',
+  favorites: isEl ? 'Αγαπημένα' : isBg ? 'Любими' : isSr ? 'Омиљени' : isTr ? 'Favoriler' : isRo ? 'Favorite' : 'Favorites',
+  messages: isEl ? 'Μηνύματα' : isBg ? 'Съобщения' : isSr ? 'Поруке' : isTr ? 'Mesajlar' : isRo ? 'Mesaje' : 'Messages',
+  notifications: isEl ? 'Ειδοποιήσεις' : isBg ? 'Известия' : isSr ? 'Обавештења' : isTr ? 'Bildirimler' : isRo ? 'Notificări' : 'Notifications',
+  posts: isEl ? 'Δημοσιεύσεις' : isBg ? 'Публикации' : isSr ? 'Објаве' : isTr ? 'Gönderiler' : isRo ? 'Postări' : 'Posts',
+  myBookings: isEl ? 'Οι Κρατήσεις μου' : isBg ? 'Моите резервации' : isSr ? 'Моја букирања' : isTr ? 'Rezervasyonlarım' : isRo ? 'Rezervările Mele' : 'My Bookings',
+  myReservations: isEl ? 'Οι Κρατήσεις μου' : isBg ? 'Моите резервации' : isSr ? 'Моје резервације' : isTr ? 'Restoran Rezervasyonlarım' : isRo ? 'Rezervările Mele' : 'My Reservations',
+  viewBookings: isEl ? 'Δείτε και διαχειριστείτε τις κρατήσεις σας' : isBg ? 'Преглед и управление на резервациите ви' : isSr ? 'Прегледајте и управљајте букирањима' : isTr ? 'Rezervasyonlarınızı görüntüleyin' : isRo ? 'Vizualizați și gestionați rezervările dvs.' : 'View and manage your property bookings',
+  restaurantBookings: isEl ? 'Κρατήσεις εστιατορίου' : isBg ? 'Ресторантски резервации и хранене' : isSr ? 'Ресторанске резервације' : isTr ? 'Restoran rezervasyonları' : isRo ? 'Rezervări restaurant și dining' : 'Restaurant bookings and dining',
+  manageConnections: isEl ? 'Διαχειριστείτε τις συνδέσεις σας' : isBg ? 'Управлявайте връзките си' : isSr ? 'Управљајте везама' : isTr ? 'Bağlantılarınızı yönetin' : isRo ? 'Gestionați conexiunile dvs.' : 'Manage your connections',
+  chatWithFriends: isEl ? 'Συνομιλήστε με φίλους' : isBg ? 'Чат с приятели и членове' : isSr ? 'Разговарајте са пријатељима' : isTr ? 'Arkadaşlarınızla sohbet edin' : isRo ? 'Conversați cu prietenii și membrii' : 'Chat with friends and members',
+  savedProperties: isEl ? 'Αποθηκευμένα ακίνητα' : isBg ? 'Запазени имоти' : isSr ? 'Сачуване некретнине' : isTr ? 'Kaydettiğiniz mülkler' : isRo ? 'Proprietăți salvate' : "Properties you've saved",
+  likesCommentsFriends: isEl ? 'Likes, σχόλια και αιτήματα φιλίας' : isBg ? 'Харесвания, коментари и заявки за приятелство' : isSr ? 'Лајкови, коментари и захтеви' : isTr ? 'Beğeniler, yorumlar ve arkadaşlık istekleri' : isRo ? 'Aprecieri, comentarii și cereri de prietenie' : 'Likes, comments and friend requests',
+  myCommunity: isEl ? 'Η Κοινότητά μου' : isBg ? 'Моята общност' : isSr ? 'Моја заједница' : isTr ? 'Topluluğum' : isRo ? 'Comunitatea Mea' : 'My Community',
+  postsCommentsActivity: isEl ? 'Δημοσιεύσεις, σχόλια και δραστηριότητα' : isBg ? 'Вашите публикации, коментари и активност' : isSr ? 'Објаве, коментари и активност' : isTr ? 'Gönderileriniz, yorumlarınız ve etkinliğiniz' : isRo ? 'Postările, comentariile și activitatea dvs.' : 'Your posts, comments and activity',
+  editProfile: isEl ? 'Επεξεργασία Προφίλ' : isBg ? 'Редактиране на профил' : isSr ? 'Уреди профил' : isTr ? 'Profili Düzenle' : isRo ? 'Editare Profil' : 'Edit Profile',
+  updateInfo: isEl ? 'Ενημερώστε τις πληροφορίες σας' : isBg ? 'Актуализирайте информацията и снимките си' : isSr ? 'Ажурирајте податке и фотографије' : isTr ? 'Bilgilerinizi ve fotoğraflarınızı güncelleyin' : isRo ? 'Actualizați informațiile și fotografiile dvs.' : 'Update your info and photos',
+};
+
+const session = Astro.locals.session;
+if (!session) return Astro.redirect('/community/join?next=/account');
+
+const service = getServiceClient();
+const userId = session.user.id;
+
+const [profileRes, bookingsRes, postsRes] = await Promise.all([
+  service.from('profiles').select('full_name, email, avatar_url, bio, location, friends_count, favorites_count, unread_messages_count, unread_notifications_count, created_at').eq('id', userId).single(),
+  service.from('bookings').select('id', { count: 'exact', head: true }).or(`guest_user_id.eq.${userId},guest_email.eq.${(Astro.locals.profile as any)?.email ?? ''}`),
+  service.from('community_posts').select('id', { count: 'exact', head: true }).eq('author_id', userId),
+]);
+
+const profile = profileRes.data;
+const bookingsCount = bookingsRes.count ?? 0;
+const postsCount = postsRes.count ?? 0;
+
+const { count: reservationsCount } = await service
+  .from('restaurant_reservations')
+  .select('id', { count: 'exact', head: true })
+  .or(`member_id.eq.${userId}${(Astro.locals.profile as any)?.email ? `,guest_email.eq.${(Astro.locals.profile as any).email}` : ''}`);
+
+const stats = [
+  { label: t.bookings, value: bookingsCount, href: '/my-bookings', icon: '&#x1F3E0;' },
+  { label: t.reservations, value: reservationsCount ?? 0, href: '/account/reservations', icon: '&#x1F37D;' },
+  { label: t.friends, value: profile?.friends_count ?? 0, href: '/account/friends', icon: '&#x1F465;' },
+  { label: t.favorites, value: profile?.favorites_count ?? 0, href: '/account/favorites', icon: '&#x2764;' },
+  { label: t.messages, value: profile?.unread_messages_count ?? 0, href: '/account/messages', icon: '&#x1F4AC;', badge: true },
+  { label: t.notifications, value: profile?.unread_notifications_count ?? 0, href: '/account/notifications', icon: '&#x1F514;', badge: true },
+  { label: t.posts, value: postsCount, href: '/account/community', icon: '&#x1F4DD;' },
+];
+
+const navCards = [
+  { title: t.myBookings, desc: t.viewBookings, href: '/my-bookings', icon: '&#x1F4C5;' },
+  { title: t.myReservations, desc: t.restaurantBookings, href: '/account/reservations', icon: '&#x1F37D;' },
+  { title: t.friends, desc: t.manageConnections, href: '/account/friends', icon: '&#x1F465;' },
+  { title: t.messages, desc: t.chatWithFriends, href: '/account/messages', icon: '&#x1F4AC;' },
+  { title: t.favorites, desc: t.savedProperties, href: '/account/favorites', icon: '&#x2764;' },
+  { title: t.notifications, desc: t.likesCommentsFriends, href: '/account/notifications', icon: '&#x1F514;' },
+  { title: t.myCommunity, desc: t.postsCommentsActivity, href: '/account/community', icon: '&#x1F4DD;' },
+  { title: t.editProfile, desc: t.updateInfo, href: '/community/profile', icon: '&#x270F;' },
+];
+---
+
+<BaseLayout title={t.myAccount} noIndex>
+  <div class="max-w-4xl mx-auto px-4 py-10">
+    <!-- Profile summary -->
+    <div class="flex items-center gap-4 mb-8">
+      <div class="w-16 h-16 rounded-full bg-[#1a1a2e] overflow-hidden shrink-0">
+        {profile?.avatar_url ? (
+          <img src={profile.avatar_url} alt="" class="w-full h-full object-cover" />
+        ) : (
+          <div class="w-full h-full flex items-center justify-center text-white text-2xl font-bold">
+            {(profile?.full_name || '?')[0].toUpperCase()}
+          </div>
+        )}
+      </div>
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900">{profile?.full_name || t.myAccount}</h1>
+        <p class="text-sm text-gray-500">{profile?.email} {profile?.location ? `· ${profile.location}` : ''}</p>
+      </div>
+    </div>
+
+    <!-- Stats -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 mb-10">
+      {stats.map((s) => (
+        <a href={s.href} class="bg-white rounded-xl border border-gray-100 p-4 text-center hover:border-[#c9a96e] transition-colors">
+          <p class="text-2xl mb-1" set:html={s.icon} />
+          <p class="text-lg font-bold text-gray-900">
+            {s.value}
+            {s.badge && s.value > 0 && <span class="inline-block w-2 h-2 bg-red-500 rounded-full ml-1 relative -top-2"></span>}
+          </p>
+          <p class="text-xs text-gray-500">{s.label}</p>
+        </a>
+      ))}
+    </div>
+
+    <!-- Navigation cards -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {navCards.map((card) => (
+        <a href={card.href} class="bg-white rounded-xl border border-gray-100 p-5 hover:border-[#c9a96e] hover:shadow-md transition-all group">
+          <p class="text-2xl mb-2" set:html={card.icon} />
+          <h3 class="font-semibold text-gray-900 text-sm group-hover:text-[#c9a96e] transition-colors">{card.title}</h3>
+          <p class="text-xs text-gray-500 mt-1">{card.desc}</p>
+        </a>
+      ))}
+    </div>
+  </div>
+</BaseLayout>

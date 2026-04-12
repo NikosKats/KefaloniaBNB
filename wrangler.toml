@@ -1,0 +1,19 @@
+name = "kefaloniabnb"
+compatibility_date = "2025-01-01"
+workers_dev = false
+
+routes = [
+  { pattern = "kefaloniabnb.com", custom_domain = true },
+  { pattern = "www.kefaloniabnb.com", custom_domain = true }
+]
+
+[[kv_namespaces]]
+binding = "SESSION"
+id = "e7cece2f57c145979c2b5d75fe1aae4c"
+preview_id = "73099bacd5674b3f829ef0ee00565c50"
+
+[env.production]
+name = "kefaloniabnb-production"
+
+[env.preview]
+name = "kefaloniabnb-preview"

@@ -1,0 +1,243 @@
+---
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../../lib/supabase.ts';
+
+const role = Astro.locals.profile?.role ?? '';
+if (!['admin','super_admin'].includes(role)) {
+  return Astro.redirect('/admin');
+}
+
+const { id } = Astro.params;
+const service = getServiceClient();
+
+const { data: job, error: jobError } = await service
+  .from('cleaning_jobs')
+  .select('*, listings(title,city,slug), cleaner_profiles(id, bio, stripe_onboarded, user_id)')
+  .eq('id', id!)
+  .single();
+
+if (jobError || !job) return Astro.redirect('/admin/cleaning');
+
+// Fetch cleaner's public profile separately (FK is to auth.users, not public.profiles)
+const cleanerUserId = (job as any).cleaner_profiles?.user_id;
+const { data: cleanerPublicProfile } = cleanerUserId
+  ? await service.from('profiles').select('full_name, email').eq('id', cleanerUserId).single()
+  : { data: null };
+
+const { data: payment } = await service
+  .from('cleaning_payments')
+  .select('*')
+  .eq('job_id', id!)
+  .single();
+
+const { data: payout } = await service
+  .from('cleaning_payouts')
+  .select('*')
+  .eq('job_id', id!)
+  .single();
+
+const { data: checklist } = await service
+  .from('job_checklist_items')
+  .select('*')
+  .eq('job_id', id!)
+  .order('sort_order');
+
+const { data: photos } = await service
+  .from('job_photos')
+  .select('*')
+  .eq('job_id', id!)
+  .order('created_at');
+
+const { data: dispute } = await service
+  .from('cleaning_disputes')
+  .select('*')
+  .eq('job_id', id!)
+  .single();
+
+const statusColors: Record<string, string> = {
+  scheduled: 'bg-blue-100 text-blue-800',
+  started: 'bg-yellow-100 text-yellow-800',
+  completed: 'bg-purple-100 text-purple-800',
+  approved: 'bg-emerald-100 text-emerald-800',
+  disputed: 'bg-red-100 text-red-800',
+  cancelled: 'bg-gray-100 text-gray-600',
+};
+
+const beforePhotos = (photos ?? []).filter((p: any) => p.phase === 'before');
+const afterPhotos = (photos ?? []).filter((p: any) => p.phase === 'after');
+const cleanerProfile = { ...(job as any).cleaner_profiles, profiles: cleanerPublicProfile };
+---
+
+<AdminLayout title={`Cleaning Job — ${(job as any).listings?.title}`}>
+  <div class="max-w-3xl mx-auto space-y-6">
+    <!-- Header -->
+    <div class="flex items-start justify-between">
+      <div>
+        <h1 class="text-xl font-bold text-gray-900">{(job as any).listings?.title}</h1>
+        <p class="text-sm text-gray-500">{(job as any).listings?.city} · {job.scheduled_date} at {job.scheduled_time}</p>
+      </div>
+      <span class={`px-3 py-1 rounded-full text-sm font-medium ${statusColors[job.status]}`}>{job.status}</span>
+    </div>
+
+    <!-- Financials -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6 grid grid-cols-3 gap-4">
+      <div>
+        <p class="text-xs text-gray-500">Agreed Price</p>
+        <p class="text-xl font-bold text-gray-900">€{job.agreed_price}</p>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500">Platform Fee</p>
+        <p class="text-xl font-bold text-[#c9a96e]">€{job.platform_fee}</p>
+      </div>
+      <div>
+        <p class="text-xs text-gray-500">Cleaner Payout</p>
+        <p class="text-xl font-bold text-emerald-600">€{job.cleaner_payout}</p>
+      </div>
+    </div>
+
+    <!-- Payment & Payout Status -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6 space-y-3">
+      <h3 class="text-sm font-semibold text-gray-700">Payment</h3>
+      {payment ? (
+        <div class="flex items-center justify-between">
+          <span class="text-sm text-gray-600">€{payment.amount} — {payment.status}</span>
+          {payment.paid_at && <span class="text-xs text-gray-400">{new Date(payment.paid_at).toLocaleDateString()}</span>}
+        </div>
+      ) : (
+        <p class="text-sm text-gray-400">No payment record</p>
+      )}
+      {payout && (
+        <div class="flex items-center justify-between border-t border-gray-50 pt-3">
+          <span class="text-sm text-gray-600">Payout €{payout.amount} — {payout.status}</span>
+          {payout.transferred_at && <span class="text-xs text-gray-400">{new Date(payout.transferred_at).toLocaleDateString()}</span>}
+        </div>
+      )}
+    </div>
+
+    <!-- Cleaner Info -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <h3 class="text-sm font-semibold text-gray-700 mb-3">Cleaner</h3>
+      <p class="text-sm font-medium text-gray-900">{cleanerProfile?.profiles?.full_name ?? '—'}</p>
+      <p class="text-xs text-gray-500">{cleanerProfile?.profiles?.email}</p>
+      <p class="text-xs mt-1">
+        Stripe: <span class={cleanerProfile?.stripe_onboarded ? 'text-emerald-600' : 'text-red-500'}>
+          {cleanerProfile?.stripe_onboarded ? 'Onboarded' : 'Not onboarded'}
+        </span>
+      </p>
+    </div>
+
+    <!-- Checklist -->
+    {(checklist ?? []).length > 0 && (
+      <div class="bg-white rounded-2xl border border-gray-100 p-6">
+        <h3 class="text-sm font-semibold text-gray-700 mb-3">Checklist</h3>
+        <ul class="space-y-2">
+          {(checklist ?? []).map((item: any) => (
+            <li class="flex items-center gap-3 text-sm">
+              <span class={`w-4 h-4 rounded flex-shrink-0 flex items-center justify-center ${item.is_done ? 'bg-emerald-500 text-white' : 'border border-gray-300'}`}>
+                {item.is_done && '✓'}
+              </span>
+              <span class={item.is_done ? 'line-through text-gray-400' : 'text-gray-700'}>{item.label}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )}
+
+    <!-- Photos -->
+    {(photos ?? []).length > 0 && (
+      <div class="bg-white rounded-2xl border border-gray-100 p-6">
+        <h3 class="text-sm font-semibold text-gray-700 mb-3">Photos</h3>
+        {beforePhotos.length > 0 && (
+          <div class="mb-4">
+            <p class="text-xs text-gray-500 mb-2">Before</p>
+            <div class="grid grid-cols-3 gap-2">
+              {beforePhotos.map((p: any) => (
+                <img src={p.url} alt="Before" class="w-full aspect-square object-cover rounded-lg" loading="lazy" />
+              ))}
+            </div>
+          </div>
+        )}
+        {afterPhotos.length > 0 && (
+          <div>
+            <p class="text-xs text-gray-500 mb-2">After</p>
+            <div class="grid grid-cols-3 gap-2">
+              {afterPhotos.map((p: any) => (
+                <img src={p.url} alt="After" class="w-full aspect-square object-cover rounded-lg" loading="lazy" />
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    )}
+
+    <!-- Dispute -->
+    {dispute && (
+      <div class="bg-red-50 border border-red-200 rounded-2xl p-6">
+        <h3 class="text-sm font-semibold text-red-700 mb-2">Dispute</h3>
+        <p class="text-sm text-gray-700 mb-4">{dispute.reason}</p>
+        <p class="text-xs text-gray-500 mb-4">Status: <strong>{dispute.status}</strong></p>
+        {dispute.status === 'open' && (
+          <div class="space-y-3">
+            <textarea id="dispute-resolution" class="w-full border border-gray-200 rounded-xl p-3 text-sm" rows="3" placeholder="Resolution notes…"></textarea>
+            <div class="flex gap-2">
+              <button onclick="resolveDispute('resolved')" class="bg-emerald-600 text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-emerald-700">Mark Resolved</button>
+              <button onclick="resolveDispute('escalated')" class="bg-red-600 text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-red-700">Escalate</button>
+            </div>
+          </div>
+        )}
+        {dispute.resolution && (
+          <div class="mt-3 p-3 bg-white rounded-xl">
+            <p class="text-xs text-gray-500">Resolution:</p>
+            <p class="text-sm text-gray-700">{dispute.resolution}</p>
+          </div>
+        )}
+      </div>
+    )}
+
+    <!-- Admin Actions -->
+    {['completed', 'disputed'].includes(job.status) && (
+      <div class="bg-white rounded-2xl border border-gray-100 p-6">
+        <h3 class="text-sm font-semibold text-gray-700 mb-3">Admin Actions</h3>
+        <div class="flex gap-2">
+          {job.status === 'completed' && (
+            <button onclick="updateStatus('approved')" class="bg-emerald-600 text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-emerald-700">Force Approve & Payout</button>
+          )}
+        </div>
+      </div>
+    )}
+
+    <div class="pt-2">
+      <a href="/admin/cleaning" class="text-sm text-gray-400 hover:text-gray-600">← Back to Cleaning</a>
+    </div>
+  </div>
+</AdminLayout>
+
+<script define:vars={{ jobId: job.id, disputeId: dispute?.id ?? null }}>
+  async function updateStatus(status) {
+    const res = await fetch(`/api/cleaning/jobs/${jobId}/status`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    if (res.ok) window.location.reload();
+    else {
+      const d = await res.json();
+      alert(d.error ?? 'Failed');
+    }
+  }
+
+  async function resolveDispute(status) {
+    const resolution = document.getElementById('dispute-resolution').value.trim();
+    if (!resolution) { alert('Enter resolution notes'); return; }
+    const res = await fetch(`/api/cleaning/disputes/${disputeId}/resolve`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resolution, status }),
+    });
+    if (res.ok) window.location.reload();
+    else {
+      const d = await res.json();
+      alert(d.error ?? 'Failed');
+    }
+  }
+</script>

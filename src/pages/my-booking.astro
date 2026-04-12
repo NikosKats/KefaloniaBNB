@@ -1,0 +1,406 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getServiceClient } from '../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+const token = Astro.url.searchParams.get('token');
+
+// --- Look up booking by guest_token (service client bypasses RLS) ---
+let booking: any = null;
+let listing: any = null;
+let owner: any = null;
+let error: string | null = null;
+let cancelSuccess = Astro.url.searchParams.get('cancelled') === '1';
+let cancelError   = Astro.url.searchParams.get('cancel_error') ?? null;
+
+if (!token) {
+  error = 'no_token';
+} else {
+  const sb = getServiceClient();
+  const { data, error: dbErr } = await sb
+    .from('bookings')
+    .select(`
+      id, status, payment_status, payment_method, payment_type,
+      deposit_amount, remaining_amount,
+      guest_name, guest_email, guest_phone,
+      check_in, check_out, nights, guests_adults, guests_children,
+      total_price, currency, guest_message,
+      cancel_requested,
+      review_token,
+      listing:listings(id, title, address, city, country, check_in_time, check_out_time, owner_id, listing_images(url, is_cover, sort_order))
+    `)
+    .eq('guest_token', token)
+    .single();
+
+  if (dbErr || !data) {
+    error = 'not_found';
+  } else {
+    booking = data;
+    listing = data.listing;
+
+    // Fetch property owner contact info
+    if (listing?.owner_id) {
+      const { data: ownerData } = await sb
+        .from('profiles')
+        .select('full_name, email, phone')
+        .eq('id', listing.owner_id)
+        .single();
+      owner = ownerData;
+    }
+  }
+}
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-GB', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
+}
+
+function fmtCurrency(n: number, currency = 'EUR') {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 0 }).format(n);
+}
+
+const statusLabel: Record<string, { label: string; color: string }> = {
+  pending:    { label: isEl ? 'Αναμένει Επιβεβαίωση' : isBg ? 'Очаква потвърждение' : isSr ? 'На чекању'   : isTr ? 'Beklemede'       : isRo ? 'În așteptare'      : 'Awaiting Confirmation', color: 'bg-yellow-100 text-yellow-800' },
+  confirmed:  { label: isEl ? 'Επιβεβαιωμένη'        : isBg ? 'Потвърдена'          : isSr ? 'Потврђено'   : isTr ? 'Onaylandı'       : isRo ? 'Confirmată'        : 'Confirmed',             color: 'bg-green-100 text-green-800'  },
+  checked_in: { label: isEl ? 'Άφιξη'                : isBg ? 'Настанен'            : isSr ? 'Пријављено'  : isTr ? 'Giriş yapıldı'   : isRo ? 'Check-in'          : 'Checked In',            color: 'bg-blue-100 text-blue-800'   },
+  checked_out:{ label: isEl ? 'Αναχώρηση'            : isBg ? 'Напуснал'            : isSr ? 'Одјављено'   : isTr ? 'Çıkış yapıldı'   : isRo ? 'Check-out'         : 'Checked Out',           color: 'bg-gray-100 text-gray-700'   },
+  completed:  { label: isEl ? 'Ολοκληρωμένη'         : isBg ? 'Завършена'           : isSr ? 'Завршено'    : isTr ? 'Tamamlandı'      : isRo ? 'Finalizată'        : 'Completed',             color: 'bg-gray-100 text-gray-700'   },
+  cancelled:  { label: isEl ? 'Ακυρωμένη'            : isBg ? 'Анулирана'           : isSr ? 'Отказано'    : isTr ? 'İptal edildi'    : isRo ? 'Anulată'           : 'Cancelled',             color: 'bg-red-100 text-red-800'     },
+};
+
+const st = booking ? (statusLabel[booking.status] ?? { label: booking.status, color: 'bg-gray-100 text-gray-700' }) : null;
+const canCancel = booking && ['pending', 'confirmed'].includes(booking.status) && !booking.cancel_requested;
+const cancelRequested = booking?.cancel_requested;
+const todayLocal = (() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })();
+const canReview = booking && ['confirmed','checked_in','checked_out','completed'].includes(booking.status) && booking.check_in <= todayLocal;
+const coverImage = listing?.listing_images
+  ? (listing.listing_images.find((i: any) => i.is_cover) ?? listing.listing_images.sort((a: any, b: any) => a.sort_order - b.sort_order)[0])?.url ?? null
+  : null;
+---
+
+<BaseLayout
+  title="My Booking — KefaloniaBNB"
+  description="View and manage your booking at KefaloniaBNB."
+>
+  <div class="max-w-2xl mx-auto px-4 sm:px-6 py-16">
+
+    {error === 'no_token' && (
+      <div class="text-center py-20">
+        <p class="text-5xl mb-4">🔑</p>
+        <h1 class="text-2xl font-bold text-gray-900 mb-2">{isEl ? 'Δεν υπάρχει κωδικός κράτησης' : isBg ? 'Няма токен за резервация' : isSr ? 'Нема токена резервације' : isTr ? 'Rezervasyon kodu yok' : isRo ? 'Lipsă cod rezervare' : 'No booking token'}</h1>
+        <p class="text-gray-500">{isEl ? 'Αυτός ο σύνδεσμος φαίνεται ελλιπής. Ελέγξτε τον σύνδεσμο στο email επιβεβαίωσής σας.' : isBg ? 'Този линк изглежда непълен. Моля, проверете линка в имейла си за потвърждение.' : isSr ? 'Овај линк изгледа непотпун. Проверите линк у вашем имејлу са потврдом.' : isTr ? 'Bu bağlantı eksik görünüyor. Lütfen onay e-postanızdaki bağlantıyı kontrol edin.' : isRo ? 'Acest link pare incomplet. Verificați linkul din emailul de confirmare.' : 'This link appears to be incomplete. Please check the link in your confirmation email.'}</p>
+      </div>
+    )}
+
+    {error === 'not_found' && (
+      <div class="text-center py-20">
+        <p class="text-5xl mb-4">🔍</p>
+        <h1 class="text-2xl font-bold text-gray-900 mb-2">{isEl ? 'Η κράτηση δεν βρέθηκε' : isBg ? 'Резервацията не е намерена' : isSr ? 'Резервација није пронађена' : isTr ? 'Rezervasyon bulunamadı' : isRo ? 'Rezervare negăsită' : 'Booking not found'}</h1>
+        <p class="text-gray-500 mb-6">{isEl ? 'Δεν βρέθηκε κράτηση για αυτόν τον σύνδεσμο. Ενδέχεται να έχει λήξει ή ο σύνδεσμος να είναι λανθασμένος.' : isBg ? 'Не намерихме резервация за този линк. Възможно е да е изтекъл или линкът да е грешен.' : isSr ? 'Нисмо пронашли резервацију за овај линк. Можда је истекао или је линк нетачан.' : isTr ? 'Bu bağlantı için bir rezervasyon bulamadık. Süresi dolmuş olabilir veya bağlantı hatalı olabilir.' : isRo ? 'Nu am găsit o rezervare pentru acest link. Este posibil să fi expirat sau linkul să fie incorect.' : "We couldn't find a booking for this link. It may have expired or the link is incorrect."}</p>
+        <a href="/contact" class="inline-block bg-[#1a1a2e] text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">{isEl ? 'Επικοινωνήστε μαζί μας' : isBg ? 'Свържете се с нас' : isSr ? 'Контактирајте нас' : isTr ? 'Bize Ulaşın' : isRo ? 'Contactați-ne' : 'Contact Us'}</a>
+      </div>
+    )}
+
+    {booking && (
+      <div class="space-y-6">
+
+        <!-- Link to all bookings for logged-in users -->
+        {Astro.locals.session && (
+          <a href="/my-bookings" class="inline-flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition-colors">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"/></svg>
+            {isEl ? 'Όλες οι κρατήσεις μου' : isBg ? 'Всички мои резервации' : isSr ? 'Све моје резервације' : isTr ? 'Tüm rezervasyonlarım' : isRo ? 'Toate rezervările mele' : 'All my bookings'}
+          </a>
+        )}
+
+        <!-- Header -->
+        <div class="flex items-start justify-between gap-4">
+          <div>
+            <h1 class="text-2xl font-bold text-gray-900">{isEl ? 'Η Κράτησή σας' : isBg ? 'Вашата резервация' : isSr ? 'Ваша резервација' : isTr ? 'Rezervasyonunuz' : isRo ? 'Rezervarea Dvs.' : 'Your Booking'}</h1>
+            <p class="text-sm text-gray-500 mt-1">Ref: <code class="bg-gray-100 px-2 py-0.5 rounded font-mono text-xs">{booking.id.slice(0,8).toUpperCase()}</code></p>
+          </div>
+          <span class={`inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold ${st!.color}`}>
+            {st!.label}
+          </span>
+        </div>
+
+        {/* Success / error banners */}
+        {cancelSuccess && (
+          <div class="bg-green-50 border border-green-200 text-green-800 text-sm rounded-xl px-4 py-3">
+            {isEl ? '✓ Το αίτημα ακύρωσης υποβλήθηκε. Θα επικοινωνήσουμε εντός 24 ωρών.' : isBg ? '✓ Заявката за анулиране е изпратена. Ще се свържем с вас в рамките на 24 часа.' : isSr ? '✓ Захтев за отказивање је послат. Јавићемо вам се у року од 24 сата.' : isTr ? '✓ İptal isteği gönderildi. 24 saat içinde sizinle iletişime geçeceğiz.' : isRo ? '✓ Cererea de anulare a fost trimisă. Vă vom contacta în 24 de ore.' : "✓ Cancellation request sent. We'll be in touch within 24 hours."}
+          </div>
+        )}
+        {cancelError && (
+          <div class="bg-red-50 border border-red-200 text-red-700 text-sm rounded-xl px-4 py-3">
+            {cancelError === 'already'
+              ? (isEl ? 'Έχει ήδη υποβληθεί αίτημα ακύρωσης.' : isBg ? 'Вече е подадена заявка за анулиране.' : isSr ? 'Захтев за отказивање је већ поднет.' : isTr ? 'Bir iptal isteği zaten gönderildi.' : isRo ? 'O cerere de anulare a fost deja trimisă.' : 'A cancellation request has already been submitted.')
+              : (isEl ? 'Κάτι πήγε στραβά. Επικοινωνήστε μαζί μας απευθείας.' : isBg ? 'Нещо се обърка. Моля, свържете се с нас директно.' : isSr ? 'Нешто је пошло по злу. Контактирајте нас директно.' : isTr ? 'Bir şeyler ters gitti. Lütfen doğrudan bizimle iletişime geçin.' : isRo ? 'Ceva a mers greșit. Contactați-ne direct.' : 'Something went wrong. Please contact us directly.')}
+          </div>
+        )}
+
+        <!-- Property card -->
+        {listing && (
+          <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            {coverImage && (
+              <img src={coverImage} alt={listing.title} class="w-full h-44 object-cover" />
+            )}
+            <div class="p-5">
+              <h2 class="font-bold text-gray-900 text-lg">{listing.title}</h2>
+              {listing.address && (
+                <p class="text-sm text-gray-500 mt-0.5">{listing.address}, {listing.city}, {listing.country}</p>
+              )}
+            </div>
+          </div>
+        )}
+
+        <!-- Booking details -->
+        <div class="bg-white rounded-2xl border border-gray-100 divide-y divide-gray-100">
+          <div class="flex items-center justify-between px-5 py-4">
+            <span class="text-sm text-gray-500">{isEl ? 'Άφιξη' : isBg ? 'Настаняване' : isSr ? 'Долазак' : isTr ? 'Giriş' : isRo ? 'Check-in' : 'Check-in'}</span>
+            <span class="text-sm font-medium text-gray-900 text-right">
+              {fmtDate(booking.check_in)}
+              {listing?.check_in_time && <span class="text-gray-400 font-normal"> {isEl ? 'από' : isBg ? 'от' : isSr ? 'од' : isTr ? 'itibaren' : isRo ? 'de la' : 'from'} {listing.check_in_time}</span>}
+            </span>
+          </div>
+          <div class="flex items-center justify-between px-5 py-4">
+            <span class="text-sm text-gray-500">{isEl ? 'Αναχώρηση' : isBg ? 'Напускане' : isSr ? 'Одлазак' : isTr ? 'Çıkış' : isRo ? 'Check-out' : 'Check-out'}</span>
+            <span class="text-sm font-medium text-gray-900 text-right">
+              {fmtDate(booking.check_out)}
+              {listing?.check_out_time && <span class="text-gray-400 font-normal"> {isEl ? 'μέχρι' : isBg ? 'до' : isSr ? 'до' : isTr ? 'saat' : isRo ? 'până la' : 'by'} {listing.check_out_time}</span>}
+            </span>
+          </div>
+          <div class="flex items-center justify-between px-5 py-4">
+            <span class="text-sm text-gray-500">{isEl ? 'Επισκέπτες' : isBg ? 'Гости' : isSr ? 'Гости' : isTr ? 'Misafirler' : isRo ? 'Oaspeți' : 'Guests'}</span>
+            <span class="text-sm font-medium text-gray-900">{booking.guests_adults + booking.guests_children}</span>
+          </div>
+          <div class="flex items-center justify-between px-5 py-4">
+            <span class="text-sm text-gray-500">{isEl ? 'Σύνολο' : isBg ? 'Общо' : isSr ? 'Укупно' : isTr ? 'Toplam' : isRo ? 'Total' : 'Total'}</span>
+            <span class="text-base font-bold text-gray-900">{fmtCurrency(booking.total_price, booking.currency)}</span>
+          </div>
+          {/* Payment status — full breakdown */}
+          {booking.payment_status === 'paid' && (
+            <div class="flex items-center justify-between px-5 py-4">
+              <span class="text-sm text-gray-500">{isEl ? 'Πληρωμή' : isBg ? 'Плащане' : isSr ? 'Плаћање' : isTr ? 'Ödeme' : isRo ? 'Plată' : 'Payment'}</span>
+              <span class="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-700">
+                <span class="w-2 h-2 rounded-full bg-emerald-500"></span> {isEl ? 'Πλήρως εξοφλημένη' : isBg ? 'Изцяло платена' : isSr ? 'У потпуности плаћено' : isTr ? 'Tam ödendi' : isRo ? 'Plătită integral' : 'Fully paid'}
+              </span>
+            </div>
+          )}
+          {booking.payment_status === 'deposit_paid' && (
+            <>
+              <div class="flex items-center justify-between px-5 py-4">
+                <span class="text-sm text-gray-500">{isEl ? 'Προκαταβολή πληρωμένη' : isBg ? 'Платен депозит' : isSr ? 'Депозит плаћен' : isTr ? 'Depozito ödendi' : isRo ? 'Depozit plătit' : 'Deposit paid'}</span>
+                <span class="text-sm font-semibold text-emerald-700">
+                  {fmtCurrency(booking.deposit_amount ?? 0, booking.currency)}
+                </span>
+              </div>
+              <div class="flex items-center justify-between px-5 py-4 bg-amber-50">
+                <span class="text-sm text-amber-800 font-medium">{isEl ? 'Υπόλοιπο κατά την άφιξη' : isBg ? 'Остатък при пристигане' : isSr ? 'Остатак при доласку' : isTr ? 'Varışta kalan ödeme' : isRo ? 'Rest la sosire' : 'Remaining on arrival'}</span>
+                <span class="text-sm font-bold text-amber-900">
+                  {fmtCurrency(booking.remaining_amount ?? (booking.total_price - (booking.deposit_amount ?? 0)), booking.currency)}
+                </span>
+              </div>
+            </>
+          )}
+          {booking.payment_status === 'unpaid' && booking.payment_type === 'deposit' && (
+            <>
+              <div class="flex items-center justify-between px-5 py-4">
+                <span class="text-sm text-gray-500">{isEl ? 'Οφειλόμενη προκαταβολή' : isBg ? 'Дължим депозит' : isSr ? 'Депозит на чекању' : isTr ? 'Ödenecek depozito' : isRo ? 'Depozit de plătit' : 'Deposit due'}</span>
+                <span class="text-sm font-semibold text-amber-700">
+                  {fmtCurrency(booking.deposit_amount ?? 0, booking.currency)}
+                </span>
+              </div>
+              <div class="flex items-center justify-between px-5 py-4">
+                <span class="text-sm text-gray-500">{isEl ? 'Υπόλοιπο κατά την άφιξη' : isBg ? 'Остатък при пристигане' : isSr ? 'Остатак при доласку' : isTr ? 'Varışta kalan ödeme' : isRo ? 'Rest la sosire' : 'Remaining on arrival'}</span>
+                <span class="text-sm font-medium text-gray-700">
+                  {fmtCurrency(booking.remaining_amount ?? (booking.total_price - (booking.deposit_amount ?? 0)), booking.currency)}
+                </span>
+              </div>
+            </>
+          )}
+          {booking.payment_status === 'unpaid' && booking.payment_type !== 'deposit' && (
+            <div class="flex items-center justify-between px-5 py-4">
+              <span class="text-sm text-gray-500">{isEl ? 'Πληρωμή' : isBg ? 'Плащане' : isSr ? 'Плаћање' : isTr ? 'Ödeme' : isRo ? 'Plată' : 'Payment'}</span>
+              <span class="text-sm font-medium text-amber-700">⏳ {isEl ? 'Αναμένει πληρωμή' : isBg ? 'Очаква плащане' : isSr ? 'Чека се уплата' : isTr ? 'Ödeme bekleniyor' : isRo ? 'Așteptare plată' : 'Awaiting payment'}</span>
+            </div>
+          )}
+          {(booking.payment_status === 'refunded' || booking.payment_status === 'partially_refunded') && (
+            <div class="flex items-center justify-between px-5 py-4">
+              <span class="text-sm text-gray-500">{isEl ? 'Πληρωμή' : isBg ? 'Плащане' : isSr ? 'Плаћање' : isTr ? 'Ödeme' : isRo ? 'Plată' : 'Payment'}</span>
+              <span class="text-sm font-medium text-gray-700 capitalize">{booking.payment_status.replace('_', ' ')}</span>
+            </div>
+          )}
+        </div>
+
+        <!-- Guest info -->
+        <div class="bg-white rounded-2xl border border-gray-100 px-5 py-4 space-y-2">
+          <h3 class="text-sm font-semibold text-gray-900 mb-3">{isEl ? 'Στοιχεία Επισκέπτη' : isBg ? 'Данни на госта' : isSr ? 'Подаци о госту' : isTr ? 'Misafir Bilgileri' : isRo ? 'Detalii Oaspete' : 'Guest Details'}</h3>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-gray-500">{isEl ? 'Όνομα' : isBg ? 'Име' : isSr ? 'Име' : isTr ? 'Ad Soyad' : isRo ? 'Nume' : 'Name'}</span>
+            <span class="text-gray-900">{booking.guest_name}</span>
+          </div>
+          <div class="flex items-center justify-between text-sm">
+            <span class="text-gray-500">Email</span>
+            <span class="text-gray-900">{booking.guest_email}</span>
+          </div>
+          {booking.guest_phone && (
+            <div class="flex items-center justify-between text-sm">
+              <span class="text-gray-500">{isEl ? 'Τηλέφωνο' : isBg ? 'Телефон' : isSr ? 'Телефон' : isTr ? 'Telefon' : isRo ? 'Telefon' : 'Phone'}</span>
+              <span class="text-gray-900">{booking.guest_phone}</span>
+            </div>
+          )}
+        </div>
+
+        <!-- Contact owner -->
+        {owner && (owner.email || owner.phone) && (
+          <div class="bg-white rounded-2xl border border-gray-100 px-5 py-4">
+            <h3 class="text-sm font-semibold text-gray-900 mb-3">{isEl ? 'Επικοινωνία με τον ιδιοκτήτη' : isBg ? 'Свържете се със собственика' : isSr ? 'Контактирајте власника' : isTr ? 'Ev sahibiyle iletişim' : isRo ? 'Contactați Proprietarul' : 'Contact Property Owner'}</h3>
+            {owner.full_name && <p class="text-sm text-gray-600 mb-3">{owner.full_name}</p>}
+            <div class="flex flex-wrap gap-2">
+              {owner.email && (
+                <a href={`mailto:${owner.email}?subject=${encodeURIComponent(`Booking ${booking.id.slice(0,8).toUpperCase()} — ${listing?.title ?? 'Property'}`)}`}
+                  class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" /></svg>
+                  Email
+                </a>
+              )}
+              {owner.phone && (
+                <>
+                  <a href={`tel:${owner.phone}`}
+                    class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 0 0 2.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 0 1-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 0 0-1.091-.852H4.5A2.25 2.25 0 0 0 2.25 4.5v2.25Z" /></svg>
+                    {isEl ? 'Κλήση' : isBg ? 'Обаждане' : isSr ? 'Позив' : isTr ? 'Ara' : isRo ? 'Apelează' : 'Call'}
+                  </a>
+                  <a href={`https://wa.me/${owner.phone.replace(/[\s\-()]/g, '').replace(/^(?=69)/, '30').replace(/^\+?/, '')}?text=${encodeURIComponent(`Hi, I have a booking (${booking.id.slice(0,8).toUpperCase()}) at ${listing?.title ?? 'your property'}...`)}`}
+                    target="_blank" rel="noopener"
+                    class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-[#25D366]/10 text-[#25D366] hover:bg-[#25D366]/20 transition-colors">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347z"/><path d="M12 0C5.373 0 0 5.373 0 12c0 2.625.846 5.059 2.284 7.034L.789 23.492l4.625-1.47A11.94 11.94 0 0012 24c6.627 0 12-5.373 12-12S18.627 0 12 0zm0 21.818c-2.168 0-4.178-.577-5.923-1.586l-.424-.254-2.742.872.87-2.649-.277-.44A9.782 9.782 0 012.182 12c0-5.422 4.396-9.818 9.818-9.818 5.422 0 9.818 4.396 9.818 9.818 0 5.422-4.396 9.818-9.818 9.818z"/></svg>
+                    WhatsApp
+                  </a>
+                  <a href={`viber://chat?number=${encodeURIComponent(owner.phone.replace(/[\s\-()]/g, '').replace(/^(?=69)/, '+30'))}`}
+                    target="_blank" rel="noopener"
+                    class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-[#7360F2]/10 text-[#7360F2] hover:bg-[#7360F2]/20 transition-colors">
+                    <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor"><path d="M11.4 0C5.112 0 0 5.093 0 11.363c0 2.625.897 5.037 2.399 6.95L.828 23.382l5.247-1.685c1.8.949 3.852 1.49 6.025 1.49 6.287 0 11.4-5.094 11.4-11.364C23.5 5.537 18.387 0 11.4 0z"/></svg>
+                    Viber
+                  </a>
+                  <a href={`https://t.me/+${owner.phone.replace(/[\s\-()]/g, '').replace(/^(?=69)/, '30').replace(/^\+?/, '')}`}
+                    target="_blank" rel="noopener"
+                    class="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-medium bg-[#0088cc]/10 text-[#0088cc] hover:bg-[#0088cc]/20 transition-colors">
+                    <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.479.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+                    Telegram
+                  </a>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        <!-- Review CTA -->
+        {canReview && (
+          <div class="bg-[#1a1a2e] text-white rounded-2xl p-6 text-center">
+            <p class="text-2xl mb-2">⭐</p>
+            <h3 class="font-bold mb-1">{isEl ? 'Πώς ήταν η διαμονή σας;' : isBg ? 'Как беше престоят ви?' : isSr ? 'Како је био ваш боравак?' : isTr ? 'Konaklamanız nasıldı?' : isRo ? 'Cum a fost șederea dvs.?' : 'How was your stay?'}</h3>
+            <p class="text-gray-300 text-sm mb-4">{isEl ? 'Η κριτική σας βοηθά μελλοντικούς επισκέπτες και χρειάζεται λιγότερο από ένα λεπτό.' : isBg ? 'Отзивът ви помага на бъдещи гости и отнема по-малко от минута.' : isSr ? 'Ваша рецензија помаже будућим гостима и траје мање од минута.' : isTr ? 'Değerlendirmeniz gelecekteki misafirlere yardımcı olur ve bir dakikadan az sürer.' : isRo ? 'Recenzia dvs. ajută viitorii oaspeți și durează mai puțin de un minut.' : 'Your review helps future guests and takes less than a minute.'}</p>
+            <a href={`/review?token=${booking.review_token}`} class="inline-block bg-[#c9a96e] text-white font-semibold px-6 py-2.5 rounded-xl text-sm hover:opacity-90 transition-opacity">
+              {isEl ? 'Αφήστε Κριτική' : isBg ? 'Напишете отзив' : isSr ? 'Оставите рецензију' : isTr ? 'Değerlendirme Bırakın' : isRo ? 'Lasă o Recenzie' : 'Leave a Review'}
+            </a>
+          </div>
+        )}
+
+        <!-- Cancel request -->
+        {cancelRequested && (
+          <div class="bg-yellow-50 border border-yellow-200 text-yellow-800 text-sm rounded-2xl px-5 py-4">
+            {isEl
+              ? <><strong>Αίτημα ακύρωσης.</strong> Λάβαμε το αίτημα ακύρωσής σας και θα απαντήσουμε εντός 24 ωρών.</>
+              : isBg
+              ? <><strong>Заявка за анулиране.</strong> Получихме заявката ви за анулиране и ще отговорим в рамките на 24 часа.</>
+              : isSr
+              ? <><strong>Захтев за отказивање.</strong> Примили смо ваш захтев за отказивање и одговорићемо у року од 24 сата.</>
+              : isTr
+              ? <><strong>İptal talep edildi.</strong> İptal talebinizi aldık ve 24 saat içinde yanıt vereceğiz.</>
+              : isRo
+              ? <><strong>Anulare solicitată.</strong> Am primit cererea dvs. de anulare și vom răspunde în 24 de ore.</>
+              : <><strong>Cancellation requested.</strong> We've received your cancellation request and will respond within 24 hours.</>}
+          </div>
+        )}
+
+        {canCancel && (
+          <details class="group bg-white rounded-2xl border border-gray-100 overflow-hidden">
+            <summary class="flex items-center justify-between px-5 py-4 cursor-pointer text-sm font-medium text-gray-700 list-none">
+              {isEl ? 'Αίτημα ακύρωσης' : isBg ? 'Заявка за анулиране' : isSr ? 'Захтев за отказивање' : isTr ? 'İptal talebi' : isRo ? 'Solicitare anulare' : 'Request cancellation'}
+              <span class="text-gray-400 group-open:rotate-180 transition-transform">▾</span>
+            </summary>
+            <div class="px-5 pb-5">
+              <p class="text-sm text-gray-500 mb-4">{isEl ? 'Παρακαλώ ελέγξτε την' : isBg ? 'Моля, прегледайте нашата' : isSr ? 'Молимо прегледајте нашу' : isTr ? 'Lütfen' : isRo ? 'Vă rugăm consultați' : 'Please review our'} <a href="/cancellation-policy" class="text-[#c9a96e] hover:opacity-80 underline">{isEl ? 'πολιτική ακύρωσης' : isBg ? 'политика за анулиране' : isSr ? 'политику отказивања' : isTr ? 'iptal politikamızı' : isRo ? 'politica de anulare' : 'cancellation policy'}</a> {isEl ? 'πριν υποβάλετε. Ενδέχεται να ισχύουν χρεώσεις ακύρωσης.' : isBg ? 'преди да изпратите. Може да се прилагат такси за анулиране.' : isSr ? 'пре слања. Могу се применити накнаде за отказивање.' : isTr ? 'göndermeden önce inceleyin. İptal ücretleri uygulanabilir.' : isRo ? 'înainte de trimitere. Se pot aplica taxe de anulare.' : 'before submitting. Cancellation fees may apply.'}</p>
+              <form id="cancel-form" class="space-y-3">
+                <textarea
+                  id="cancel-reason"
+                  name="reason"
+                  rows="3"
+                  placeholder={isEl ? 'Προαιρετικό: ενημερώστε μας γιατί ακυρώνετε' : isBg ? 'По желание: кажете ни защо анулирате' : isSr ? 'Опционо: реците нам зашто отказујете' : isTr ? 'İsteğe bağlı: neden iptal ettiğinizi bize bildirin' : isRo ? 'Opțional: spuneți-ne de ce anulați' : "Optional: let us know why you're cancelling"}
+                  class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none resize-none"
+                ></textarea>
+                <button
+                  type="submit"
+                  class="w-full bg-red-600 text-white font-semibold py-2.5 rounded-xl text-sm hover:bg-red-700 transition-colors"
+                >
+                  {isEl ? 'Υποβολή Αιτήματος Ακύρωσης' : isBg ? 'Изпрати заявка за анулиране' : isSr ? 'Пошаљи захтев за отказивање' : isTr ? 'İptal Talebini Gönder' : isRo ? 'Trimite Cererea de Anulare' : 'Submit Cancellation Request'}
+                </button>
+                <p id="cancel-msg" class="text-sm text-center hidden"></p>
+              </form>
+            </div>
+          </details>
+        )}
+
+        <!-- Contact -->
+        <p class="text-center text-sm text-gray-400">
+          {isEl ? 'Χρειάζεστε βοήθεια;' : isBg ? 'Нужна ви е помощ?' : isSr ? 'Треба вам помоћ?' : isTr ? 'Yardıma mı ihtiyacınız var?' : isRo ? 'Aveți nevoie de ajutor?' : 'Need help?'} <a href="mailto:info@kefaloniabnb.com" class="text-[#c9a96e] hover:opacity-80">info@kefaloniabnb.com</a>
+        </p>
+
+      </div>
+    )}
+  </div>
+</BaseLayout>
+
+{canCancel && (
+  <script define:vars={{
+    token,
+    _tSending: isEl ? 'Αποστολή…' : isBg ? 'Изпращане…' : isSr ? 'Слање…' : isTr ? 'Gönderiliyor…' : isRo ? 'Se trimite…' : 'Sending…',
+    _tNotCancellable: isEl ? 'Αυτή η κράτηση δεν μπορεί να ακυρωθεί σε αυτό το στάδιο.' : isBg ? 'Тази резервация не може да бъде анулирана на този етап.' : isSr ? 'Ова резервација не може бити отказана у овој фази.' : isTr ? 'Bu rezervasyon bu aşamada iptal edilemez.' : isRo ? 'Această rezervare nu poate fi anulată în această etapă.' : 'This booking cannot be cancelled at this stage.',
+    _tSomethingWrong: isEl ? 'Κάτι πήγε στραβά. Επικοινωνήστε μαζί μας απευθείας.' : isBg ? 'Нещо се обърка. Моля, свържете се с нас директно.' : isSr ? 'Нешто је пошло по злу. Контактирајте нас директно.' : isTr ? 'Bir şeyler ters gitti. Lütfen doğrudan bizimle iletişime geçin.' : isRo ? 'Ceva a mers greșit. Trimiteți-ne un email direct.' : 'Something went wrong. Please email us directly.',
+    _tSubmitCancel: isEl ? 'Υποβολή Αιτήματος Ακύρωσης' : isBg ? 'Изпрати заявка за анулиране' : isSr ? 'Пошаљи захтев за отказивање' : isTr ? 'İptal Talebini Gönder' : isRo ? 'Trimite Cererea de Anulare' : 'Submit Cancellation Request',
+  }}>
+    document.getElementById('cancel-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const reason = document.getElementById('cancel-reason').value;
+      const btn = e.target.querySelector('button[type="submit"]');
+      const msg = document.getElementById('cancel-msg');
+      btn.disabled = true;
+      btn.textContent = _tSending;
+
+      const res = await fetch('/api/bookings/cancel-request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ guest_token: token, reason }),
+      });
+
+      if (res.ok) {
+        window.location.href = `/my-booking?token=${token}&cancelled=1`;
+      } else {
+        const data = await res.json().catch(() => ({}));
+        msg.textContent = data.error === 'not_cancellable'
+          ? _tNotCancellable
+          : _tSomethingWrong;
+        msg.classList.remove('hidden');
+        msg.classList.add('text-red-600');
+        btn.disabled = false;
+        btn.textContent = _tSubmitCancel;
+      }
+    });
+  </script>
+)}

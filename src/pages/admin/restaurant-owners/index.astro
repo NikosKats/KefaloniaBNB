@@ -1,0 +1,429 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+const profile = Astro.locals.profile!;
+if (profile.role !== 'super_admin') return Astro.redirect('/admin');
+
+const service = getServiceClient();
+
+// Fetch restaurant owners
+const { data: owners } = await service
+  .from('profiles')
+  .select('id,email,full_name,phone,created_at')
+  .eq('role', 'restaurant_owner')
+  .order('created_at', { ascending: false });
+
+const ownerList: any[] = owners ?? [];
+
+// Fetch auth status for invite acceptance detection
+const authStatusMap: Record<string, { last_sign_in_at: string | null }> = {};
+for (const o of ownerList) {
+  try {
+    const { data } = await service.auth.admin.getUserById(o.id);
+    if (data?.user) {
+      authStatusMap[o.id] = { last_sign_in_at: data.user.last_sign_in_at ?? null };
+    }
+  } catch {}
+}
+
+// Fetch restaurants and group by owner
+const { data: restaurants } = await service
+  .from('restaurants')
+  .select('id,name,slug,owner_id,is_active,accepts_reservations')
+  .not('owner_id', 'is', null);
+
+const restaurantsByOwner: Record<string, any[]> = {};
+for (const r of (restaurants ?? [])) {
+  if (!restaurantsByOwner[r.owner_id]) restaurantsByOwner[r.owner_id] = [];
+  restaurantsByOwner[r.owner_id].push(r);
+}
+
+// Unassigned restaurants (no owner)
+const { data: unassigned } = await service
+  .from('restaurants')
+  .select('id,name,slug,is_active')
+  .is('owner_id', null);
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+
+<AdminLayout title="Restaurant Owners">
+
+  <div class="flex items-center justify-between mb-6">
+    <p class="text-sm text-gray-500">{ownerList.length} restaurant {ownerList.length !== 1 ? 'owners' : 'owner'}</p>
+    <button id="invite-btn"
+      class="bg-[#1a1a2e] text-white font-semibold px-4 py-2 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">
+      + Invite owner
+    </button>
+  </div>
+
+  <!-- Invite modal -->
+  <div id="invite-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      <h3 class="font-semibold text-gray-900 mb-4">Invite restaurant owner</h3>
+      <div class="space-y-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Full name *</label>
+          <input id="inv-name" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" placeholder="Giorgos Papadopoulos" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+          <input id="inv-email" type="email" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" placeholder="owner@restaurant.com" />
+        </div>
+        <p class="text-xs text-gray-400">The owner will receive an email to set their password and access their restaurant dashboard.</p>
+      </div>
+      <div id="invite-error" class="hidden mt-3 text-sm text-red-600"></div>
+      <div class="flex gap-3 mt-5">
+        <button id="invite-cancel" class="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+        <button id="invite-submit" class="flex-1 bg-[#1a1a2e] text-white font-semibold px-4 py-2 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">Send invite</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Remove confirmation modal -->
+  <div id="remove-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+      <div class="flex items-center gap-3 mb-4">
+        <div class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center shrink-0">
+          <svg class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+          </svg>
+        </div>
+        <div>
+          <h3 class="font-semibold text-gray-900">Remove restaurant owner</h3>
+          <p id="remove-modal-desc" class="text-sm text-gray-500 mt-0.5"></p>
+        </div>
+      </div>
+      <div class="bg-red-50 border border-red-200 rounded-xl px-4 py-3 mb-5 text-sm text-red-800">
+        This will <strong>unlink all their restaurants</strong> and remove their account. Restaurants will remain but have no owner.
+      </div>
+      <div class="flex gap-3">
+        <button id="remove-cancel" class="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+        <button id="remove-confirm" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-xl text-sm transition-colors">Yes, remove</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Edit modal -->
+  <div id="edit-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+      <h3 class="font-semibold text-gray-900 mb-4">Edit restaurant owner</h3>
+      <input type="hidden" id="edit-id" />
+      <div class="space-y-3">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Full name</label>
+          <input id="edit-name" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+          <input id="edit-phone" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+        </div>
+      </div>
+      <div id="edit-error" class="hidden mt-3 text-sm text-red-600"></div>
+      <div class="flex gap-3 mt-5">
+        <button id="edit-cancel" class="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+        <button id="edit-submit" class="flex-1 bg-[#1a1a2e] text-white font-semibold px-4 py-2 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">Save changes</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Owners list -->
+  <div class="space-y-4">
+    {ownerList.map((owner) => {
+      const ownerRestaurants = restaurantsByOwner[owner.id] ?? [];
+      const authInfo = authStatusMap[owner.id];
+      const hasAccepted = !!authInfo?.last_sign_in_at;
+      return (
+        <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+          <div class="p-5 flex flex-col sm:flex-row sm:items-center gap-4">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <p class="font-semibold text-gray-900">{owner.full_name ?? owner.email}</p>
+                {hasAccepted
+                  ? <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700">Accepted</span>
+                  : <span class="px-2 py-0.5 rounded-full text-[10px] font-semibold bg-amber-100 text-amber-700">Pending invite</span>
+                }
+              </div>
+              <p class="text-sm text-gray-400">{owner.email}</p>
+              {owner.phone && <p class="text-xs text-gray-400">{owner.phone}</p>}
+              <p class="text-xs text-gray-300 mt-0.5">Joined {fmtDate(owner.created_at)}</p>
+            </div>
+            <div class="flex items-center gap-3 shrink-0 flex-wrap">
+              {!hasAccepted && (
+                <button
+                  class="resend-invite-btn text-xs text-amber-600 font-medium hover:text-amber-700 transition-colors px-3 py-1.5 border border-amber-200 rounded-lg bg-amber-50 hover:bg-amber-100"
+                  data-id={owner.id}
+                  data-email={owner.email}
+                  data-name={owner.full_name ?? owner.email}>
+                  Resend invite
+                </button>
+              )}
+              <button
+                class="edit-owner-btn text-xs text-gray-400 font-medium hover:text-gray-600 transition-colors px-3 py-1.5 border border-gray-200 rounded-lg"
+                data-id={owner.id}
+                data-name={owner.full_name ?? ''}
+                data-phone={owner.phone ?? ''}>
+                Edit
+              </button>
+              <button
+                class="delete-owner-btn text-xs text-red-400 hover:text-red-600 transition-colors px-3 py-1.5"
+                data-id={owner.id} data-name={owner.full_name ?? owner.email}>
+                Remove
+              </button>
+            </div>
+          </div>
+
+          {ownerRestaurants.length > 0 && (
+            <div class="border-t border-gray-50 px-5 py-3">
+              <p class="text-xs font-medium text-gray-500 mb-2">Restaurants ({ownerRestaurants.length})</p>
+              <div class="flex flex-wrap gap-2">
+                {ownerRestaurants.map((r: any) => (
+                  <a href={`/admin/restaurants`}
+                    class="inline-flex items-center gap-1.5 px-3 py-1 bg-gray-50 hover:bg-gray-100 rounded-lg text-xs text-gray-700 transition-colors">
+                    <span class={`w-1.5 h-1.5 rounded-full ${r.is_active ? 'bg-emerald-400' : 'bg-gray-300'}`}></span>
+                    {r.name}
+                    {r.accepts_reservations && <span class="text-[#c9a96e]">📅</span>}
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
+          {ownerRestaurants.length === 0 && (
+            <div class="border-t border-gray-50 px-5 py-3 text-xs text-gray-300 italic">No restaurants assigned yet — assign from <a href="/admin/restaurants" class="text-[#c9a96e] hover:underline">Restaurants</a></div>
+          )}
+        </div>
+      );
+    })}
+
+    {ownerList.length === 0 && (
+      <div class="text-center py-20 text-gray-400">
+        <p class="text-4xl mb-3">🍽️</p>
+        <p class="font-medium">No restaurant owners yet</p>
+        <p class="text-sm mt-1">Invite your first restaurant owner using the button above.</p>
+      </div>
+    )}
+  </div>
+
+  {/* Unassigned restaurants */}
+  {(unassigned ?? []).length > 0 && (
+    <div class="mt-8 bg-amber-50 border border-amber-200 rounded-2xl p-5">
+      <h3 class="font-semibold text-amber-800 mb-3">⚠️ Unassigned restaurants ({unassigned!.length})</h3>
+      <p class="text-sm text-amber-700 mb-3">These restaurants have no owner. Assign them from the <a href="/admin/restaurants" class="text-[#1a1a2e] font-medium underline">Restaurants</a> page.</p>
+      <div class="flex flex-wrap gap-2">
+        {(unassigned ?? []).map((r: any) => (
+          <span class="inline-flex items-center gap-1.5 px-3 py-1 bg-white rounded-lg text-xs text-gray-700 border border-amber-200">
+            <span class={`w-1.5 h-1.5 rounded-full ${r.is_active ? 'bg-emerald-400' : 'bg-gray-300'}`}></span>
+            {r.name}
+          </span>
+        ))}
+      </div>
+    </div>
+  )}
+
+  <!-- Toast -->
+  <div id="toast" class="fixed bottom-6 right-6 z-[100] flex items-center gap-3 px-4 py-3 rounded-2xl shadow-xl text-sm font-medium text-white translate-y-16 opacity-0 transition-all duration-300 pointer-events-none max-w-xs">
+    <span id="toast-icon" class="text-lg shrink-0"></span>
+    <span id="toast-msg"></span>
+  </div>
+
+</AdminLayout>
+
+<script>
+  // ── Toast ──────────────────────────────────────────────────────────────────
+  const toast     = document.getElementById('toast')!;
+  const toastMsg  = document.getElementById('toast-msg')!;
+  const toastIcon = document.getElementById('toast-icon')!;
+  let toastTimer: ReturnType<typeof setTimeout>;
+
+  function showToast(msg: string, type: 'success' | 'error' = 'success') {
+    clearTimeout(toastTimer);
+    toastMsg.textContent = msg;
+    toastIcon.textContent = type === 'success' ? '✓' : '✕';
+    toast.className = toast.className
+      .replace(/bg-\S+/g, '')
+      .replace(/translate-y-\S+/g, '')
+      .replace(/opacity-\S+/g, '');
+    toast.classList.add(
+      type === 'success' ? 'bg-emerald-600' : 'bg-red-600',
+      'translate-y-0', 'opacity-100',
+    );
+    toastTimer = setTimeout(() => {
+      toast.classList.remove('translate-y-0', 'opacity-100');
+      toast.classList.add('translate-y-16', 'opacity-0');
+    }, 4000);
+  }
+
+  // ── Invite modal ─────────────────────────────────────────────────────────
+  const modal     = document.getElementById('invite-modal')!;
+  const invBtn    = document.getElementById('invite-btn')!;
+  const cancelBtn = document.getElementById('invite-cancel')!;
+  const submitBtn = document.getElementById('invite-submit')!;
+  const errBox    = document.getElementById('invite-error')!;
+
+  invBtn.addEventListener('click', () => modal.classList.remove('hidden'));
+  cancelBtn.addEventListener('click', () => modal.classList.add('hidden'));
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.add('hidden'); });
+
+  submitBtn.addEventListener('click', async () => {
+    const email     = (document.getElementById('inv-email') as HTMLInputElement).value.trim();
+    const full_name = (document.getElementById('inv-name') as HTMLInputElement).value.trim();
+
+    if (!email || !full_name) {
+      errBox.textContent = 'Name and email are required.';
+      errBox.classList.remove('hidden');
+      return;
+    }
+
+    submitBtn.textContent = 'Sending…';
+    submitBtn.setAttribute('disabled', 'true');
+    errBox.classList.add('hidden');
+
+    const res = await fetch('/api/admin/restaurant-owners/invite', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, full_name }),
+    });
+    const json = await res.json();
+
+    if (res.ok) {
+      modal.classList.add('hidden');
+      showToast(`Invite sent to ${email}`, 'success');
+      setTimeout(() => window.location.reload(), 1200);
+    } else {
+      errBox.textContent = json.error ?? 'Invite failed';
+      errBox.classList.remove('hidden');
+      showToast(json.error ?? 'Invite failed', 'error');
+      submitBtn.textContent = 'Send invite';
+      submitBtn.removeAttribute('disabled');
+    }
+  });
+
+  // ── Edit modal ───────────────────────────────────────────────────────────
+  const editModal   = document.getElementById('edit-modal')!;
+  const editId      = document.getElementById('edit-id') as HTMLInputElement;
+  const editName    = document.getElementById('edit-name') as HTMLInputElement;
+  const editPhone   = document.getElementById('edit-phone') as HTMLInputElement;
+  const editErr     = document.getElementById('edit-error')!;
+  const editSubmit  = document.getElementById('edit-submit') as HTMLButtonElement;
+
+  document.getElementById('edit-cancel')!.addEventListener('click', () => editModal.classList.add('hidden'));
+  editModal.addEventListener('click', (e) => { if (e.target === editModal) editModal.classList.add('hidden'); });
+
+  document.querySelectorAll('.edit-owner-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const el = btn as HTMLElement;
+      editId.value    = el.dataset.id!;
+      editName.value  = el.dataset.name ?? '';
+      editPhone.value = el.dataset.phone ?? '';
+      editErr.classList.add('hidden');
+      editModal.classList.remove('hidden');
+    });
+  });
+
+  editSubmit.addEventListener('click', async () => {
+    editSubmit.disabled = true;
+    editSubmit.textContent = 'Saving…';
+    editErr.classList.add('hidden');
+
+    const res = await fetch('/api/admin/restaurant-owners/invite', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: editId.value,
+        full_name: editName.value.trim(),
+        phone: editPhone.value.trim() || null,
+      }),
+    });
+
+    if (res.ok) {
+      editModal.classList.add('hidden');
+      showToast('Owner updated', 'success');
+      setTimeout(() => window.location.reload(), 1200);
+    } else {
+      const json = await res.json();
+      editErr.textContent = json.error ?? 'Update failed';
+      editErr.classList.remove('hidden');
+      showToast(json.error ?? 'Update failed', 'error');
+      editSubmit.disabled = false;
+      editSubmit.textContent = 'Save changes';
+    }
+  });
+
+  // ── Remove modal ─────────────────────────────────────────────────────────
+  const removeModal   = document.getElementById('remove-modal')!;
+  const removeDesc    = document.getElementById('remove-modal-desc')!;
+  const removeCancel  = document.getElementById('remove-cancel')!;
+  const removeConfirm = document.getElementById('remove-confirm') as HTMLButtonElement;
+  let pendingRemoveId: string | null = null;
+
+  document.querySelectorAll('.delete-owner-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const el = btn as HTMLElement;
+      pendingRemoveId = el.dataset.id!;
+      removeDesc.textContent = `You are about to remove ${el.dataset.name ?? 'this owner'}.`;
+      removeModal.classList.remove('hidden');
+    });
+  });
+
+  removeCancel.addEventListener('click', () => {
+    removeModal.classList.add('hidden');
+    pendingRemoveId = null;
+  });
+  removeModal.addEventListener('click', (e) => {
+    if (e.target === removeModal) { removeModal.classList.add('hidden'); pendingRemoveId = null; }
+  });
+
+  removeConfirm.addEventListener('click', async () => {
+    if (!pendingRemoveId) return;
+    removeConfirm.disabled = true;
+    removeConfirm.textContent = 'Removing…';
+
+    const res = await fetch('/api/admin/restaurant-owners/invite', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: pendingRemoveId }),
+    });
+
+    if (res.ok) {
+      removeModal.classList.add('hidden');
+      showToast('Owner removed', 'success');
+      setTimeout(() => window.location.reload(), 1200);
+    } else {
+      removeModal.classList.add('hidden');
+      pendingRemoveId = null;
+      removeConfirm.disabled = false;
+      removeConfirm.textContent = 'Yes, remove';
+      showToast('Failed to remove owner', 'error');
+    }
+  });
+
+  // ── Resend invite ────────────────────────────────────────────────────────
+  document.querySelectorAll('.resend-invite-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const el = btn as HTMLButtonElement;
+      const id = el.dataset.id!;
+      const email = el.dataset.email!;
+      el.disabled = true;
+      el.textContent = 'Sending…';
+      const res = await fetch('/api/admin/restaurant-owners/resend-invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) {
+        showToast(`Invite resent to ${email}`, 'success');
+        el.textContent = 'Sent ✓';
+      } else {
+        const json = await res.json();
+        showToast(json.error ?? 'Failed to resend invite', 'error');
+        el.textContent = 'Resend invite';
+        el.disabled = false;
+      }
+    });
+  });
+</script>

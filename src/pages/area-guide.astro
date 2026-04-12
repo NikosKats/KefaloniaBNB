@@ -1,0 +1,325 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { type Lang } from '../i18n/translations.ts';
+const lang = (Astro.locals.lang ?? 'en') as Lang;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://kefaloniabnb.com';
+
+const schemas = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'Area Guide', item: `${siteUrl}/area-guide` },
+    ],
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'TouristDestination',
+    name: 'Keramoti, Kefalonia, Greece',
+    description: 'Keramoti is a coastal village in Northern Greece, known for its beach, ferry to Thassos island, and proximity to Kefalonia city.',
+    url: `${siteUrl}/area-guide`,
+    touristType: ['Beach', 'Family', 'Nature', 'Culture'],
+    geo: { '@type': 'GeoCoordinates', latitude: 40.9716, longitude: 24.6736 },
+  },
+];
+
+const highlights = [
+  { icon: '☀️', label: 'Climate', value: '300+ sunny days/year' },
+  { icon: '🏖️', label: 'Beach', value: '5 min walk' },
+  { icon: '⛴️', label: 'Thassos ferry', value: '35 min away' },
+  { icon: '🏛️', label: 'UNESCO site', value: 'Ancient Philippi' },
+];
+
+const beaches = [
+  {
+    name: 'Keramoti Beach',
+    badge: '★ Most popular',
+    badgeColor: 'bg-amber-100 text-amber-800',
+    desc: 'A long, gently shelving sandy beach with crystal-clear shallow water — ideal for families. Sun-beds, beach bars and water sports in season.',
+    icon: '🏖️',
+  },
+  {
+    name: 'Aspri Ammos',
+    badge: 'Quiet & natural',
+    badgeColor: 'bg-emerald-100 text-emerald-800',
+    desc: 'Secluded white-sand cove a short drive north. No facilities — bring a picnic and enjoy the solitude.',
+    icon: '🌊',
+  },
+  {
+    name: 'Thassos Beaches',
+    badge: '35 min by ferry',
+    badgeColor: 'bg-blue-100 text-blue-800',
+    desc: 'The island of Thassos has world-class beaches — Marble Beach, Paradise, Golden Beach — all reachable by a short ferry ride.',
+    icon: '⛴️',
+  },
+];
+
+const experiences = [
+  {
+    category: 'Culture & History',
+    icon: '🏛️',
+    items: [
+      { name: 'Ancient Philippi', detail: '40 min · UNESCO World Heritage', desc: 'One of Greece\'s most impressive archaeological sites — the city where Julius Caesar\'s assassins fought their final battle.' },
+      { name: 'Kefalonia Old Town', detail: '35 min · Byzantine castle', desc: 'Wander the old quarter, visit the imposing Byzantine fortress and enjoy sweeping views over the port.' },
+      { name: 'Xanthi Old Town', detail: '45 min · Traditional market', desc: 'A beautifully preserved Ottoman-era town with colourful mansions, a covered bazaar and great coffee culture.' },
+    ],
+  },
+  {
+    category: 'Nature & Outdoors',
+    icon: '🌿',
+    items: [
+      { name: 'Nestos River Gorge', detail: '50 min · Kayaking & hiking', desc: 'A dramatic limestone gorge with emerald water, ideal for kayaking, birdwatching and riverside walks.' },
+      { name: 'Nymphaea Lakes', detail: '30 min · Birdwatching', desc: 'A network of wetland lakes attracting hundreds of migratory bird species — a paradise for nature lovers.' },
+      { name: 'Mount Kefalonia', detail: '1h · Hiking trails', desc: 'Several well-marked hiking trails with panoramic views of the Aegean and the Northern Greek coast.' },
+    ],
+  },
+  {
+    category: 'Food & Drink',
+    icon: '🍽️',
+    items: [
+      { name: 'Seafood tavernas', detail: 'Keramoti port', desc: 'The port area has several exceptional seafood restaurants serving the day\'s catch — grilled octopus, sea bream and local mezedes.' },
+      { name: 'Local wineries', detail: '45–60 min · Wine tasting', desc: 'Northern Greece has some of the country\'s finest wine regions. Several family wineries near Drama offer tours and tastings.' },
+      { name: 'Kefalonia food scene', detail: '35 min · Wide choice', desc: 'From traditional ouzeries to modern restaurants, Kefalonia has an excellent dining scene centred around its lively waterfront.' },
+    ],
+  },
+];
+
+const dayTrips = [
+  { dest: 'Thassos Island', dist: '35 min ferry', emoji: '🏝️', desc: 'Marble beaches, waterfalls, ancient ruins, mountain villages. A full-day island escape.' },
+  { dest: 'Kefalonia City', dist: '35 min drive', emoji: '🏰', desc: 'Byzantine castle, vibrant waterfront, excellent restaurants, and a beautiful old town.' },
+  { dest: 'Ancient Philippi', dist: '40 min drive', emoji: '🏛️', desc: 'UNESCO World Heritage Roman city with an impressive amphitheatre still used for summer festivals.' },
+  { dest: 'Xanthi', dist: '45 min drive', emoji: '🕌', desc: 'Charming Ottoman-era old town, colourful timber houses, covered bazaar and great café culture.' },
+  { dest: 'Drama & Springs', dist: '55 min drive', emoji: '🌊', desc: 'Scenic town built around natural springs, caves, local wine production and mountain scenery.' },
+  { dest: 'Thessaloniki', dist: '2.5h drive', emoji: '🌆', desc: 'Greece\'s second city — Byzantine monuments, outstanding food scene, vibrant nightlife and beaches.' },
+];
+
+const gettingAround = [
+  { icon: '🚗', title: 'By Car', desc: 'A rental car gives you the most flexibility. Free parking is available at all properties. The main roads are in excellent condition.' },
+  { icon: '⛴️', title: 'Ferry to Thassos', desc: 'Ferries run every 30–60 min in summer from Keramoti port (5 min drive). Cars and bikes can board. Journey is 35 minutes.' },
+  { icon: '🚌', title: 'KTEL Bus', desc: 'KTEL buses connect Keramoti to Kefalonia city several times daily. Kefalonia has onward connections to Thessaloniki and other cities.' },
+  { icon: '✈️', title: 'Nearest Airports', desc: 'Kefalonia "Alexander the Great" Airport (KVA) — 25 min. Thessaloniki (SKG) — 2.5h. Both have international summer connections.' },
+];
+---
+
+<BaseLayout
+  title="Area Guide – Keramoti, Kefalonia & Northern Greece"
+  description="Discover the best of Keramoti and Northern Greece: beaches, ferry to Thassos, ancient ruins, local food and day trips. Your complete destination guide."
+  schema={schemas}
+>
+  <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+
+    <!-- Hero -->
+    <div class="text-center mb-14">
+      <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-wider mb-2">{isEl ? 'Οδηγός Προορισμού' : isBg ? 'Пътеводител за дестинацията' : isSr ? 'Водич кроз дестинацију' : isTr ? 'Yöre Rehberi' : isRo ? 'Ghid de Destinație' : 'Destination Guide'}</p>
+      <h1 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">{isEl ? 'Κεραμωτί & Βόρεια Ελλάδα' : isBg ? 'Keramoti & Северна Гърция' : isSr ? 'Keramoti & Северна Грчка' : isTr ? 'Keramoti & Kuzey Yunanistan' : isRo ? 'Keramoti & Grecia de Nord' : 'Keramoti & Northern Greece'}</h1>
+      <p class="text-gray-500 max-w-2xl mx-auto leading-relaxed">{isEl ? 'Ένας κρυμμένος θησαυρός στην ακτή του Αιγαίου — παρθένες παραλίες, αρχαία ιστορία, εκδρομές σε νησί και αυθεντικός ελληνικός πολιτισμός, όλα σε εύκολη απόσταση.' : isBg ? 'Скрито съкровище по бреговете на Егейско море — девствени плажове, древна история, еднодневни екскурзии до острови и автентична гръцка култура, всичко в лесна досегаемост.' : isSr ? 'Скривени бисер на обали Егејског мора — нетакнуте плаже, древна историја, излети на острва и аутентична грчка култура, све на дохват руке.' : isTr ? 'Ege kıyısında gizli bir mücevher — bozulmamış plajlar, antik tarih, ada günübirlik gezileri ve otantik Yunan kültürü, hepsi kolayca ulaşılabilir mesafede.' : isRo ? 'O bijuterie ascunsă pe coasta Egee — plaje imaculate, istorie antică, excursii pe insulă și cultură greacă autentică, toate la îndemână.' : 'A hidden gem on the Aegean coast — pristine beaches, ancient history, island day trips and authentic Greek culture, all within easy reach.'}</p>
+    </div>
+
+    <!-- Highlights bar -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-16">
+      {highlights.map((h) => (
+        <div class="bg-white border border-gray-100 rounded-2xl p-4 text-center shadow-sm">
+          <div class="text-2xl mb-1">{h.icon}</div>
+          <p class="text-xs text-gray-400 mb-0.5">{
+            h.label === 'Climate' ? (isEl ? 'Κλίμα' : isBg ? 'Климат' : isSr ? 'Клима' : isTr ? 'İklim' : isRo ? 'Climă' : h.label) :
+            h.label === 'Beach' ? (isEl ? 'Παραλία' : isBg ? 'Плаж' : isSr ? 'Плажа' : isTr ? 'Plaj' : isRo ? 'Plajă' : h.label) :
+            h.label === 'Thassos ferry' ? (isEl ? 'Φέρι για Θάσο' : isBg ? 'Ферибот до Thassos' : isSr ? 'Трајект до Thassos' : isTr ? 'Thassos feribotu' : isRo ? 'Feribot Thassos' : h.label) :
+            h.label === 'UNESCO site' ? (isEl ? 'Μνημείο UNESCO' : isBg ? 'Обект на ЮНЕСКО' : isSr ? 'УНЕСКО локалитет' : isTr ? 'UNESCO alanı' : isRo ? 'Sit UNESCO' : h.label) :
+            h.label
+          }</p>
+          <p class="font-semibold text-gray-900 text-sm">{
+            h.value === '300+ sunny days/year' ? (isEl ? '300+ ηλιόλουστες μέρες/χρόνο' : isBg ? '300+ слънчеви дни/годишно' : isSr ? '300+ сунчаних дана/год.' : isTr ? 'Yılda 300+ güneşli gün' : isRo ? '300+ zile însorite/an' : h.value) :
+            h.value === '5 min walk' ? (isEl ? '5 λεπτά με τα πόδια' : isBg ? '5 мин. пеша' : isSr ? '5 мин. пешке' : isTr ? '5 dk yürüyüş' : isRo ? '5 min pe jos' : h.value) :
+            h.value === '35 min away' ? (isEl ? '35 λεπτά μακριά' : isBg ? 'На 35 мин.' : isSr ? '35 мин. удаљено' : isTr ? '35 dk uzakta' : isRo ? 'La 35 min' : h.value) :
+            h.value === 'Ancient Philippi' ? (isEl ? 'Αρχαίοι Φίλιπποι' : isBg ? 'Древен Филипи' : isSr ? 'Антички Филипи' : isTr ? 'Antik Philippi' : isRo ? 'Philippi Antic' : h.value) :
+            h.value
+          }</p>
+        </div>
+      ))}
+    </div>
+
+    <div class="space-y-20">
+
+      <!-- Beaches -->
+      <section>
+        <h2 class="text-2xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+          <span class="text-2xl">🏖️</span> {isEl ? 'Παραλίες' : isBg ? 'Плажове' : isSr ? 'Плаже' : isTr ? 'Plajlar' : isRo ? 'Plaje' : 'Beaches'}
+        </h2>
+        <p class="text-gray-500 mb-6">{isEl ? 'Η ακτογραμμή της Βόρειας Ελλάδας είναι ένα από τα καλύτερα κρυμμένα μυστικά της Ευρώπης — καθαρή, αραιοκατοικημένη και εντυπωσιακά όμορφη.' : isBg ? 'Крайбрежието на Северна Гърция е един от най-добре пазените секрети на Европа — чисто, непренаселено и зашеметяващо красиво.' : isSr ? 'Обала Северне Грчке је један од најбоље чуваних тајни Европе — чиста, ненасељена и задивљујуће лепа.' : isTr ? 'Kuzey Yunanistan\'ın kıyı şeridi Avrupa\'nın en iyi korunan sırlarından biridir — temiz, kalabalık olmayan ve etkileyici derecede güzel.' : isRo ? 'Litoralul Greciei de Nord este unul dintre cele mai bine păzite secrete ale Europei — curat, neaglomerat și impresionant de frumos.' : "Northern Greece's coastline is one of Europe's best-kept secrets — clean, uncrowded, and strikingly beautiful."}</p>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {beaches.map((b) => (
+            <div class="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex flex-col gap-3">
+              <div class="flex items-start justify-between">
+                <div class="w-12 h-12 bg-blue-50 rounded-xl flex items-center justify-center text-2xl shrink-0">{b.icon}</div>
+                <span class={`text-xs font-medium px-2 py-0.5 rounded-full ${b.badgeColor}`}>{
+                  b.badge === '★ Most popular' ? (isEl ? '★ Πιο δημοφιλής' : isBg ? '★ Най-популярен' : isSr ? '★ Најпопуларнија' : isTr ? '★ En popüler' : isRo ? '★ Cea mai populară' : b.badge) :
+                  b.badge === 'Quiet & natural' ? (isEl ? 'Ήσυχη & φυσική' : isBg ? 'Тих & природен' : isSr ? 'Тихо & природно' : isTr ? 'Sakin & doğal' : isRo ? 'Liniștită & naturală' : b.badge) :
+                  b.badge === '35 min by ferry' ? (isEl ? '35 λεπτά με φέρι' : isBg ? '35 мин. с ферибот' : isSr ? '35 мин. трајектом' : isTr ? 'Feribotla 35 dk' : isRo ? '35 min cu feribotul' : b.badge) :
+                  b.badge
+                }</span>
+              </div>
+              <div>
+                <h3 class="font-semibold text-gray-900 mb-1">{b.name}</h3>
+                <p class="text-gray-500 text-sm leading-relaxed">{
+                  b.name === 'Keramoti Beach' ? (isEl ? 'Μια μακριά αμμουδερή παραλία με κρυστάλλινα ρηχά νερά — ιδανική για οικογένειες. Ξαπλώστρες, beach bars και θαλάσσια σπορ εποχιακά.' : isBg ? 'Дълъг пясъчен плаж с кристално чиста плитка вода — идеален за семейства. Шезлонги, плажни барове и водни спортове в сезона.' : isSr ? 'Дуга пешчана плажа са кристално чистом плитком водом — идеална за породице. Лежаљке, плажни барови и водени спортови у сезони.' : isTr ? 'Kristal berraklığında sığ suları olan uzun, yavaş eğimli kumlu bir plaj — aileler için ideal. Sezonda şezlonglar, plaj barları ve su sporları mevcut.' : isRo ? 'O plajă lungă de nisip cu apă cristalină și puțin adâncă — ideală pentru familii. Șezlonguri, baruri de plajă și sporturi nautice în sezon.' : b.desc) :
+                  b.name === 'Aspri Ammos' ? (isEl ? 'Απομονωμένος λευκός κολπίσκος λίγο βορειότερα. Χωρίς εγκαταστάσεις — φέρτε πικνίκ και απολαύστε την ησυχία.' : isBg ? 'Уединен залив с бял пясък на кратко разстояние на север. Без удобства — вземете пикник и се насладете на тишината.' : isSr ? 'Усамљена увала с белим песком мало северније. Без садржаја — понесите пикник и уживајте у тишини.' : isTr ? 'Biraz kuzeyde sessiz beyaz kumlu koy. Tesis yok — piknik götürün ve sessizliğin tadını çıkarın.' : isRo ? 'Un golf izolat cu nisip alb la scurt drum spre nord. Fără facilități — luați un picnic și bucurați-vă de liniște.' : b.desc) :
+                  b.name === 'Thassos Beaches' ? (isEl ? 'Το νησί της Θάσου έχει παγκόσμιας κλάσης παραλίες — Παραλία Μαρμάρου, Παράδεισο, Χρυσή Αμμουδιά — όλες προσβάσιμες με σύντομο ταξίδι με φέρι.' : isBg ? 'Островът Thassos разполага с плажове от световна класа — Marble Beach, Paradise, Golden Beach — всички достъпни с кратък ферибот.' : isSr ? 'Острво Thassos има плаже светске класе — Marble Beach, Paradise, Golden Beach — све доступне кратким трајектом.' : isTr ? 'Thassos adası dünya standartlarında plajlara sahiptir — Marble Beach, Paradise, Golden Beach — hepsi kısa bir feribot yolculuğuyla ulaşılabilir.' : isRo ? 'Insula Thassos are plaje de clasă mondială — Marble Beach, Paradise, Golden Beach — toate accesibile cu o scurtă călătorie cu feribotul.' : b.desc) :
+                  b.desc
+                }</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <!-- Experiences by category -->
+      {experiences.map((cat) => (
+        <section>
+          <h2 class="text-2xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+            <span class="text-2xl">{cat.icon}</span> {
+              cat.category === 'Culture & History' ? (isEl ? 'Πολιτισμός & Ιστορία' : isBg ? 'Култура & история' : isSr ? 'Култура & историја' : isTr ? 'Kültür & Tarih' : isRo ? 'Cultură & Istorie' : cat.category) :
+              cat.category === 'Nature & Outdoors' ? (isEl ? 'Φύση & Υπαίθριο' : isBg ? 'Природа & активен отдих' : isSr ? 'Природа & активности' : isTr ? 'Doğa & Açık Hava' : isRo ? 'Natură & Aer liber' : cat.category) :
+              cat.category === 'Food & Drink' ? (isEl ? 'Φαγητό & Ποτό' : isBg ? 'Храна & напитки' : isSr ? 'Храна & пиће' : isTr ? 'Yeme & İçme' : isRo ? 'Mâncare & Băuturi' : cat.category) :
+              cat.category
+            }
+          </h2>
+          <div class="space-y-3 mt-6">
+            {cat.items.map((item) => (
+              <div class="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex flex-col sm:flex-row sm:items-start gap-4">
+                <div class="flex-1">
+                  <div class="flex items-center gap-3 mb-1">
+                    <h3 class="font-semibold text-gray-900">{
+                      item.name === 'Kefalonia Old Town' ? (isEl ? 'Παλαιά Πόλη Καβάλας' : isBg ? 'Стар град Kefalonia' : isSr ? 'Стари град Kefalonia' : isTr ? 'Kefalonia Eski Şehir' : isRo ? 'Orașul Vechi Kefalonia' : item.name) :
+                      item.name === 'Xanthi Old Town' ? (isEl ? 'Παλαιά Πόλη Ξάνθης' : isBg ? 'Стар град Ксанти' : isSr ? 'Стари град Ксанти' : isTr ? 'Xanthi Eski Şehir' : isRo ? 'Orașul Vechi Xanthi' : item.name) :
+                      item.name === 'Nestos River Gorge' ? (isEl ? 'Φαράγγι Ποταμού Νέστου' : isBg ? 'Ждрело на река Места' : isSr ? 'Кланац реке Несtos' : isTr ? 'Nestos Nehri Kanyonu' : isRo ? 'Defileul Râului Nestos' : item.name) :
+                      item.name === 'Mount Kefalonia' ? (isEl ? 'Βουνό Καβάλας' : isBg ? 'Планината край Kefalonia' : isSr ? 'Планина код Kefalonia' : isTr ? 'Kefalonia Dağı' : isRo ? 'Muntele Kefalonia' : item.name) :
+                      item.name === 'Seafood tavernas' ? (isEl ? 'Ταβέρνες θαλασσινών' : isBg ? 'Таверни за морска храна' : isSr ? 'Таверне с морским плодовима' : isTr ? 'Deniz ürünleri tavernaları' : isRo ? 'Taverne cu fructe de mare' : item.name) :
+                      item.name === 'Local wineries' ? (isEl ? 'Τοπικά οινοποιεία' : isBg ? 'Местни изби' : isSr ? 'Локалне винарије' : isTr ? 'Yerel şarap mahzenleri' : isRo ? 'Crame locale' : item.name) :
+                      item.name === 'Kefalonia food scene' ? (isEl ? 'Γαστρονομία Καβάλας' : isBg ? 'Гастрономия на Kefalonia' : isSr ? 'Гастрономија Kefalonia' : isTr ? 'Kefalonia yeme içme sahnesi' : isRo ? 'Scena gastronomică Kefalonia' : item.name) :
+                      item.name
+                    }</h3>
+                    <span class="text-xs text-[#c9a96e] font-medium bg-[#c9a96e]/10 px-2 py-0.5 rounded-full shrink-0">{
+                      item.detail === '40 min · UNESCO World Heritage' ? (isEl ? '40 λεπτά · Παγκόσμια Κληρονομιά UNESCO' : isBg ? '40 мин. · Световно наследство на ЮНЕСКО' : isSr ? '40 мин. · УНЕСКО светска баштина' : isTr ? '40 dk · UNESCO Dünya Mirası' : isRo ? '40 min · Patrimoniu Mondial UNESCO' : item.detail) :
+                      item.detail === '35 min · Byzantine castle' ? (isEl ? '35 λεπτά · Βυζαντινό κάστρο' : isBg ? '35 мин. · Византийска крепост' : isSr ? '35 мин. · Византијска тврђава' : isTr ? '35 dk · Bizans kalesi' : isRo ? '35 min · Castel bizantin' : item.detail) :
+                      item.detail === '45 min · Traditional market' ? (isEl ? '45 λεπτά · Παραδοσιακή αγορά' : isBg ? '45 мин. · Традиционен пазар' : isSr ? '45 мин. · Традиционна пијаца' : isTr ? '45 dk · Geleneksel çarşı' : isRo ? '45 min · Piață tradițională' : item.detail) :
+                      item.detail === '50 min · Kayaking & hiking' ? (isEl ? '50 λεπτά · Kayaking & πεζοπορία' : isBg ? '50 мин. · Каяк & туризъм' : isSr ? '50 мин. · Кајак & пешачење' : isTr ? '50 dk · Kano & yürüyüş' : isRo ? '50 min · Caiac & drumeții' : item.detail) :
+                      item.detail === '30 min · Birdwatching' ? (isEl ? '30 λεπτά · Παρατήρηση πουλιών' : isBg ? '30 мин. · Наблюдение на птици' : isSr ? '30 мин. · Посматрање птица' : isTr ? '30 dk · Kuş gözlemi' : isRo ? '30 min · Observarea păsărilor' : item.detail) :
+                      item.detail === '1h · Hiking trails' ? (isEl ? '1 ώρα · Μονοπάτια πεζοπορίας' : isBg ? '1 ч. · Туристически пътеки' : isSr ? '1 сат · Планинарске стазе' : isTr ? '1 saat · Yürüyüş parkurları' : isRo ? '1h · Trasee de drumeție' : item.detail) :
+                      item.detail === 'Keramoti port' ? (isEl ? 'Λιμάνι Κεραμωτίου' : isBg ? 'Пристанище Keramoti' : isSr ? 'Лука Keramoti' : isTr ? 'Keramoti limanı' : isRo ? 'Portul Keramoti' : item.detail) :
+                      item.detail === '45–60 min · Wine tasting' ? (isEl ? '45–60 λεπτά · Γευσιγνωσία κρασιών' : isBg ? '45–60 мин. · Дегустация на вино' : isSr ? '45–60 мин. · Дегустација вина' : isTr ? '45–60 dk · Şarap tadımı' : isRo ? '45–60 min · Degustare de vinuri' : item.detail) :
+                      item.detail === '35 min · Wide choice' ? (isEl ? '35 λεπτά · Μεγάλη ποικιλία' : isBg ? '35 мин. · Голям избор' : isSr ? '35 мин. · Широк избор' : isTr ? '35 dk · Geniş seçenek' : isRo ? '35 min · Varietate mare' : item.detail) :
+                      item.detail
+                    }</span>
+                  </div>
+                  <p class="text-gray-500 text-sm leading-relaxed">{
+                    item.name === 'Ancient Philippi' ? (isEl ? 'Ένας από τους πιο εντυπωσιακούς αρχαιολογικούς χώρους της Ελλάδας — η πόλη όπου οι δολοφόνοι του Ιούλιου Καίσαρα έδωσαν την τελευταία τους μάχη.' : isBg ? 'Един от най-внушителните археологически обекти в Гърция — градът, в който убийците на Юлий Цезар водят последната си битка.' : isSr ? 'Један од најимпресивнијих археолошких налазишта у Грчкој — град где су убице Јулија Цезара водили своју последњу битку.' : isTr ? 'Yunanistan\'ın en etkileyici arkeolojik alanlarından biri — Julius Caesar\'ın katillerinin son savaşını verdiği şehir.' : isRo ? 'Unul dintre cele mai impresionante situri arheologice din Grecia — orașul unde asasinii lui Iulius Caesar au dat ultima lor bătălie.' : item.desc) :
+                    item.name === 'Kefalonia Old Town' ? (isEl ? 'Περιπλανηθείτε στην παλιά πόλη, επισκεφτείτε το επιβλητικό βυζαντινό φρούριο και απολαύστε πανοραμική θέα στο λιμάνι.' : isBg ? 'Разходете се из стария квартал, посетете внушителната византийска крепост и се насладете на панорамна гледка към пристанището.' : isSr ? 'Прошетајте се старим кварталом, посетите импресивну византијску тврђаву и уживајте у панорамском погледу на луку.' : isTr ? 'Eski mahalleyi gezin, etkileyici Bizans kalesini ziyaret edin ve limana panoramik manzaranın tadını çıkarın.' : isRo ? 'Plimbați-vă prin cartierul vechi, vizitați impunătoarea fortăreață bizantină și bucurați-vă de priveliștea panoramică asupra portului.' : item.desc) :
+                    item.name === 'Xanthi Old Town' ? (isEl ? 'Μια υπέροχα διατηρημένη οθωμανική πόλη με πολύχρωμα αρχοντικά, στεγασμένο παζάρι και υπέροχη κουλτούρα καφέ.' : isBg ? 'Прекрасно запазен османски град с цветни особняци, покрит базар и богата кафе култура.' : isSr ? 'Прелепо очуван османски град са шареним вилама, наткривеним базаром и одличном кафанском културом.' : isTr ? 'Renkli konaklar, kapalı çarşı ve harika kahve kültürüyle güzelce korunmuş Osmanlı dönemi bir şehir.' : isRo ? 'Un oraș din epoca otomană frumos conservat cu conace colorate, un bazar acoperit și o cultură a cafelei excelentă.' : item.desc) :
+                    item.name === 'Nestos River Gorge' ? (isEl ? 'Ένα εντυπωσιακό ασβεστολιθικό φαράγγι με σμαραγδένια νερά, ιδανικό για κανό, παρατήρηση πουλιών και περιπάτους στις όχθες.' : isBg ? 'Зашеметяващо варовиково ждрело с изумруденозелена вода — идеално за каяк, наблюдение на птици и разходки край реката.' : isSr ? 'Задивљујући кречњачки кланац са смарагдном водом, идеалан за кајак, посматрање птица и шетње поред реке.' : isTr ? 'Zümrüt renkli suları olan çarpıcı bir kireçtaşı kanyonu — kano, kuş gözlemi ve nehir kenarı yürüyüşleri için ideal.' : isRo ? 'Un defileu spectaculos de calcar cu apă smaraldină, ideal pentru caiac, observarea păsărilor și plimbări pe malul râului.' : item.desc) :
+                    item.name === 'Nymphaea Lakes' ? (isEl ? 'Ένα δίκτυο λιμνών υγροβιότοπου που προσελκύει εκατοντάδες είδη μεταναστευτικών πουλιών — παράδεισος για τους λάτρεις της φύσης.' : isBg ? 'Мрежа от влажни езера, привличаща стотици видове прелетни птици — истински рай за любителите на природата.' : isSr ? 'Мрежа мочварних језера која привлачи стотине врста птица селица — рај за љубитеље природе.' : isTr ? 'Yüzlerce göçmen kuş türünü çeken sulak alan gölleri ağı — doğa severler için bir cennet.' : isRo ? 'O rețea de lacuri din zone umede care atrage sute de specii de păsări migratoare — un paradis pentru iubitorii de natură.' : item.desc) :
+                    item.name === 'Mount Kefalonia' ? (isEl ? 'Αρκετά καλά σημαδεμένα μονοπάτια πεζοπορίας με πανοραμική θέα στο Αιγαίο και την ακτή της Βόρειας Ελλάδας.' : isBg ? 'Няколко добре маркирани туристически пътеки с панорамна гледка към Егейско море и северногръцкото крайбрежие.' : isSr ? 'Неколико добро обележених планинарских стаза са панорамским погледом на Егејско море и обалу Северне Грчке.' : isTr ? 'Ege Denizi ve Kuzey Yunan kıyısına panoramik manzaralı birkaç iyi işaretlenmiş yürüyüş parkuru.' : isRo ? 'Mai multe trasee de drumeție bine marcate cu vederi panoramice asupra Egee și a coastei Greciei de Nord.' : item.desc) :
+                    item.name === 'Seafood tavernas' ? (isEl ? 'Η περιοχή του λιμανιού έχει αρκετά εξαιρετικά εστιατόρια θαλασσινών που σερβίρουν τη φρέσκια ψαριά — ψητό χταπόδι, τσιπούρα και τοπικοί μεζέδες.' : isBg ? 'Районът на пристанището разполага с изключителни ресторанти за морска храна, сервиращи дневния улов — печени октоподи, ципура и местни мезета.' : isSr ? 'Пристанишна четврт има неколико изузетних ресторана с морским плодовима где послужују дневни улов — печена хоботница, орада и локални мезеси.' : isTr ? 'Liman bölgesinde günlük avı sunan — ızgara ahtapot, çipura ve yerel mezeler — birkaç olağanüstü deniz ürünleri restoranı bulunur.' : isRo ? 'Zona portului are câteva restaurante excepționale cu fructe de mare care servesc captura zilei — caracatiță la grătar, doradă și mezeduri locale.' : item.desc) :
+                    item.name === 'Local wineries' ? (isEl ? 'Η Βόρεια Ελλάδα έχει μερικές από τις καλύτερες οινοποιητικές περιοχές της χώρας. Αρκετά οικογενειακά οινοποιεία κοντά στη Δράμα προσφέρουν ξεναγήσεις και γευσιγνωσίες.' : isBg ? 'Северна Гърция разполага с едни от най-добрите лозарски райони в страната. Няколко семейни изби близо до Драма предлагат обиколки и дегустации.' : isSr ? 'Северна Грчка има неке од најбољих винарских региона у земљи. Неколико породичних винарија близу Драме нуди туре и дегустације.' : isTr ? 'Kuzey Yunanistan ülkenin en iyi şarap bölgelerinden bazılarına ev sahipliği yapar. Drama yakınındaki birkaç aile şaraphanesi tur ve tadım imkânı sunar.' : isRo ? 'Grecia de Nord are unele dintre cele mai bune regiuni viticole din țară. Mai multe crame familiale lângă Drama oferă tururi și degustări.' : item.desc) :
+                    item.name === 'Kefalonia food scene' ? (isEl ? 'Από παραδοσιακές ουζερί έως σύγχρονα εστιατόρια, η Καβάλα έχει μια εξαιρετική γαστρονομική σκηνή γύρω από τον ζωντανό παραλιακό της δρόμο.' : isBg ? 'От традиционни узерии до модерни ресторанти — Kefalonia предлага отлична гастрономическа сцена около оживения си крайбрежен булевард.' : isSr ? 'Од традиционалних узерија до савремених ресторана, Kefalonia има одличну гастрономску сцену уз оживљену обалу.' : isTr ? 'Geleneksel uzericilerden modern restoranlara kadar Kefalonia, canlı rıhtımı çevresinde mükemmel bir yeme içme sahnesine sahiptir.' : isRo ? 'De la ouzeriile tradiționale la restaurantele moderne, Kefalonia are o scenă gastronomică excelentă centrată pe faleza sa animată.' : item.desc) :
+                    item.desc
+                  }</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+
+      <!-- Day trips -->
+      <section>
+        <h2 class="text-2xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+          <span class="text-2xl">🗺️</span> {isEl ? 'Εκδρομές Ημέρας' : isBg ? 'Еднодневни екскурзии' : isSr ? 'Излети' : isTr ? 'Günübirlik Geziler' : isRo ? 'Excursii de o Zi' : 'Day Trips'}
+        </h2>
+        <p class="text-gray-500 mb-6">{isEl ? 'Η τοποθεσία σας φέρνει σε εύκολη απόσταση από μερικούς από τους πιο αξιόλογους προορισμούς της Ελλάδας.' : isBg ? 'Местоположението ви поставя в лесна досегаемост до едни от най-атрактивните дестинации в Гърция.' : isSr ? 'Локација вас ставља на дохват руке од неких од најатрактивнијих одредишта у Грчкој.' : isTr ? 'Konum sizi Yunanistan\'ın en değerli destinasyonlarından bazılarına kolayca ulaşabileceğiniz mesafeye koyar.' : isRo ? 'Locația vă pune la îndemână unele dintre cele mai valoroase destinații din Grecia.' : "The location puts you within easy reach of some of Greece's most rewarding destinations."}</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {dayTrips.map((d) => (
+            <div class="bg-gray-50 rounded-2xl p-5">
+              <div class="flex items-center justify-between mb-2">
+                <div class="flex items-center gap-2">
+                  <span class="text-xl">{d.emoji}</span>
+                  <h3 class="font-semibold text-gray-900 text-sm">{
+                    d.dest === 'Thassos Island' ? (isEl ? 'Νησί Θάσου' : isBg ? 'Остров Thassos' : isSr ? 'Острво Thassos' : isTr ? 'Thassos Adası' : isRo ? 'Insula Thassos' : d.dest) :
+                    d.dest === 'Kefalonia City' ? (isEl ? 'Πόλη Καβάλας' : isBg ? 'Град Kefalonia' : isSr ? 'Град Kefalonia' : isTr ? 'Kefalonia Şehri' : isRo ? 'Orașul Kefalonia' : d.dest) :
+                    d.dest === 'Drama & Springs' ? (isEl ? 'Δράμα & Πηγές' : isBg ? 'Драма & Извори' : isSr ? 'Драма & извори' : isTr ? 'Drama & Kaynaklar' : isRo ? 'Drama & Izvoare' : d.dest) :
+                    d.dest
+                  }</h3>
+                </div>
+                <span class="text-xs text-[#c9a96e] font-medium shrink-0">{
+                  d.dist === '35 min ferry' ? (isEl ? '35 λεπτά φέρι' : isBg ? '35 мин. ферибот' : isSr ? '35 мин. трајектом' : isTr ? '35 dk feribot' : isRo ? '35 min feribot' : d.dist) :
+                  d.dist === '35 min drive' ? (isEl ? '35 λεπτά οδήγηση' : isBg ? '35 мин. с кола' : isSr ? '35 мин. вожње' : isTr ? '35 dk araç' : isRo ? '35 min cu mașina' : d.dist) :
+                  d.dist === '40 min drive' ? (isEl ? '40 λεπτά οδήγηση' : isBg ? '40 мин. с кола' : isSr ? '40 мин. вожње' : isTr ? '40 dk araç' : isRo ? '40 min cu mașina' : d.dist) :
+                  d.dist === '45 min drive' ? (isEl ? '45 λεπτά οδήγηση' : isBg ? '45 мин. с кола' : isSr ? '45 мин. вожње' : isTr ? '45 dk araç' : isRo ? '45 min cu mașina' : d.dist) :
+                  d.dist === '55 min drive' ? (isEl ? '55 λεπτά οδήγηση' : isBg ? '55 мин. с кола' : isSr ? '55 мин. вожње' : isTr ? '55 dk araç' : isRo ? '55 min cu mașina' : d.dist) :
+                  d.dist === '2.5h drive' ? (isEl ? '2,5 ώρες οδήγηση' : isBg ? '2,5 ч. с кола' : isSr ? '2,5 сата вожње' : isTr ? '2,5 saat araç' : isRo ? '2,5h cu mașina' : d.dist) :
+                  d.dist
+                }</span>
+              </div>
+              <p class="text-gray-500 text-xs leading-relaxed">{
+                d.dest === 'Thassos Island' ? (isEl ? 'Παραλίες Μαρμάρου, καταρράκτες, αρχαία ερείπια, ορεινά χωριά. Μια ολοήμερη απόδραση στο νησί.' : isBg ? 'Мраморни плажове, водопади, древни руини, планински села. Цял ден почивка на острова.' : isSr ? 'Мермерне плаже, водопади, античке рушевине, планинска села. Цео дан одмора на острву.' : isTr ? 'Mermer plajlar, şelaleler, antik kalıntılar, dağ köyleri. Ada\'da tam günlük bir kaçış.' : isRo ? 'Plaje de marmură, cascade, ruine antice, sate montane. O evadare pe insulă pentru o zi întreagă.' : d.desc) :
+                d.dest === 'Kefalonia City' ? (isEl ? 'Βυζαντινό κάστρο, ζωντανός παραλιακός δρόμος, εξαιρετικά εστιατόρια και όμορφη παλιά πόλη.' : isBg ? 'Византийска крепост, оживен крайбрежен булевард, отлични ресторанти и красив стар град.' : isSr ? 'Византијска тврђава, оживљена обала, одлични ресторани и леп стари град.' : isTr ? 'Bizans kalesi, canlı sahil, mükemmel restoranlar ve güzel eski şehir.' : isRo ? 'Castel bizantin, faleză animată, restaurante excelente și un oraș vechi frumos.' : d.desc) :
+                d.dest === 'Ancient Philippi' ? (isEl ? 'Ρωμαϊκή πόλη Παγκόσμιας Κληρονομιάς UNESCO με εντυπωσιακό αμφιθέατρο που χρησιμοποιείται ακόμα για καλοκαιρινά φεστιβάλ.' : isBg ? 'Римски град — Световно наследство на ЮНЕСКО, с внушителен амфитеатър, използван и до днес за летни фестивали.' : isSr ? 'Римски град — УНЕСКО светска баштина са импресивним амфитеатром који се и данас користи за летне фестивале.' : isTr ? 'Yaz festivalleri için hâlâ kullanılan etkileyici amfitiyatrosuyla UNESCO Dünya Mirası Roma şehri.' : isRo ? 'Oraș roman Patrimoniu Mondial UNESCO cu un amfiteatru impresionant încă folosit pentru festivaluri de vară.' : d.desc) :
+                d.dest === 'Xanthi' ? (isEl ? 'Γοητευτική οθωμανική παλιά πόλη, πολύχρωμα ξύλινα σπίτια, στεγασμένο παζάρι και υπέροχη κουλτούρα καφέ.' : isBg ? 'Чаровен османски стар град, цветни дървени къщи, покрит базар и прекрасна кафе култура.' : isSr ? 'Шармантни османски стари град, шарене дрвене куће, наткривена пијаца и одлична кафанска култура.' : isTr ? 'Büyüleyici Osmanlı eski şehri, renkli ahşap evler, kapalı çarşı ve harika kahve kültürü.' : isRo ? 'Oraș vechi otoman fermecător, case colorate de lemn, bazar acoperit și o cultură a cafelei excelentă.' : d.desc) :
+                d.dest === 'Drama & Springs' ? (isEl ? 'Γραφική πόλη χτισμένη γύρω από φυσικές πηγές, σπήλαια, τοπική παραγωγή κρασιού και ορεινό τοπίο.' : isBg ? 'Живописен град, изграден около естествени извори, пещери, местно лозарство и планински пейзажи.' : isSr ? 'Живописан град изграђен око природних извора, пећина, локалне производње вина и планинских пејзажа.' : isTr ? 'Doğal kaynaklar, mağaralar, yerel şarap üretimi ve dağ manzaraları etrafında kurulmuş pitoresk şehir.' : isRo ? 'Oraș pitoresc construit în jurul izvoarelor naturale, peșterilor, producției locale de vin și peisajelor montane.' : d.desc) :
+                d.dest === 'Thessaloniki' ? (isEl ? 'Η δεύτερη πόλη της Ελλάδας — βυζαντινά μνημεία, εξαιρετική γαστρονομία, ζωντανή νυχτερινή ζωή και παραλίες.' : isBg ? 'Вторият по големина гръцки град — византийски паметници, изключителна гастрономия, оживен нощен живот и плажове.' : isSr ? 'Други град Грчке — византијски споменици, одлична гастрономија, оживљен ноћни живот и плаже.' : isTr ? 'Yunanistan\'ın ikinci şehri — Bizans anıtları, olağanüstü yeme içme, canlı gece hayatı ve plajlar.' : isRo ? 'Al doilea oraș al Greciei — monumente bizantine, scenă gastronomică excepțională, viață de noapte vibrantă și plaje.' : d.desc) :
+                d.desc
+              }</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <!-- Getting around -->
+      <section>
+        <h2 class="text-2xl font-bold text-gray-900 mb-2 flex items-center gap-3">
+          <span class="text-2xl">🧭</span> {isEl ? 'Μετακίνηση' : isBg ? 'Транспорт' : isSr ? 'Превоз' : isTr ? 'Ulaşım' : isRo ? 'Transport' : 'Getting Around'}
+        </h2>
+        <p class="text-gray-500 mb-6">{isEl ? 'Όλα όσα χρειάζεστε να γνωρίζετε για τις μεταφορές στην περιοχή.' : isBg ? 'Всичко, което трябва да знаете за транспорта в района.' : isSr ? 'Све што треба да знате о превозу у овом крају.' : isTr ? 'Bölgedeki ulaşım hakkında bilmeniz gereken her şey.' : isRo ? 'Tot ce trebuie să știți despre transportul din și în jurul zonei.' : 'Everything you need to know about transport in and around the area.'}</p>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {gettingAround.map((g) => (
+            <div class="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex gap-4 items-start">
+              <div class="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-xl shrink-0">{g.icon}</div>
+              <div>
+                <h3 class="font-semibold text-gray-900 mb-1 text-sm">{
+                  g.title === 'By Car' ? (isEl ? 'Με Αυτοκίνητο' : isBg ? 'С кола' : isSr ? 'Аутомобилом' : isTr ? 'Araçla' : isRo ? 'Cu Mașina' : g.title) :
+                  g.title === 'Ferry to Thassos' ? (isEl ? 'Φέρι για Θάσο' : isBg ? 'Ферибот до Thassos' : isSr ? 'Трајект до Thassos' : isTr ? 'Thassos Feribotu' : isRo ? 'Feribot spre Thassos' : g.title) :
+                  g.title === 'KTEL Bus' ? (isEl ? 'Λεωφορείο ΚΤΕΛ' : isBg ? 'Автобус KTEL' : isSr ? 'KTEL аутобус' : isTr ? 'KTEL Otobüsü' : isRo ? 'Autobuz KTEL' : g.title) :
+                  g.title === 'Nearest Airports' ? (isEl ? 'Πλησιέστερα Αεροδρόμια' : isBg ? 'Най-близки летища' : isSr ? 'Најближи аеродроми' : isTr ? 'En Yakın Havalimanları' : isRo ? 'Cele Mai Apropiate Aeroporturi' : g.title) :
+                  g.title
+                }</h3>
+                <p class="text-gray-500 text-sm leading-relaxed">{
+                  g.title === 'By Car' ? (isEl ? 'Ένα ενοικιαζόμενο αυτοκίνητο σας δίνει τη μεγαλύτερη ευελιξία. Δωρεάν χώρος στάθμευσης σε όλα τα ακίνητα. Οι κύριοι δρόμοι είναι σε άριστη κατάσταση.' : g.desc) :
+                  g.title === 'Ferry to Thassos' ? (isEl ? 'Τα φέρι τρέχουν κάθε 30–60 λεπτά το καλοκαίρι από το λιμάνι Κεραμωτίου (5 λεπτά οδήγηση). Αυτοκίνητα και μοτοσυκλέτες μπορούν να επιβιβαστούν. Η διαδρομή διαρκεί 35 λεπτά.' : g.desc) :
+                  g.title === 'KTEL Bus' ? (isEl ? 'Τα λεωφορεία ΚΤΕΛ συνδέουν το Κεραμωτί με την πόλη της Καβάλας αρκετές φορές την ημέρα. Η Καβάλα έχει συνδέσεις για Θεσσαλονίκη και άλλες πόλεις.' : g.desc) :
+                  g.title === 'Nearest Airports' ? (isEl ? 'Αεροδρόμιο Καβάλας «Μέγας Αλέξανδρος» (KVA) — 25 λεπτά. Θεσσαλονίκη (SKG) — 2,5 ώρες. Και τα δύο έχουν διεθνείς καλοκαιρινές πτήσεις.' : g.desc) :
+                  g.desc
+                }</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+    </div>
+
+    <!-- CTA -->
+    <div class="mt-20 bg-[#1a1a2e] rounded-2xl p-10 text-center text-white">
+      <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-wider mb-3">{isEl ? 'Έτοιμοι να εξερευνήσετε;' : isBg ? 'Готови ли сте да изследвате?' : isSr ? 'Спремни за истраживање?' : isTr ? 'Keşfetmeye hazır mısınız?' : isRo ? 'Sunteți pregătiți să explorați?' : 'Ready to explore?'}</p>
+      <h2 class="text-2xl font-bold mb-3">{isEl ? 'Βρείτε την ιδανική σας διαμονή στο Κεραμωτί' : isBg ? 'Намерете идеалния си престой в Keramoti' : isSr ? 'Пронађите идеалан боравак у Keramoti' : isTr ? 'Keramoti\'de mükemmel konaklamanızı bulun' : isRo ? 'Găsiți sejurul perfect în Keramoti' : 'Find your perfect stay in Keramoti'}</h2>
+      <p class="text-white/60 mb-8 max-w-md mx-auto">{isEl ? 'Εξερευνήστε τα επιλεγμένα μας ακίνητα και κάντε απευθείας κράτηση — χωρίς τέλη πλατφόρμας, καλύτερη τιμή εγγυημένη.' : isBg ? 'Разгледайте внимателно подбраните ни имоти и резервирайте директно — без такси, най-добра цена гарантирана.' : isSr ? 'Прегледајте наше пажљиво одабране некретнине и резервишите директно — без накнада, најбоља цена загарантована.' : isTr ? 'Özenle seçilmiş mülklerimize göz atın ve doğrudan rezervasyon yapın — platform ücreti yok, en iyi fiyat garantisi.' : isRo ? 'Răsfoiți proprietățile noastre selectate manual și rezervați direct — fără comisioane de platformă, cel mai bun preț garantat.' : 'Browse our handpicked properties and book directly — no platform fees, best rate guaranteed.'}</p>
+      <a href="/rentals" class="inline-block bg-[#c9a96e] hover:bg-[#b8934a] text-white font-semibold px-8 py-3 rounded-xl text-sm transition-colors">
+        {isEl ? 'Δείτε τα Ακίνητα' : isBg ? 'Разгледайте имотите' : isSr ? 'Прегледајте некретнине' : isTr ? 'Mülklere Göz Atın' : isRo ? 'Răsfoiți Proprietățile' : 'Browse Properties'}
+      </a>
+    </div>
+  </div>
+</BaseLayout>

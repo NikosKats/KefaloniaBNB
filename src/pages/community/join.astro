@@ -1,0 +1,448 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+const fbAppId = import.meta.env.PUBLIC_FACEBOOK_APP_ID ?? '';
+
+// If already logged in, redirect to intended destination or board
+if (Astro.locals.session) {
+  const next = Astro.url.searchParams.get('next') ?? '/community/board';
+  return Astro.redirect(next);
+}
+---
+
+<BaseLayout
+  title={isEl ? 'Γίνε Μέλος — Keramoti Community' : isBg ? 'Присъединете се — Keramoti Community' : isSr ? 'Pridruži se — Keramoti Community' : isTr ? 'Katıl — Keramoti Community' : isRo ? 'Alătură-te — Keramoti Community' : 'Join — Keramoti Community'}
+  description={isEl ? 'Γίνε μέλος της κοινότητας Κεραμωτής' : isBg ? 'Присъединете се към общността на Керамоти' : isSr ? 'Pridruži se zajednici Keramotija' : isTr ? 'Keramoti topluluğuna katılın' : isRo ? 'Alătură-te comunității Keramoti' : 'Join the Keramoti community board'}
+>
+  <section class="bg-[#1a1a2e] py-16 sm:py-20">
+    <div class="max-w-md mx-auto px-4 text-center">
+      <h1 class="text-3xl font-bold text-white mb-2">{isEl ? 'Κοινότητα Κεραμωτής' : isBg ? 'Общност Керамоти' : isSr ? 'Zajednica Keramoti' : isTr ? 'Keramoti Topluluğu' : isRo ? 'Comunitatea Keramoti' : 'Keramoti Community'}</h1>
+      <p class="text-gray-300">{isEl ? 'Γίνε μέλος για να μοιραστείς, ρωτήσεις, ανακαλύψεις' : isBg ? 'Присъединете се, за да споделяте съвети, задавате въпроси, откривате местни съкровища' : isSr ? 'Pridruži se da deliš savete, postavljaš pitanja, otkrivaš lokalne dragulje' : isTr ? 'İpuçları paylaşmak, sorular sormak, yerel güzellikleri keşfetmek için katılın' : isRo ? 'Alătură-te pentru a distribui sfaturi, a pune întrebări, a descoperi comori locale' : 'Join to share tips, ask questions, discover local gems'}</p>
+    </div>
+  </section>
+
+  <section class="max-w-md mx-auto px-4 py-10">
+    <!-- Social Login -->
+    <div class="space-y-3 mb-6">
+      <button id="google-login" type="button"
+        class="w-full flex items-center justify-center gap-3 bg-white border border-gray-200 text-gray-700 py-3 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors shadow-sm">
+        <svg class="w-5 h-5" viewBox="0 0 24 24">
+          <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+          <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+          <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+          <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+        </svg>
+        {isEl ? 'Συνέχεια με Google' : isBg ? 'Продължете с Google' : isSr ? 'Nastavi sa Google' : isTr ? 'Google ile devam et' : isRo ? 'Continuă cu Google' : 'Continue with Google'}
+      </button>
+      <button id="facebook-login" type="button"
+        class="w-full flex items-center justify-center gap-3 bg-[#1877F2] text-white py-3 rounded-xl text-sm font-medium hover:bg-[#166FE5] transition-colors shadow-sm">
+        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+        </svg>
+        {isEl ? 'Συνέχεια με Facebook' : isBg ? 'Продължете с Facebook' : isSr ? 'Nastavi sa Facebook' : isTr ? 'Facebook ile devam et' : isRo ? 'Continuă cu Facebook' : 'Continue with Facebook'}
+      </button>
+    </div>
+
+    <div class="flex items-center gap-3 mb-6">
+      <div class="flex-1 h-px bg-gray-200"></div>
+      <span class="text-xs text-gray-400">{isEl ? 'ή με email' : isBg ? 'или с email' : isSr ? 'ili sa email-om' : isTr ? 'veya e-posta ile' : isRo ? 'sau cu email' : 'or with email'}</span>
+      <div class="flex-1 h-px bg-gray-200"></div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex rounded-xl bg-gray-100 p-1 mb-6">
+      <button id="tab-login" class="flex-1 py-2.5 text-sm font-medium rounded-lg transition-colors bg-white text-gray-900 shadow-sm">
+        {isEl ? 'Σύνδεση' : isBg ? 'Вход' : isSr ? 'Prijava' : isTr ? 'Giriş' : isRo ? 'Autentificare' : 'Log In'}
+      </button>
+      <button id="tab-signup" class="flex-1 py-2.5 text-sm font-medium rounded-lg transition-colors text-gray-500">
+        {isEl ? 'Εγγραφή' : isBg ? 'Регистрация' : isSr ? 'Registracija' : isTr ? 'Kayıt Ol' : isRo ? 'Înregistrare' : 'Sign Up'}
+      </button>
+    </div>
+
+    <!-- Login Form -->
+    <form id="login-form" class="space-y-4">
+      <div>
+        <label class="block text-sm text-gray-700 mb-1">Email</label>
+        <input type="email" name="email" required class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-[#1a1a2e]" />
+      </div>
+      <div>
+        <label class="block text-sm text-gray-700 mb-1">{isEl ? 'Κωδικός' : isBg ? 'Парола' : isSr ? 'Lozinka' : isTr ? 'Şifre' : isRo ? 'Parolă' : 'Password'}</label>
+        <input type="password" name="password" required class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-[#1a1a2e]" />
+      </div>
+      <button type="submit" class="w-full bg-[#1a1a2e] text-white py-3 rounded-xl text-sm font-semibold hover:bg-[#2d2d4e] transition-colors">
+        {isEl ? 'Σύνδεση' : isBg ? 'Вход' : isSr ? 'Prijava' : isTr ? 'Giriş' : isRo ? 'Autentificare' : 'Log In'}
+      </button>
+      <p id="login-msg" class="text-sm text-center hidden"></p>
+      <!-- Resend verification (hidden by default, shown when email not confirmed) -->
+      <div id="resend-section" class="hidden text-center space-y-2">
+        <button id="resend-btn" type="button" class="text-sm text-[#1a1a2e] font-medium underline hover:text-[#c9a96e] transition-colors">
+          {isEl ? 'Επανάληψη αποστολής email επιβεβαίωσης' : isBg ? 'Изпратете отново имейл за потвърждение' : isSr ? 'Ponovo pošalji verifikacioni email' : isTr ? 'Doğrulama e-postasını tekrar gönder' : isRo ? 'Retrimite emailul de verificare' : 'Resend verification email'}
+        </button>
+        <p id="resend-msg" class="text-xs hidden"></p>
+      </div>
+      <!-- Forgot password -->
+      <div class="text-center">
+        <button id="forgot-link" type="button" class="text-sm text-gray-500 hover:text-[#1a1a2e] transition-colors">
+          {isEl ? 'Ξεχάσατε τον κωδικό;' : isBg ? 'Забравена парола?' : isSr ? 'Zaboravljena lozinka?' : isTr ? 'Şifrenizi mi unuttunuz?' : isRo ? 'Ai uitat parola?' : 'Forgot password?'}
+        </button>
+      </div>
+    </form>
+
+    <!-- Signup Form -->
+    <form id="signup-form" class="space-y-4 hidden">
+      <div>
+        <label class="block text-sm text-gray-700 mb-1">{isEl ? 'Ονοματεπώνυμο' : isBg ? 'Пълно име' : isSr ? 'Ime i prezime' : isTr ? 'Ad Soyad' : isRo ? 'Nume complet' : 'Full Name'}</label>
+        <input type="text" name="full_name" required class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-[#1a1a2e]" />
+      </div>
+      <div>
+        <label class="block text-sm text-gray-700 mb-1">Email</label>
+        <input type="email" name="email" required class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-[#1a1a2e]" />
+      </div>
+      <div>
+        <label class="block text-sm text-gray-700 mb-1">{isEl ? 'Κωδικός' : isBg ? 'Парола' : isSr ? 'Lozinka' : isTr ? 'Şifre' : isRo ? 'Parolă' : 'Password'}</label>
+        <input type="password" name="password" required minlength="6" class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-[#1a1a2e]" />
+      </div>
+      <button type="submit" class="w-full bg-[#c9a96e] text-white py-3 rounded-xl text-sm font-semibold hover:bg-[#b89556] transition-colors">
+        {isEl ? 'Δημιουργία Λογαριασμού' : isBg ? 'Създайте акаунт' : isSr ? 'Kreiraj nalog' : isTr ? 'Hesap Oluştur' : isRo ? 'Creează Cont' : 'Create Account'}
+      </button>
+      <p id="signup-msg" class="text-sm text-center hidden"></p>
+    </form>
+
+    <!-- Forgot Password Form (hidden, toggled) -->
+    <form id="forgot-form" class="space-y-4 hidden">
+      <p class="text-sm text-gray-600 mb-2">
+        {isEl ? 'Εισάγετε το email σας και θα σας στείλουμε σύνδεσμο για επαναφορά κωδικού.' : isBg ? 'Въведете имейла си и ще ви изпратим линк за нулиране на паролата.' : isSr ? 'Unesite svoj email i poslaćemo vam link za resetovanje lozinke.' : isTr ? 'E-postanızı girin, şifre sıfırlama bağlantısı göndereceğiz.' : isRo ? 'Introduceți emailul și vă vom trimite un link de resetare a parolei.' : 'Enter your email and we\'ll send you a password reset link.'}
+      </p>
+      <div>
+        <label class="block text-sm text-gray-700 mb-1">Email</label>
+        <input type="email" name="email" required class="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm outline-none focus:border-[#1a1a2e]" />
+      </div>
+      <button type="submit" class="w-full bg-[#1a1a2e] text-white py-3 rounded-xl text-sm font-semibold hover:bg-[#2d2d4e] transition-colors">
+        {isEl ? 'Αποστολή συνδέσμου' : isBg ? 'Изпратете линк за нулиране' : isSr ? 'Pošalji link za resetovanje' : isTr ? 'Sıfırlama bağlantısı gönder' : isRo ? 'Trimite link de resetare' : 'Send Reset Link'}
+      </button>
+      <p id="forgot-msg" class="text-sm text-center hidden"></p>
+      <div class="text-center">
+        <button id="back-to-login" type="button" class="text-sm text-gray-500 hover:text-[#1a1a2e] transition-colors">
+          &larr; {isEl ? 'Πίσω στη σύνδεση' : isBg ? 'Назад към входа' : isSr ? 'Nazad na prijavu' : isTr ? 'Girişe dön' : isRo ? 'Înapoi la autentificare' : 'Back to login'}
+        </button>
+      </div>
+    </form>
+
+    <!-- Email Confirmation Success (shown after signup when confirmation needed) -->
+    <div id="confirm-section" class="hidden text-center py-8">
+      <div class="w-16 h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+        <svg class="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 0 1-2.25 2.25h-15a2.25 2.25 0 0 1-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0 0 19.5 4.5h-15a2.25 2.25 0 0 0-2.25 2.25m19.5 0v.243a2.25 2.25 0 0 1-1.07 1.916l-7.5 4.615a2.25 2.25 0 0 1-2.36 0L3.32 8.91a2.25 2.25 0 0 1-1.07-1.916V6.75" />
+        </svg>
+      </div>
+      <h2 class="text-xl font-bold text-gray-900 mb-2">{isEl ? 'Ελέγξτε το email σας' : isBg ? 'Проверете имейла си' : isSr ? 'Proverite svoj email' : isTr ? 'E-postanızı kontrol edin' : isRo ? 'Verifică emailul' : 'Check your email'}</h2>
+      <p class="text-sm text-gray-600 mb-4" id="confirm-email-text"></p>
+      <p class="text-xs text-gray-400 mb-4">{isEl ? 'Ελέγξτε και τον φάκελο spam' : isBg ? 'Проверете и папката за спам, ако не го виждате' : isSr ? 'Proverite i spam folder ako ne vidite' : isTr ? 'Göremiyorsanız spam klasörünü kontrol edin' : isRo ? 'Verifică și folderul de spam dacă nu îl vezi' : 'Check your spam folder if you don\'t see it'}</p>
+      <button id="confirm-resend-btn" type="button" class="text-sm text-[#1a1a2e] font-medium underline hover:text-[#c9a96e] transition-colors">
+        {isEl ? 'Επανάληψη αποστολής' : isBg ? 'Изпратете отново' : isSr ? 'Ponovo pošalji' : isTr ? 'Tekrar gönder' : isRo ? 'Retrimite emailul' : 'Resend email'}
+      </button>
+      <p id="confirm-resend-msg" class="text-xs mt-2 hidden"></p>
+    </div>
+  </section>
+</BaseLayout>
+
+<!-- Facebook JS SDK -->
+<script is:inline define:vars={{ fbAppId }}>
+  window.fbAsyncInit = function() {
+    FB.init({
+      appId: fbAppId,
+      cookie: true,
+      xfbml: false,
+      version: 'v21.0'
+    });
+  };
+  (function(d, s, id) {
+    var js, fjs = d.getElementsByTagName(s)[0];
+    if (d.getElementById(id)) return;
+    js = d.createElement(s); js.id = id;
+    js.src = 'https://connect.facebook.net/en_US/sdk.js';
+    fjs.parentNode.insertBefore(js, fjs);
+  }(document, 'script', 'facebook-jssdk'));
+</script>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+
+  const supabase = createClient(
+    import.meta.env.PUBLIC_SUPABASE_URL,
+    import.meta.env.PUBLIC_SUPABASE_ANON_KEY
+  );
+
+  const siteUrl = import.meta.env.PUBLIC_SITE_URL || window.location.origin;
+
+  // ── Google login ──────────────────────────────────────────────────────────────
+  document.getElementById('google-login')?.addEventListener('click', async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${siteUrl}/api/auth/oauth-callback`,
+      },
+    });
+    if (error) alert(error.message);
+  });
+
+  // ── Facebook login ────────────────────────────────────────────────────────────
+  document.getElementById('facebook-login')?.addEventListener('click', () => {
+    const btn = document.getElementById('facebook-login') as HTMLButtonElement;
+    btn.textContent = 'Connecting...';
+    btn.disabled = true;
+
+    (window as any).FB.login(async (response: any) => {
+      if (response.authResponse) {
+        try {
+          const res = await fetch('/api/auth/facebook-token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ access_token: response.authResponse.accessToken }),
+          });
+          if (res.ok) {
+            window.location.href = '/community/board';
+          } else {
+            const data = await res.json();
+            alert(data.error || 'Facebook login failed');
+            btn.textContent = 'Continue with Facebook';
+            btn.disabled = false;
+          }
+        } catch {
+          alert('Network error');
+          btn.textContent = 'Continue with Facebook';
+          btn.disabled = false;
+        }
+      } else {
+        btn.textContent = 'Continue with Facebook';
+        btn.disabled = false;
+      }
+    }, { scope: 'public_profile,email', auth_type: 'rerequest' });
+  });
+
+  // ── Elements ──────────────────────────────────────────────────────────────────
+  const tabLogin = document.getElementById('tab-login')!;
+  const tabSignup = document.getElementById('tab-signup')!;
+  const loginForm = document.getElementById('login-form')!;
+  const signupForm = document.getElementById('signup-form')!;
+  const forgotForm = document.getElementById('forgot-form')!;
+  const confirmSection = document.getElementById('confirm-section')!;
+  const tabContainer = tabLogin.parentElement!;
+
+  // Track email for resend
+  let pendingEmail = '';
+
+  function hideAll() {
+    loginForm.classList.add('hidden');
+    signupForm.classList.add('hidden');
+    forgotForm.classList.add('hidden');
+    confirmSection.classList.add('hidden');
+  }
+
+  function setTab(tab: 'login' | 'signup') {
+    hideAll();
+    tabContainer.classList.remove('hidden');
+    if (tab === 'login') {
+      tabLogin.className = tabLogin.className.replace('text-gray-500', 'bg-white text-gray-900 shadow-sm');
+      tabSignup.className = tabSignup.className.replace('bg-white text-gray-900 shadow-sm', 'text-gray-500');
+      loginForm.classList.remove('hidden');
+    } else {
+      tabSignup.className = tabSignup.className.replace('text-gray-500', 'bg-white text-gray-900 shadow-sm');
+      tabLogin.className = tabLogin.className.replace('bg-white text-gray-900 shadow-sm', 'text-gray-500');
+      signupForm.classList.remove('hidden');
+    }
+  }
+
+  tabLogin.addEventListener('click', () => setTab('login'));
+  tabSignup.addEventListener('click', () => setTab('signup'));
+
+  // Check URL hash
+  if (location.hash === '#signup') setTab('signup');
+
+  // ── Forgot password toggle ────────────────────────────────────────────────────
+  document.getElementById('forgot-link')?.addEventListener('click', () => {
+    hideAll();
+    tabContainer.classList.add('hidden');
+    forgotForm.classList.remove('hidden');
+  });
+
+  document.getElementById('back-to-login')?.addEventListener('click', () => {
+    setTab('login');
+  });
+
+  // ── Login form ────────────────────────────────────────────────────────────────
+  loginForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(loginForm as HTMLFormElement);
+    const msg = document.getElementById('login-msg')!;
+    const resendSection = document.getElementById('resend-section')!;
+    msg.classList.add('hidden');
+    resendSection.classList.add('hidden');
+
+    const email = fd.get('email') as string;
+    pendingEmail = email;
+
+    try {
+      const res = await fetch('/api/auth/community-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password: fd.get('password') }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        window.location.href = '/community/board';
+      } else {
+        msg.textContent = data.error;
+        msg.className = 'text-sm text-center text-red-600';
+
+        // Show resend verification button if email not confirmed
+        if (data.code === 'EMAIL_NOT_CONFIRMED') {
+          resendSection.classList.remove('hidden');
+        }
+      }
+    } catch {
+      msg.textContent = 'Network error';
+      msg.className = 'text-sm text-center text-red-600';
+    }
+  });
+
+  // ── Resend verification (from login form) ─────────────────────────────────────
+  document.getElementById('resend-btn')?.addEventListener('click', async () => {
+    const resendMsg = document.getElementById('resend-msg')!;
+    const resendBtn = document.getElementById('resend-btn') as HTMLButtonElement;
+    resendBtn.disabled = true;
+    const _l = document.documentElement.lang;
+    resendBtn.textContent = _l === 'el' ? 'Αποστολή...' : _l === 'bg' ? 'Изпращане...' : _l === 'sr' ? 'Slanje...' : _l === 'tr' ? 'Gönderiliyor...' : _l === 'ro' ? 'Se trimite...' : 'Sending...';
+
+    try {
+      await fetch('/api/auth/resend-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: pendingEmail }),
+      });
+      resendMsg.textContent = _l === 'el' ? 'Το email επιβεβαίωσης στάλθηκε!' : _l === 'bg' ? 'Имейлът за потвърждение е изпратен! Проверете входящата си поща.' : _l === 'sr' ? 'Verifikacioni email poslat! Proverite inbox.' : _l === 'tr' ? 'Doğrulama e-postası gönderildi! Gelen kutunuzu kontrol edin.' : _l === 'ro' ? 'Email de verificare trimis! Verifică inbox-ul.' : 'Verification email sent! Check your inbox.';
+      resendMsg.className = 'text-xs text-green-600';
+    } catch {
+      resendMsg.textContent = _l === 'el' ? 'Αποτυχία. Δοκιμάστε ξανά.' : _l === 'bg' ? 'Неуспешно изпращане. Опитайте отново.' : _l === 'sr' ? 'Slanje nije uspelo. Pokušajte ponovo.' : _l === 'tr' ? 'Gönderilemedi. Tekrar deneyin.' : _l === 'ro' ? 'Trimiterea a eșuat. Încearcă din nou.' : 'Failed to send. Try again.';
+      resendMsg.className = 'text-xs text-red-600';
+    }
+    resendBtn.disabled = false;
+    resendBtn.textContent = _l === 'el' ? 'Επανάληψη αποστολής email επιβεβαίωσης' : _l === 'bg' ? 'Изпратете отново имейл за потвърждение' : _l === 'sr' ? 'Ponovo pošalji verifikacioni email' : _l === 'tr' ? 'Doğrulama e-postasını tekrar gönder' : _l === 'ro' ? 'Retrimite emailul de verificare' : 'Resend verification email';
+  });
+
+  // ── Signup form ───────────────────────────────────────────────────────────────
+  signupForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(signupForm as HTMLFormElement);
+    const msg = document.getElementById('signup-msg')!;
+    msg.classList.add('hidden');
+
+    const email = fd.get('email') as string;
+    pendingEmail = email;
+
+    try {
+      const res = await fetch('/api/auth/community-signup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          full_name: fd.get('full_name'),
+          email,
+          password: fd.get('password'),
+        }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.needs_confirmation) {
+          // Show email confirmation screen
+          hideAll();
+          tabContainer.classList.add('hidden');
+          confirmSection.classList.remove('hidden');
+          const emailText = document.getElementById('confirm-email-text')!;
+          const _ls = document.documentElement.lang;
+          emailText.textContent = _ls === 'el' ? `Στείλαμε σύνδεσμο επιβεβαίωσης στο ${email}. Πατήστε τον σύνδεσμο για ενεργοποίηση.` : _ls === 'bg' ? `Изпратихме линк за потвърждение на ${email}. Кликнете линка, за да активирате акаунта си.` : _ls === 'sr' ? `Poslali smo link za potvrdu na ${email}. Kliknite na link da aktivirate nalog.` : _ls === 'tr' ? `${email} adresine onay bağlantısı gönderdik. Hesabınızı etkinleştirmek için bağlantıya tıklayın.` : _ls === 'ro' ? `Am trimis un link de confirmare la ${email}. Apasă pe link pentru a-ți activa contul.` : `We've sent a confirmation link to ${email}. Click the link to activate your account.`;
+        } else {
+          // No confirmation needed, auto-login
+          const loginRes = await fetch('/api/auth/community-login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email, password: fd.get('password') }),
+          });
+          if (loginRes.ok) {
+            window.location.href = '/community/board';
+          } else {
+            const _ls2 = document.documentElement.lang;
+          msg.textContent = _ls2 === 'el' ? 'Ο λογαριασμός δημιουργήθηκε! Συνδεθείτε.' : _ls2 === 'bg' ? 'Акаунтът е създаден! Моля, влезте.' : _ls2 === 'sr' ? 'Nalog kreiran! Prijavite se.' : _ls2 === 'tr' ? 'Hesap oluşturuldu! Lütfen giriş yapın.' : _ls2 === 'ro' ? 'Cont creat! Te rugăm să te autentifici.' : 'Account created! Please log in.';
+            msg.className = 'text-sm text-center text-green-600';
+            setTab('login');
+          }
+        }
+      } else {
+        msg.textContent = data.error;
+        msg.className = 'text-sm text-center text-red-600';
+      }
+    } catch {
+      msg.textContent = 'Network error';
+      msg.className = 'text-sm text-center text-red-600';
+    }
+  });
+
+  // ── Resend from confirmation screen ───────────────────────────────────────────
+  document.getElementById('confirm-resend-btn')?.addEventListener('click', async () => {
+    const resendMsg = document.getElementById('confirm-resend-msg')!;
+    const resendBtn = document.getElementById('confirm-resend-btn') as HTMLButtonElement;
+    resendBtn.disabled = true;
+    const _lc = document.documentElement.lang;
+    resendBtn.textContent = _lc === 'el' ? 'Αποστολή...' : _lc === 'bg' ? 'Изпращане...' : _lc === 'sr' ? 'Slanje...' : _lc === 'tr' ? 'Gönderiliyor...' : 'Sending...';
+
+    try {
+      await fetch('/api/auth/resend-confirmation', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: pendingEmail }),
+      });
+      resendMsg.textContent = _lc === 'el' ? 'Το email στάλθηκε! Ελέγξτε εισερχόμενα και spam.' : _lc === 'bg' ? 'Имейлът е изпратен! Проверете входящата поща и спам.' : _lc === 'sr' ? 'Email poslat! Proverite inbox i spam.' : _lc === 'tr' ? 'E-posta gönderildi! Gelen kutusunu ve spam klasörünü kontrol edin.' : _lc === 'ro' ? 'Email trimis! Verifică inbox-ul și folderul de spam.' : 'Email sent! Check your inbox and spam folder.';
+      resendMsg.className = 'text-xs text-green-600';
+    } catch {
+      resendMsg.textContent = _lc === 'el' ? 'Αποτυχία. Δοκιμάστε ξανά.' : _lc === 'bg' ? 'Неуспешно. Опитайте отново.' : _lc === 'sr' ? 'Neuspešno. Pokušajte ponovo.' : _lc === 'tr' ? 'Başarısız. Tekrar deneyin.' : _lc === 'ro' ? 'Trimiterea a eșuat. Încearcă din nou.' : 'Failed to send. Try again.';
+      resendMsg.className = 'text-xs text-red-600';
+    }
+    resendBtn.disabled = false;
+    resendBtn.textContent = _lc === 'el' ? 'Επανάληψη αποστολής' : _lc === 'bg' ? 'Изпратете отново' : _lc === 'sr' ? 'Ponovo pošalji' : _lc === 'tr' ? 'Tekrar gönder' : _lc === 'ro' ? 'Retrimite emailul' : 'Resend email';
+  });
+
+  // ── Forgot password form ──────────────────────────────────────────────────────
+  forgotForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(forgotForm as HTMLFormElement);
+    const msg = document.getElementById('forgot-msg')!;
+    msg.classList.add('hidden');
+
+    const email = fd.get('email') as string;
+
+    try {
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, context: 'community' }),
+      });
+      if (res.ok) {
+        const _lf = document.documentElement.lang;
+        msg.textContent = _lf === 'el' ? 'Αν υπάρχει λογαριασμός, στάλθηκε σύνδεσμος. Ελέγξτε τα εισερχόμενά σας.' : _lf === 'bg' ? 'Ако съществува акаунт с този имейл, е изпратен линк за нулиране. Проверете входящата си поща.' : _lf === 'sr' ? 'Ako nalog postoji, link za resetovanje je poslat. Proverite inbox.' : _lf === 'tr' ? 'Bu e-posta ile bir hesap varsa, sıfırlama bağlantısı gönderildi. Gelen kutunuzu kontrol edin.' : _lf === 'ro' ? 'Dacă există un cont cu acest email, un link de resetare a parolei a fost trimis. Verifică inbox-ul.' : 'If an account exists with this email, a password reset link has been sent. Check your inbox.';
+        msg.className = 'text-sm text-center text-green-600';
+      } else {
+        const data = await res.json();
+        msg.textContent = data.error || 'Something went wrong. Please try again.';
+        msg.className = 'text-sm text-center text-red-600';
+      }
+    } catch {
+      msg.textContent = 'Network error. Please try again.';
+      msg.className = 'text-sm text-center text-red-600';
+    }
+  });
+</script>

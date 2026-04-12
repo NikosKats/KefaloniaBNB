@@ -1,0 +1,261 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+const profile = Astro.locals.profile!;
+if (!profile || !['admin', 'super_admin'].includes(profile.role)) return Astro.redirect('/admin');
+
+const { id } = Astro.params;
+const isNew = id === 'new';
+const service = getServiceClient();
+
+let post: any = null;
+if (!isNew) {
+  const { data } = await service.from('blog_posts').select('*').eq('id', id).single();
+  if (!data) return Astro.redirect('/admin/blog');
+  post = data;
+}
+---
+
+<AdminLayout title={isNew ? 'New Post' : `Edit: ${post?.title}`}>
+
+  <div class="flex items-center gap-4 mb-6">
+    <a href="/admin/blog" class="text-gray-400 hover:text-gray-600 transition-colors text-sm">← All posts</a>
+    {!isNew && post?.is_published && (
+      <a href={`/blog/${post.slug}`} target="_blank" class="text-xs text-[#c9a96e] font-medium hover:opacity-80">
+        View live ↗
+      </a>
+    )}
+  </div>
+
+  <div class="max-w-4xl">
+    <div id="save-error" class="hidden mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm"></div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Main content -->
+      <div class="lg:col-span-2 space-y-5">
+
+        <div class="bg-white rounded-2xl border border-gray-100 p-6 space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Title *</label>
+            <input id="f-title" type="text" value={post?.title ?? ''} required
+              class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20"
+              placeholder="Best things to do in Kefalonia, Greece" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Slug *</label>
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-gray-400">/blog/</span>
+              <input id="f-slug" type="text" value={post?.slug ?? ''} required
+                class="flex-1 px-3 py-2 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20"
+                placeholder="best-things-to-do-kefalonia" />
+            </div>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Excerpt</label>
+            <textarea id="f-excerpt" rows={2}
+              class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20"
+              placeholder="A short summary shown on the blog listing page..."
+            >{post?.excerpt ?? ''}</textarea>
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-gray-100 p-6">
+          <div class="flex items-center justify-between mb-3">
+            <label class="text-sm font-medium text-gray-700">Content (HTML)</label>
+            <a href="https://htmlstrip.com/html-editor" target="_blank" rel="noopener"
+              class="text-xs text-[#c9a96e] hover:opacity-80">Open HTML editor ↗</a>
+          </div>
+          <textarea id="f-content" rows={20}
+            class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm font-mono resize-y focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20"
+            placeholder="<p>Start writing your post content in HTML...</p>"
+          >{post?.content ?? ''}</textarea>
+          <p class="text-xs text-gray-400 mt-2">Write or paste HTML. Use &lt;h2&gt;, &lt;p&gt;, &lt;ul&gt;, &lt;img&gt;, &lt;a&gt; etc.</p>
+        </div>
+
+      </div>
+
+      <!-- Sidebar -->
+      <div class="space-y-5">
+
+        <!-- Publish -->
+        <div class="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
+          <h3 class="font-semibold text-gray-900 text-sm">Publish</h3>
+          <div class="flex items-center justify-between">
+            <span class="text-sm text-gray-700">Status</span>
+            <label class="relative inline-flex items-center cursor-pointer">
+              <input type="checkbox" id="f-published" class="sr-only peer" checked={post?.is_published ?? false} />
+              <div class="w-10 h-6 bg-gray-200 peer-checked:bg-emerald-500 rounded-full transition-colors"></div>
+              <div class="absolute left-1 top-1 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-4"></div>
+            </label>
+          </div>
+          <div class="flex gap-2 pt-1">
+            <button id="save-btn"
+              class="flex-1 bg-[#1a1a2e] text-white font-semibold px-4 py-2 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">
+              Save
+            </button>
+            {!isNew && (
+              <button id="delete-btn"
+                class="text-sm text-red-400 hover:text-red-600 border border-gray-200 px-3 py-2 rounded-xl transition-colors">
+                Delete
+              </button>
+            )}
+          </div>
+        </div>
+
+        <!-- Cover image -->
+        <div class="bg-white rounded-2xl border border-gray-100 p-5 space-y-3">
+          <h3 class="font-semibold text-gray-900 text-sm">Cover image</h3>
+          <input id="f-cover" type="url" value={post?.cover_image ?? ''}
+            class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20"
+            placeholder="https://..." />
+          {post?.cover_image && (
+            <img id="cover-preview" src={post.cover_image} alt="Cover" class="w-full aspect-video object-cover rounded-xl" />
+          )}
+          {!post?.cover_image && (
+            <div id="cover-preview" class="hidden w-full aspect-video object-cover rounded-xl bg-gray-100"></div>
+          )}
+          <p class="text-xs text-gray-400">Paste a Supabase storage URL or any public image URL (1200×630 recommended)</p>
+        </div>
+
+        <!-- Author + tags -->
+        <div class="bg-white rounded-2xl border border-gray-100 p-5 space-y-3">
+          <h3 class="font-semibold text-gray-900 text-sm">Details</h3>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Author</label>
+            <input id="f-author" type="text" value={post?.author ?? 'KefaloniaBNB'}
+              class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Tags (comma-separated)</label>
+            <input id="f-tags" type="text" value={(post?.tags ?? []).join(', ')}
+              class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20"
+              placeholder="kefalonia, travel, greece" />
+          </div>
+        </div>
+
+        <!-- SEO -->
+        <div class="bg-white rounded-2xl border border-gray-100 p-5 space-y-3">
+          <h3 class="font-semibold text-gray-900 text-sm">SEO</h3>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Meta title</label>
+            <input id="f-meta-title" type="text" value={post?.meta_title ?? ''}
+              class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20"
+              maxlength="160" placeholder="Leave blank to use post title" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Meta description</label>
+            <textarea id="f-meta-desc" rows={3}
+              class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm resize-none focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20"
+              maxlength="300" placeholder="Leave blank to use excerpt"
+            >{post?.meta_description ?? ''}</textarea>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</AdminLayout>
+
+<script define:vars={{ postId: post?.id ?? null }}>
+  const titleEl    = document.getElementById('f-title');
+  const slugEl     = document.getElementById('f-slug');
+  const excerptEl  = document.getElementById('f-excerpt');
+  const contentEl  = document.getElementById('f-content');
+  const publishedEl= document.getElementById('f-published');
+  const coverEl    = document.getElementById('f-cover');
+  const authorEl   = document.getElementById('f-author');
+  const tagsEl     = document.getElementById('f-tags');
+  const metaTitleEl= document.getElementById('f-meta-title');
+  const metaDescEl = document.getElementById('f-meta-desc');
+  const saveBtn    = document.getElementById('save-btn');
+  const deleteBtn  = document.getElementById('delete-btn');
+  const errBox     = document.getElementById('save-error');
+  const coverPreview = document.getElementById('cover-preview');
+
+  // Auto-generate slug from title (only for new posts)
+  if (!postId) {
+    titleEl.addEventListener('input', () => {
+      slugEl.value = titleEl.value.toLowerCase()
+        .replace(/[^a-z0-9\s-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').slice(0, 80);
+    });
+  }
+
+  // Cover image preview
+  coverEl.addEventListener('input', () => {
+    const url = coverEl.value.trim();
+    if (url) {
+      coverPreview.src = url;
+      coverPreview.classList.remove('hidden');
+    } else {
+      coverPreview.classList.add('hidden');
+    }
+  });
+
+  // Publish toggle toast
+  publishedEl.addEventListener('change', () => {
+    window.adminToast(publishedEl.checked ? '✅ Will be published on save' : '📝 Will be set to draft on save', 'info');
+  });
+
+  saveBtn.addEventListener('click', async () => {
+    errBox.classList.add('hidden');
+    const title = titleEl.value.trim();
+    const slug  = slugEl.value.trim();
+    if (!title || !slug) {
+      errBox.textContent = 'Title and slug are required.';
+      errBox.classList.remove('hidden');
+      return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = 'Saving…';
+
+    const tags = tagsEl.value.split(',').map(t => t.trim()).filter(Boolean);
+    const res = await fetch('/api/admin/blog/save', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        id: postId,
+        title, slug,
+        excerpt:  excerptEl.value.trim() || null,
+        content:  contentEl.value.trim() || null,
+        cover_image: coverEl.value.trim() || null,
+        author:   authorEl.value.trim() || 'KefaloniaBNB',
+        is_published: publishedEl.checked,
+        tags,
+        meta_title:    metaTitleEl.value.trim() || null,
+        meta_description: metaDescEl.value.trim() || null,
+      }),
+    });
+
+    const json = await res.json();
+    if (res.ok) {
+      window.adminToast('✅ Post saved', 'success');
+      if (!postId && json.id) {
+        window.location.href = '/admin/blog/' + json.id;
+      }
+    } else {
+      errBox.textContent = json.error ?? 'Failed to save post.';
+      errBox.classList.remove('hidden');
+      window.adminToast('❌ ' + (json.error ?? 'Save failed'), 'error');
+    }
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save';
+  });
+
+  deleteBtn?.addEventListener('click', async () => {
+    if (!confirm('Delete this post permanently?')) return;
+    const res = await fetch('/api/admin/blog/delete', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: postId }),
+    });
+    if (res.ok) {
+      window.adminToast('🗑 Post deleted', 'info');
+      setTimeout(() => { window.location.href = '/admin/blog'; }, 1000);
+    } else {
+      window.adminToast('❌ Failed to delete post', 'error');
+    }
+  });
+</script>

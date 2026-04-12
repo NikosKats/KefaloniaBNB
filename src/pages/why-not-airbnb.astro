@@ -1,0 +1,326 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://kefaloniabnb.com';
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const platformProblems = [
+  {
+    label: isEl ? 'Οι επισκέπτες πληρώνουν έως 14% επιπλέον' : isBg ? 'Гостите плащат до 14% повече' : isSr ? 'Гости плаћају до 14% више' : isTr ? 'Misafirler %14\'e kadar fazla öder' : isRo ? 'Oaspeții plătesc până la 14% în plus' : 'Guests pay up to 14% extra',
+    desc:  isEl ? 'Προστίθεται στην ολοκλήρωση αγοράς. Οι επισκέπτες το βλέπουν, το αντιπαθούν και μερικές φορές ακυρώνουν.' : isBg ? 'Добавя се при плащане. Гостите го виждат, недоволстват и понякога отказват резервацията.' : isSr ? 'Додаје се при плаћању. Гости то виде, не воле и понекад отказују резервацију.' : isTr ? 'Ödeme sırasında eklenir. Misafirler bunu görür, hoşlanmaz ve bazen iptal eder.' : isRo ? 'Adăugat la checkout. Oaspeții o văd, o resimt și uneori anulează.' : 'Added at checkout. Guests see it, resent it, and sometimes cancel.',
+  },
+  {
+    label: isEl ? 'Οι ιδιοκτήτες χάνουν έως 16%' : isBg ? 'Собствениците губят до 16%' : isSr ? 'Власници губе до 16%' : isTr ? 'Mülk sahipleri %16\'ya kadar kaybeder' : isRo ? 'Proprietarii pierd până la 16%' : 'Owners lose up to 16%',
+    desc:  isEl ? 'Προμήθειες οικοδεσπότη σε κάθε πληρωμή — επιπλέον της χρέωσης επισκεπτών.' : isBg ? 'Такси за домакина при всяко плащане — в допълнение към таксата за госта.' : isSr ? 'Накнаде домаћина при свакој исплати — поврх накнаде за госта.' : isTr ? 'Her ödemede ev sahibi ücretleri — misafir ücretinin üstüne.' : isRo ? 'Taxe de gazdă la fiecare plată — pe lângă taxa pentru oaspeți.' : 'Host fees on every payout — on top of the guest fee.',
+  },
+  {
+    label: isEl ? 'Επικοινωνείτε μέσω παρακολουθούμενης πλατφόρμας' : isBg ? 'Комуникирате чрез наблюдавана платформа' : isSr ? 'Комуницирате преко надгледане платформе' : isTr ? 'İzlenen bir platform üzerinden iletişim kuruyorsunuz' : isRo ? 'Comunicați prin intermediul unei platforme monitorizate' : 'You communicate through a monitored platform',
+    desc:  isEl ? 'Χωρίς άμεση επαφή. Χωρίς WhatsApp. Χωρίς πραγματική σχέση με τους επισκέπτες σας.' : isBg ? 'Без директен контакт. Без WhatsApp. Без истинска връзка с вашите гости.' : isSr ? 'Без директног контакта. Без WhatsApp-а. Без праве везе са вашим гостима.' : isTr ? 'Doğrudan iletişim yok. WhatsApp yok. Misafirlerinizle gerçek bir ilişki yok.' : isRo ? 'Fără contact direct. Fără WhatsApp. Fără o relație reală cu oaspeții dvs.' : 'No direct contact. No WhatsApp. No real relationship with your guests.',
+  },
+  {
+    label: isEl ? 'Μία κακή κριτική ρίχνει την κατάταξή σας' : isBg ? 'Една лоша рецензия срива класирането ви' : isSr ? 'Једна лоша рецензија урушава ваш рангирање' : isTr ? 'Bir kötü yorum sıralamanızı düşürür' : isRo ? 'O recenzie proastă vă distruge clasamentul' : 'One bad review tanks your ranking',
+    desc:  isEl ? 'Ένας αλγόριθμος που δεν ελέγχετε αποφασίζει ποιος βλέπει την καταχώρισή σας.' : isBg ? 'Алгоритъм, който не контролирате, решава кой вижда обявата ви.' : isSr ? 'Алгоритам који не контролишете одлучује ко види ваш оглас.' : isTr ? 'Kontrol edemediğiniz bir algoritma ilanınızı kimin gördüğüne karar verir.' : isRo ? 'Un algoritm pe care nu-l controlați decide cine vă vede listarea.' : "An algorithm you don't control decides who sees your listing.",
+  },
+  {
+    label: isEl ? 'Χωρίς τοπική γνώση, χωρίς τοπική υποστήριξη' : isBg ? 'Без местни познания, без местна подкрепа' : isSr ? 'Без локалног знања, без локалне подршке' : isTr ? 'Yerel bilgi yok, yerel destek yok' : isRo ? 'Fără cunoștințe locale, fără suport local' : 'No local knowledge, no local support',
+    desc:  isEl ? `Είστε μία από εκατομμύρια καταχωρίσεις. Η Καβάλα δεν είναι αγορά προτεραιότητας γι' αυτούς.` : isBg ? 'Вие сте една от милиони обяви. Kefalonia не е приоритетен пазар за тях.' : isSr ? 'Један сте од милиона огласа. Кавала није приоритетно тржиште за њих.' : isTr ? 'Milyonlarca ilanın biriysiniz. Kefalonia onlar için öncelikli bir pazar değil.' : isRo ? 'Sunteți una din milioane de listări. Kefalonia nu este o piață prioritară pentru ei.' : "You're one of millions of listings. Kefalonia is not a priority market for them.",
+  },
+];
+
+const agencyProblems = [
+  {
+    label: isEl ? '20–35% προμήθεια σε κάθε κράτηση' : isBg ? '20–35% комисионна от всяка резервация' : isSr ? '20–35% провизија на свакој резервацији' : isTr ? 'Her rezervasyonda %20–35 komisyon' : isRo ? '20–35% comision la fiecare rezervare' : '20–35% commission on every booking',
+    desc:  isEl ? 'Εσείς δημιουργήσατε το ακίνητο. Αυτοί το εκμεταλλεύονται. Με έξοδά σας.' : isBg ? 'Вие изградихте имота. Те управляват бизнеса. За ваша сметка.' : isSr ? 'Ви сте изградили некретнину. Они воде посао. На ваш рачун.' : isTr ? 'Mülkü siz inşa ettiniz. İşi onlar yürütüyor. Sizin masrafınıza.' : isRo ? 'Dvs. ați construit proprietatea. Ei conduc afacerea. Pe cheltuiala dvs.' : 'You built the asset. They run the business. At your expense.',
+  },
+  {
+    label: isEl ? 'Αυτοί αποφασίζουν τιμές, επισκέπτες και καθαρισμό' : isBg ? 'Те решават цените, гостите и почистването' : isSr ? 'Они одлучују о ценама, гостима и чишћењу' : isTr ? 'Fiyatları, misafirleri ve temizliği onlar belirler' : isRo ? 'Ei decid prețurile, oaspeții și curățenia' : 'They decide pricing, guests, and cleaning',
+    desc:  isEl ? 'Το ακίνητό σας, οι κανόνες τους. Καμία ορατότητα στα τεκταινόμενα.' : isBg ? 'Вашият имот, техните правила. Никаква прозрачност за случващото се.' : isSr ? 'Ваша некретнина, њихова правила. Никаква видљивост у оно што се дешава.' : isTr ? 'Sizin mülkünüz, onların kuralları. Neler olduğuna dair hiçbir şeffaflık yok.' : isRo ? 'Proprietatea dvs., regulile lor. Fără vizibilitate asupra a ce se întâmplă.' : "Your property, their rules. No visibility into what's happening.",
+  },
+  {
+    label: isEl ? 'Χωρίς άμεση επικοινωνία με επισκέπτες' : isBg ? 'Без директна комуникация с гостите' : isSr ? 'Без директне комуникације са гостима' : isTr ? 'Misafirlerle doğrudan iletişim yok' : isRo ? 'Fără comunicare directă cu oaspeții' : 'No direct guest communication',
+    desc:  isEl ? "Δεν ξέρετε ποιος διαμένει στο ακίνητό σας." : isBg ? 'Не знаете кой отсяда в имота ви.' : isSr ? 'Не знате ко борави у вашој некретнини.' : isTr ? 'Mülkünüzde kimin kaldığını bilmiyorsunuz.' : isRo ? 'Nu știți cine stă în proprietatea dvs.' : "You don't know who's staying at your property.",
+  },
+  {
+    label: isEl ? 'Χωρίς τεχνολογία — WhatsApp και υπολογιστικά φύλλα' : isBg ? 'Без технологии — WhatsApp и електронни таблици' : isSr ? 'Без технологије — WhatsApp и табеле' : isTr ? 'Teknoloji yok — WhatsApp ve tablolar' : isRo ? 'Fără tehnologie — WhatsApp și tabele' : 'No technology — WhatsApp and spreadsheets',
+    desc:  isEl ? 'Χειροκίνητες διαδικασίες. Αργές απαντήσεις. Λάθη.' : isBg ? 'Ръчни процеси. Бавни отговори. Грешки.' : isSr ? 'Ручни процеси. Споре реакције. Грешке.' : isTr ? 'Manuel süreçler. Yavaş yanıtlar. Hatalar.' : isRo ? 'Procese manuale. Răspunsuri lente. Erori.' : 'Manual processes. Slow responses. Errors.',
+  },
+  {
+    label: isEl ? 'Όταν είναι απασχολημένοι, το ακίνητό σας υποβαθμίζεται' : isBg ? 'Когато са заети, имотът ви е на заден план' : isSr ? 'Када су заузети, ваша некретнина је у другом плану' : isTr ? 'Meşgul olduklarında mülkünüz ikinci plana atılır' : isRo ? 'Când sunt ocupați, proprietatea dvs. este deprioritizată' : "When they're busy, your property is deprioritized",
+    desc:  isEl ? 'Δεν είστε ο μοναδικός πελάτης τους. Η βίλα σας περιμένει στη σειρά.' : isBg ? 'Не сте единственият им клиент. Вилата ви чака на опашка.' : isSr ? 'Нисте им једини клијент. Ваша вила чека у реду.' : isTr ? 'Tek müşterileri siz değilsiniz. Villanız sırada bekliyor.' : isRo ? 'Nu sunteți singurul lor client. Vila dvs. așteaptă la rând.' : "You're not their only client. Your villa waits in line.",
+  },
+];
+
+const comparisonRows = [
+  { label: isEl ? 'Χρέωση κράτησης επισκέπτη' : isBg ? 'Такса за резервация от госта' : isSr ? 'Накнада за резервацију госта' : isTr ? 'Misafir rezervasyon ücreti' : isRo ? 'Taxă de rezervare oaspete' : 'Guest booking fee',              platforms: '~14%',      agency: '0%',         us: '0%',       highlight: true },
+  { label: isEl ? 'Προμήθεια ιδιοκτήτη' : isBg ? 'Комисионна на собственика' : isSr ? 'Провизија власника' : isTr ? 'Mülk sahibi komisyonu' : isRo ? 'Comision proprietar' : 'Owner commission',                        platforms: 'up to 16%', agency: '20–35%',     us: '5%',       highlight: true },
+  { label: isEl ? 'Ο ιδιοκτήτης ελέγχει τιμές' : isBg ? 'Собственикът контролира цените' : isSr ? 'Власник контролише цене' : isTr ? 'Mülk sahibi fiyatları kontrol eder' : isRo ? 'Proprietarul controlează prețurile' : 'Owner controls pricing',      platforms: '✓',         agency: '✗',          us: '✓',        highlight: false },
+  { label: isEl ? 'Άμεση επαφή με επισκέπτη' : isBg ? 'Директен контакт с госта' : isSr ? 'Власник директно контактира госта' : isTr ? 'Mülk sahibi misafirle doğrudan iletişim kurar' : isRo ? 'Proprietarul contactează oaspetele direct' : 'Owner contacts guest directly',       platforms: '⚠ Limited', agency: '✗',          us: '✓ Direct', highlight: false },
+  { label: isEl ? 'Ενσωματωμένη αγορά καθαρισμού' : isBg ? 'Вграден пазар за почистване' : isSr ? 'Уграђена берза услуга чишћења' : isTr ? 'Yerleşik temizlik pazaryeri' : isRo ? 'Piață de curățenie integrată' : 'Built-in cleaning marketplace', platforms: '✗',        agency: '✗',          us: '✓',        highlight: false },
+  { label: isEl ? 'Αυτόματες πληρωμές' : isBg ? 'Автоматични плащания' : isSr ? 'Аутоматске исплате' : isTr ? 'Otomatik ödemeler' : isRo ? 'Plăți automate' : 'Automatic payouts',                             platforms: '✓',         agency: 'Manual',     us: '✓',        highlight: false },
+  { label: isEl ? 'Χωρίς δεσμευτικό συμβόλαιο' : isBg ? 'Без обвързващ договор' : isSr ? 'Без обавезујућег уговора' : isTr ? 'Bağlayıcı sözleşme yok' : isRo ? 'Fără contract obligatoriu' : 'No lock-in contract',                 platforms: '✓',         agency: '✗',          us: '✓',        highlight: false },
+  { label: isEl ? 'Επαληθευμένες καταχωρίσεις' : isBg ? 'Потвърдени от администратор обяви' : isSr ? 'Огласи верификовани од стране администратора' : isTr ? 'Yönetici onaylı ilanlar' : isRo ? 'Listări verificate de admin' : 'Admin-verified listings',  platforms: '✗',         agency: 'Sometimes',  us: '✓',        highlight: false },
+  { label: isEl ? 'Τοπικός ειδικός Καβάλας' : isBg ? 'Местен специалист за Kefalonia' : isSr ? 'Локални стручњак за Кавалу' : isTr ? 'Yerel Kefalonia uzmanı' : isRo ? 'Specialist local Kefalonia' : 'Local Kefalonia specialist',           platforms: '✗',         agency: 'Sometimes',  us: '✓',        highlight: false },
+  { label: isEl ? 'Αγορά προσφορών καθαριστών' : isBg ? 'Пазар за оферти от почистващи фирми' : isSr ? 'Берза понуда за услуге чишћења' : isTr ? 'Temizlikçi teklif pazaryeri' : isRo ? 'Piață de licitații pentru curățători' : 'Cleaner bidding marketplace', platforms: '✗',    agency: '✗',          us: '✓',        highlight: false },
+];
+---
+
+<BaseLayout
+  title={isEl ? 'Γιατί να Κλείσετε Απευθείας; | KefaloniaBNB' : isBg ? 'Защо да резервирате директно? | KefaloniaBNB' : isSr ? 'Зашто резервисати директно? | KefaloniaBNB' : isTr ? 'Neden Airbnb değil? | KefaloniaBNB' : isRo ? 'De ce să Rezervați Direct? | KefaloniaBNB' : 'Why Book Direct? | KefaloniaBNB'}
+  description={isEl
+    ? 'Οι πλατφόρμες OTA χρεώνουν επισκέπτες 14% και ιδιοκτήτες έως 16%. Δείτε γιατί η KefaloniaBNB είναι η καλύτερη επιλογή για Καβάλα & Κεραμωτή.'
+    : isBg
+    ? 'OTA платформите таксуват гостите с 14% и собствениците с до 16%. Местните агенции вземат 30% и вашия контрол. Вижте защо KefaloniaBNB е по-добрият избор за Kefalonia & Keramoti.'
+    : isSr
+    ? 'OTA платформе наплаћују гостима 14% и власницима до 16%. Локалне агенције узимају 30% и вашу контролу. Сазнајте зашто је KefaloniaBNB бољи избор за Кавалу и Керамоти.'
+    : isTr
+    ? 'OTA platformları misafirlerden %14, mülk sahiplerinden %16\'ya kadar ücret alır. Yerel acentalar %30 ve kontrolünüzü alır. KefaloniaBNB\'ın Kefalonia ve Keramoti için neden daha iyi bir seçim olduğunu görün.'
+    : isRo
+    ? 'Platformele OTA taxează oaspeții cu 14% și proprietarii cu până la 16%. Agențiile locale iau 30% și controlul dvs. Vedeți de ce KefaloniaBNB este alegerea mai bună pentru Kefalonia și Keramoti.'
+    : 'OTA platforms charge guests 14% and owners up to 16%. Local agencies take 30% and your control. See why KefaloniaBNB is the better choice for Kefalonia & Keramoti.'}
+>
+
+  <!-- Hero -->
+  <section class="bg-[#1a1a2e] text-white py-24 px-4">
+    <div class="max-w-3xl mx-auto text-center">
+      <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-widest mb-4">
+        {isEl ? 'Η ειλικρινής σύγκριση' : isBg ? 'Честното сравнение' : isSr ? 'Поштено поређење' : isTr ? 'Dürüst karşılaştırma' : isRo ? 'Comparația sinceră' : 'The honest comparison'}
+      </p>
+      <h1 class="text-4xl sm:text-5xl font-bold leading-tight mb-6">
+        {isEl
+          ? 'Πληρώνετε 30% για το προνόμιο να αγνοείστε.'
+          : isBg
+          ? 'Плащате 30% за привилегията да бъдете пренебрегнати.'
+          : isSr
+          ? 'Плаћате 30% за привилегију да будете игнорисани.'
+          : isTr
+          ? 'Görmezden gelinme ayrıcalığı için %30 ödüyorsunuz.'
+          : isRo
+          ? 'Plătiți 30% pentru privilegiul de a fi ignorați.'
+          : "You're paying 30% for the privilege of being ignored."}
+      </h1>
+      <p class="text-white/60 text-lg leading-relaxed max-w-2xl mx-auto">
+        {isEl
+          ? 'Οι πλατφόρμες κράτησης χρεώνουν τους επισκέπτες έως 14% και τους ιδιοκτήτες έως 16%. Οι τοπικές εταιρείες παίρνουν το ακίνητό σας και το διαχειρίζονται με τον τρόπο τους. Καμία δεν σχεδιάστηκε για την Καβάλα.'
+          : isBg
+          ? 'Платформите за резервации таксуват гостите с до 14% и собствениците с до 16%. Местните агенции вземат имота ви и го управляват по своему. Нито едната е създадена за Kefalonia.'
+          : isSr
+          ? 'Платформе за резервације наплаћују гостима до 14% и власницима до 16%. Локалне агенције преузимају вашу некретнину и управљају њом на свој начин. Ниједна није направљена за Кавалу.'
+          : isTr
+          ? 'Rezervasyon platformları misafirlerden %14\'e kadar ve mülk sahiplerinden %16\'ya kadar ücret alır. Yerel acentalar mülkünüzü alır ve kendi bildikleri gibi yönetir. Hiçbiri Kefalonia için kurulmadı.'
+          : isRo
+          ? 'Platformele de rezervare taxează oaspeții cu până la 14% și proprietarii cu până la 16%. Agențiile locale vă preiau proprietatea și o administrează în felul lor. Niciuna nu a fost construită pentru Kefalonia.'
+          : "Booking platforms charge guests up to 14% and owners up to 16%. Local agencies take your property and run it their way. Neither of them was built for Kefalonia."}
+      </p>
+    </div>
+  </section>
+
+  <!-- Problem: Platforms -->
+  <section class="py-20 bg-white">
+    <div class="max-w-4xl mx-auto px-4 sm:px-6">
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
+        <div>
+          <div class="inline-flex items-center gap-2 bg-red-50 border border-red-100 rounded-full px-4 py-1.5 text-sm text-red-600 font-semibold mb-6">
+            {isEl ? 'Το Πρόβλημα της Πλατφόρμας' : isBg ? 'Проблемът с платформите' : isSr ? 'Проблем платформи' : isTr ? 'Platform Sorunu' : isRo ? 'Problema Platformelor' : 'The Platform Problem'}
+          </div>
+          <h2 class="text-3xl font-bold text-gray-900 mb-4">
+            {isEl ? 'Οι πλατφόρμες OTA είναι ένας φόρος σε κάθε κράτηση.' : isBg ? 'OTA платформите са данък върху всяка резервация.' : isSr ? 'OTA платформе су порез на сваку резервацију.' : isTr ? 'OTA platformları her rezervasyona uygulanan bir vergidir.' : isRo ? 'Platformele OTA sunt o taxă pe fiecare rezervare.' : 'OTA platforms are a tax on every booking.'}
+          </h2>
+          <p class="text-gray-500 text-lg mb-6 leading-relaxed">
+            {isEl
+              ? 'Κάθε φορά που ένας επισκέπτης κλείνει τη βίλα σας μέσω πλατφόρμας κράτησης, όλοι πληρώνουν — και η πλατφόρμα κρατά τη διαφορά.'
+              : isBg
+              ? 'Всеки път, когато гост резервира вилата ви чрез платформа, всички плащат — а платформата задържа разликата.'
+              : isSr
+              ? 'Сваки пут када гост резервише вашу вилу преко платформе, сви плаћају — а платформа задржава разлику.'
+              : isTr
+              ? 'Bir misafir platformdan her rezervasyon yaptığında herkes ödüyor — ve platform farkı cebe atıyor.'
+              : isRo
+              ? 'De fiecare dată când un oaspete rezervă vila dvs. printr-o platformă, toți plătesc — iar platforma păstrează diferența.'
+              : 'Every time a guest books your villa through a booking platform, everyone pays — and the platform keeps the difference.'}
+          </p>
+          <ul class="space-y-4">
+            {platformProblems.map(item => (
+              <li class="flex gap-4">
+                <span class="w-5 h-5 rounded-full bg-red-100 text-red-500 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">✕</span>
+                <div>
+                  <p class="font-semibold text-gray-900 text-sm">{item.label}</p>
+                  <p class="text-gray-500 text-sm mt-0.5">{item.desc}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <!-- Problem: Agencies -->
+        <div>
+          <div class="inline-flex items-center gap-2 bg-orange-50 border border-orange-100 rounded-full px-4 py-1.5 text-sm text-orange-600 font-semibold mb-6">
+            {isEl ? 'Το Πρόβλημα της Εταιρείας' : isBg ? 'Проблемът с агенциите' : isSr ? 'Проблем агенција' : isTr ? 'Acenta Sorunu' : isRo ? 'Problema Agențiilor' : 'The Agency Problem'}
+          </div>
+          <h2 class="text-3xl font-bold text-gray-900 mb-4">
+            {isEl
+              ? 'Οι εταιρείες σας δίνουν «ησυχία» — και παίρνουν τα υπόλοιπα.'
+              : isBg
+              ? 'Агенциите ви дават „спокойствие" — и вземат всичко останало.'
+              : isSr
+              ? 'Агенције вам дају „мир" — и узимају све остало.'
+              : isTr
+              ? 'Acentalar size "huzur" veriyor — ve geri kalanı alıyor.'
+              : isRo
+              ? 'Agențiile vă oferă „liniște sufletească" — și iau tot restul.'
+              : 'Agencies give you "peace of mind" — and take everything else.'}
+          </h2>
+          <p class="text-gray-500 text-lg mb-6 leading-relaxed">
+            {isEl
+              ? 'Οι συμβάσεις πλήρους διαχείρισης ακούγονται καλές μέχρι να διαβάσετε τους όρους.'
+              : isBg
+              ? 'Договорите за пълно управление звучат добре, докато не прочетете условията.'
+              : isSr
+              ? 'Уговори о потпуном управљању звуче добро — све до тренутка када прочитате услове.'
+              : isTr
+              ? 'Tam yönetim sözleşmeleri şartları okuyuncaya kadar iyi gelir.'
+              : isRo
+              ? 'Contractele de management complet sună bine până când citiți termenii.'
+              : 'Full-management contracts sound good until you read the terms.'}
+          </p>
+          <ul class="space-y-4">
+            {agencyProblems.map(item => (
+              <li class="flex gap-4">
+                <span class="w-5 h-5 rounded-full bg-orange-100 text-orange-500 flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">✕</span>
+                <div>
+                  <p class="font-semibold text-gray-900 text-sm">{item.label}</p>
+                  <p class="text-gray-500 text-sm mt-0.5">{item.desc}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Solution -->
+  <section class="py-16 bg-[#f8f6f2] border-y border-gray-100">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 text-center">
+      <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-widest mb-4">
+        {isEl ? 'Ο τρόπος της KefaloniaBNB' : isBg ? 'Начинът на KefaloniaBNB' : isSr ? 'Начин рада KefaloniaBNB' : isTr ? 'KefaloniaBNB yöntemi' : isRo ? 'Modul KefaloniaBNB' : 'The KefaloniaBNB way'}
+      </p>
+      <h2 class="text-3xl sm:text-4xl font-bold text-gray-900 mb-4">
+        {isEl ? 'Άμεσο. Διαφανές. Με προτεραιότητα στον ιδιοκτήτη.' : isBg ? 'Директно. Прозрачно. Собственикът на първо място.' : isSr ? 'Директно. Транспарентно. Власник на првом месту.' : isTr ? 'Doğrudan. Şeffaf. Mülk sahibi önce.' : isRo ? 'Direct. Transparent. Proprietarul pe primul loc.' : 'Direct. Transparent. Owner-first.'}
+      </h2>
+      <p class="text-gray-500 text-lg leading-relaxed">
+        {isEl
+          ? 'Δημιουργήσαμε μια άμεση αγορά για Καβάλα & Κεραμωτή — όπου οι επισκέπτες δεν πληρώνουν χρεώσεις, οι ιδιοκτήτες παραμένουν σε έλεγχο, και οι καθαριστές πληρώνονται αυτόματα. Χωρίς αλγόριθμο. Χωρίς δέσμευση. Χωρίς μεσάζοντα που παίρνει 30%.'
+          : isBg
+          ? 'Изградихме директен пазар за Kefalonia & Keramoti — където гостите не плащат такси, собствениците запазват контрола, а почистващите фирми получават плащане автоматично. Без алгоритъм. Без обвързване. Без посредник, вземащ 30%.'
+          : isSr
+          ? 'Изградили смо директну берзу за Кавалу и Керамоти — где гости не плаћају накнаде, власници задржавају контролу, а услуге чишћења се плаћају аутоматски. Без алгоритма. Без обавеза. Без посредника који узима 30%.'
+          : isTr
+          ? 'Kefalonia ve Keramoti için doğrudan bir pazar kurduk — misafirlerin ücret ödemediği, mülk sahiplerinin kontrolü elinde tuttuğu ve temizlikçilerin otomatik ödeme aldığı. Algoritma yok. Bağlayıcılık yok. %30 alan aracı yok.'
+          : isRo
+          ? 'Am construit o piață directă pentru Kefalonia și Keramoti — unde oaspeții nu plătesc taxe, proprietarii păstrează controlul, iar curățătorii primesc plata automat. Fără algoritm. Fără obligații. Fără intermediar care ia 30%.'
+          : 'We built a direct marketplace for Kefalonia & Keramoti — where guests pay no fees, owners stay in control, and cleaners get paid automatically. No algorithm. No lock-in. No middleman taking 30%.'}
+      </p>
+    </div>
+  </section>
+
+  <!-- Comparison Table -->
+  <section class="py-20 bg-white">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6">
+      <h2 class="text-2xl font-bold text-gray-900 text-center mb-12">
+        {isEl ? 'Δίπλα-δίπλα' : isBg ? 'Сравнение' : isSr ? 'Упоредни преглед' : isTr ? 'Yan yana karşılaştırma' : isRo ? 'Comparație directă' : 'Side by side'}
+      </h2>
+
+      <div class="overflow-x-auto rounded-2xl border border-gray-100 shadow-sm">
+        <table class="w-full text-sm">
+          <thead>
+            <tr class="border-b border-gray-100">
+              <th class="text-left py-4 px-6 text-gray-400 font-medium bg-gray-50 rounded-tl-2xl w-1/4"></th>
+              <th class="py-4 px-6 text-center text-gray-600 font-semibold bg-gray-50">
+                {isEl ? 'Άλλες Πλατφόρμες' : isBg ? 'Други платформи' : isSr ? 'Друге платформе' : isTr ? 'Diğer Platformlar' : isRo ? 'Alte Platforme' : 'Other Platforms'}
+              </th>
+              <th class="py-4 px-6 text-center text-gray-600 font-semibold bg-gray-50">
+                {isEl ? 'Τοπική Εταιρεία' : isBg ? 'Местна агенция' : isSr ? 'Локална агенција' : isTr ? 'Yerel Acenta' : isRo ? 'Agenție Locală' : 'Local Agency'}
+              </th>
+              <th class="py-4 px-6 text-center font-bold text-[#1a1a2e] bg-[#f8f6f2] rounded-tr-2xl">KefaloniaBNB</th>
+            </tr>
+          </thead>
+          <tbody>
+            {comparisonRows.map((row, i) => (
+              <tr class={`border-b border-gray-50 last:border-0 ${i % 2 === 0 ? '' : 'bg-gray-50/40'}`}>
+                <td class="py-4 px-6 font-medium text-gray-700">{row.label}</td>
+                <td class={`py-4 px-6 text-center ${row.platforms === '✗' ? 'text-red-400 font-semibold' : row.platforms.startsWith('⚠') ? 'text-amber-500' : 'text-gray-500'}`}>
+                  {row.platforms}
+                </td>
+                <td class={`py-4 px-6 text-center ${row.agency === '✗' ? 'text-red-400 font-semibold' : row.agency === 'Sometimes' ? 'text-amber-500' : 'text-gray-500'}`}>
+                  {row.agency}
+                </td>
+                <td class={`py-4 px-6 text-center font-semibold bg-[#f8f6f2] ${row.highlight ? 'text-emerald-600 text-base' : row.us.startsWith('✓') ? 'text-emerald-600' : 'text-[#1a1a2e]'}`}>
+                  {row.us}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Savings callout -->
+      <div class="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="bg-emerald-50 border border-emerald-100 rounded-2xl p-6 text-center">
+          <p class="text-3xl font-bold text-emerald-700 mb-1">€0</p>
+          <p class="text-sm text-gray-600">{isEl ? 'Χρέωση κράτησης επισκέπτη' : isBg ? 'Такса за резервация от госта' : isSr ? 'Накнада за резервацију госта' : isTr ? 'Misafir rezervasyon ücreti' : isRo ? 'Taxă de rezervare oaspete' : 'Guest booking fee'}</p>
+          <p class="text-xs text-gray-400 mt-1">
+            {isEl ? 'έναντι ~€28 επιπλέον σε κράτηση €200 σε άλλες πλατφόρμες' : isBg ? 'спрямо ~€28 допълнително при резервация от €200 в други платформи' : isSr ? 'у поређењу са ~€28 додатно на резервацију од €200 на другим платформама' : isTr ? 'diğer platformlarda €200\'lük rezervasyonda ~€28 ekstra ödemek yerine' : isRo ? 'vs ~€28 extra la o rezervare de €200 pe alte platforme' : 'vs ~€28 extra on a €200 booking on other platforms'}
+          </p>
+        </div>
+        <div class="bg-emerald-50 border border-emerald-100 rounded-2xl p-6 text-center">
+          <p class="text-3xl font-bold text-emerald-700 mb-1">5%</p>
+          <p class="text-sm text-gray-600">{isEl ? 'Προμήθεια ιδιοκτήτη' : isBg ? 'Комисионна на собственика' : isSr ? 'Провизија власника' : isTr ? 'Mülk sahibi komisyonu' : isRo ? 'Comision proprietar' : 'Owner commission'}</p>
+          <p class="text-xs text-gray-400 mt-1">{isEl ? 'έναντι 16–35% αλλού' : isBg ? 'спрямо 16–35% другаде' : isSr ? 'у поређењу са 16–35% другде' : isTr ? 'başka yerlerde %16–35\'e karşı' : isRo ? 'vs 16–35% în altă parte' : 'vs 16–35% elsewhere'}</p>
+        </div>
+        <div class="bg-emerald-50 border border-emerald-100 rounded-2xl p-6 text-center">
+          <p class="text-3xl font-bold text-emerald-700 mb-1">100%</p>
+          <p class="text-sm text-gray-600">{isEl ? 'Έλεγχος ιδιοκτήτη' : isBg ? 'Контрол на собственика' : isSr ? 'Контрола власника' : isTr ? 'Mülk sahibi kontrolü' : isRo ? 'Control proprietar' : 'Owner control'}</p>
+          <p class="text-xs text-gray-400 mt-1">
+            {isEl ? 'Τιμές, επισκέπτες, ημερολόγιο — όλα δικά σας' : isBg ? 'Цени, гости, календар — всичко е ваше' : isSr ? 'Цене, гости, календар — све је ваше' : isTr ? 'Fiyatlar, misafirler, takvim — hepsi sizin' : isRo ? 'Prețuri, oaspeți, calendar — toate ale dvs.' : 'Pricing, guests, calendar — all yours'}
+          </p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Closing CTA -->
+  <section class="py-24 bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] text-white">
+    <div class="max-w-3xl mx-auto px-4 sm:px-6 text-center">
+      <h2 class="text-3xl sm:text-4xl font-bold mb-4">
+        {isEl ? 'Η Καβάλα αξίζει τη δική της πλατφόρμα. Αυτή είναι.' : isBg ? 'Kefalonia заслужава собствена платформа. Това е тя.' : isSr ? 'Кавала заслужује своју платформу. Ово је она.' : isTr ? 'Kefalonia kendi platformunu hak ediyor. İşte bu.' : isRo ? 'Kefalonia merită propria platformă. Aceasta este.' : 'Kefalonia deserves its own platform. This is it.'}
+      </h2>
+      <p class="text-white/60 text-lg mb-12 max-w-xl mx-auto">
+        {isEl
+          ? 'Χτίζουμε την πλατφόρμα που αξίζει πραγματικά αυτή η περιοχή — μια που σέβεται τους ιδιοκτήτες, εξοικονομεί χρήματα στους επισκέπτες και πληρώνει τους καθαριστές εγκαίρως.'
+          : isBg
+          ? 'Изграждаме платформата, която този регион наистина заслужава — такава, която уважава собствениците, спестява пари на гостите и плаща на почистващите фирми навреме.'
+          : isSr
+          ? 'Градимо платформу коју овај регион заиста заслужује — такву која поштује власнике, штеди новац гостима и на вријеме плаћа услуге чишћења.'
+          : isTr
+          ? 'Bu bölgenin gerçekten hak ettiği platformu inşa ediyoruz — mülk sahiplerine saygı gösteren, misafirlerin parasını tasarruf ettiren ve temizlikçileri zamanında ödeyen.'
+          : isRo
+          ? 'Construim platforma pe care această regiune o merită cu adevărat — una care respectă proprietarii, economisește banii oaspeților și plătește curățătorii la timp.'
+          : "We're building the platform this region actually deserves — one that respects owners, saves guests money, and pays cleaners on time."}
+      </p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <a href="/contact" class="bg-[#c9a96e] hover:bg-[#b8934a] text-white font-bold px-8 py-4 rounded-xl transition-colors text-sm">
+          {isEl ? 'Καταχωρίστε το Ακίνητό Μου — Δωρεάν' : isBg ? 'Публикувайте имота ми — безплатно' : isSr ? 'Објавите моју некретнину — бесплатно' : isTr ? 'Mülkümü Listele — Ücretsiz' : isRo ? 'Listați Proprietatea Mea — Gratuit' : 'List My Property — Free'}
+        </a>
+        <a href="/rentals" class="border border-white/30 hover:border-white/60 text-white font-semibold px-8 py-4 rounded-xl transition-colors text-sm">
+          {isEl ? 'Περιηγηθείτε σε Βίλες Χωρίς Χρεώσεις' : isBg ? 'Разгледайте вили без такси' : isSr ? 'Прегледајте виле без накнада' : isTr ? 'Ücretsiz Villaları Keşfedin' : isRo ? 'Răsfoiți Vile fără Taxe' : 'Browse Villas with Zero Fees'}
+        </a>
+      </div>
+    </div>
+  </section>
+
+</BaseLayout>

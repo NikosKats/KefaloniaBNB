@@ -1,0 +1,145 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isBg = lang === 'bg';
+const isEl = lang === 'el';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const t = {
+  messages: isEl ? 'Μηνύματα' : isBg ? 'Съобщения' : isSr ? 'Поруке' : isTr ? 'Mesajlar' : isRo ? 'Mesaje' : 'Messages',
+  myAccount: isEl ? 'Ο Λογαριασμός μου' : isBg ? 'Моят акаунт' : isSr ? 'Мој налог' : isTr ? 'Hesabım' : isRo ? 'Contul Meu' : 'My Account',
+  noConversations: isEl ? 'Δεν υπάρχουν συνομιλίες ακόμα. Επισκεφτείτε το προφίλ ενός μέλους για να ξεκινήσετε μια συνομιλία.' : isBg ? 'Все още няма разговори. Посетете профила на член, за да започнете чат.' : isSr ? 'Још нема разговора. Посетите профил члана да започнете разговор.' : isTr ? 'Henüz konuşma yok. Sohbet başlatmak için bir üye profilini ziyaret edin.' : isRo ? 'Nicio conversație încă. Vizitați profilul unui membru pentru a începe o conversație.' : "No conversations yet. Visit a member's profile to start a chat.",
+  goToCommunity: isEl ? 'Πήγαινε στην Κοινότητα' : isBg ? 'Към общността' : isSr ? 'Иди у заједницу' : isTr ? 'Topluluğa Git' : isRo ? 'Mergi la Comunitate' : 'Go to Community',
+  noMessagesYet: isEl ? 'Δεν υπάρχουν μηνύματα ακόμα' : isBg ? 'Все още няма съобщения' : isSr ? 'Још нема порука' : isTr ? 'Henüz mesaj yok' : isRo ? 'Niciun mesaj încă' : 'No messages yet',
+  member: isEl ? 'Μέλος' : isBg ? 'Член' : isSr ? 'Члан' : isTr ? 'Üye' : isRo ? 'Membru' : 'Member',
+};
+
+const session = Astro.locals.session;
+if (!session) return Astro.redirect('/community/join?next=/account/messages');
+
+const service = getServiceClient();
+const userId = session.user.id;
+const newRecipient = Astro.url.searchParams.get('new');
+
+// If ?new=userId, send the user straight to a conversation (find or create)
+if (newRecipient && newRecipient !== userId) {
+  const p1 = userId < newRecipient ? userId : newRecipient;
+  const p2 = userId < newRecipient ? newRecipient : userId;
+
+  let { data: conv } = await service
+    .from('conversations')
+    .select('id')
+    .eq('participant_1', p1)
+    .eq('participant_2', p2)
+    .maybeSingle();
+  if (!conv) {
+    ({ data: conv } = await service
+      .from('conversations')
+      .select('id')
+      .eq('participant_1', p2)
+      .eq('participant_2', p1)
+      .maybeSingle());
+  }
+  if (!conv) {
+    const { data: newConv } = await service
+      .from('conversations')
+      .insert({ participant_1: p1, participant_2: p2 })
+      .select('id')
+      .single();
+    conv = newConv;
+  }
+  if (conv) return Astro.redirect(`/account/messages/${conv.id}`);
+}
+
+// Fetch conversations
+const { data: convs } = await service
+  .from('conversations')
+  .select('id, participant_1, participant_2, last_message_at, last_message_preview, p1:profiles!conversations_participant_1_fkey(id, full_name, avatar_url), p2:profiles!conversations_participant_2_fkey(id, full_name, avatar_url)')
+  .or(`participant_1.eq.${userId},participant_2.eq.${userId}`)
+  .order('last_message_at', { ascending: false });
+
+const conversations = (convs ?? []).map((c: any) => {
+  const other = c.participant_1 === userId ? c.p2 : c.p1;
+  return { id: c.id, other, last_message_at: c.last_message_at, preview: c.last_message_preview };
+});
+
+// Unread counts per conversation
+const unreadMap: Record<string, number> = {};
+for (const conv of conversations) {
+  const { count } = await service
+    .from('messages')
+    .select('id', { count: 'exact', head: true })
+    .eq('conversation_id', conv.id)
+    .eq('is_read', false)
+    .neq('sender_id', userId);
+  unreadMap[conv.id] = count ?? 0;
+}
+
+function timeAgo(d: string) {
+  const diff = Date.now() - new Date(d).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'now';
+  if (mins < 60) return mins + 'm';
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return hrs + 'h';
+  const days = Math.floor(hrs / 24);
+  if (days < 7) return days + 'd';
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+---
+
+<BaseLayout title={t.messages} noIndex>
+  <div class="max-w-2xl mx-auto px-4 py-10">
+    <div class="flex items-center justify-between mb-6">
+      <h1 class="text-2xl font-bold text-gray-900">{t.messages}</h1>
+      <a href="/account" class="text-sm text-gray-500 hover:text-gray-700">&larr; {t.myAccount}</a>
+    </div>
+
+    {conversations.length === 0 ? (
+      <div class="text-center py-16">
+        <p class="text-4xl mb-3">&#x1F4AC;</p>
+        <p class="text-gray-500 text-sm">{t.noConversations}</p>
+        <a href="/community/board" class="inline-block mt-4 text-sm text-[#c9a96e] hover:underline">{t.goToCommunity}</a>
+      </div>
+    ) : (
+      <div class="space-y-1">
+        {conversations.map((c: any) => {
+          const unread = unreadMap[c.id] || 0;
+          return (
+            <a href={`/account/messages/${c.id}`} class={`flex items-center gap-3 p-4 rounded-xl hover:bg-gray-50 transition-colors ${unread > 0 ? 'bg-blue-50/50' : ''}`}>
+              <div class="w-11 h-11 rounded-full bg-gray-200 overflow-hidden shrink-0">
+                {c.other?.avatar_url ? (
+                  <img src={c.other.avatar_url} alt="" class="w-full h-full object-cover" />
+                ) : (
+                  <div class="w-full h-full flex items-center justify-center text-gray-400 text-sm font-bold">
+                    {(c.other?.full_name || '?')[0].toUpperCase()}
+                  </div>
+                )}
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center justify-between">
+                  <p class={`text-sm truncate ${unread > 0 ? 'font-bold text-gray-900' : 'font-medium text-gray-700'}`}>
+                    {c.other?.full_name || t.member}
+                  </p>
+                  <span class="text-xs text-gray-400 shrink-0 ml-2">{timeAgo(c.last_message_at)}</span>
+                </div>
+                <p class={`text-xs truncate mt-0.5 ${unread > 0 ? 'text-gray-700 font-medium' : 'text-gray-400'}`}>
+                  {c.preview || t.noMessagesYet}
+                </p>
+              </div>
+              {unread > 0 && (
+                <span class="w-5 h-5 rounded-full bg-[#1a1a2e] text-white text-[10px] font-bold flex items-center justify-center shrink-0">
+                  {unread > 9 ? '9+' : unread}
+                </span>
+              )}
+            </a>
+          );
+        })}
+      </div>
+    )}
+  </div>
+</BaseLayout>

@@ -1,0 +1,154 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+const profile = Astro.locals.profile!;
+const role = profile.role;
+const service = getServiceClient();
+
+// Get restaurant(s) for this owner
+let restaurantIds = Astro.locals.ownerRestaurantIds ?? [];
+if (role === 'admin' || role === 'super_admin') {
+  const { data } = await service.from('restaurants').select('id');
+  restaurantIds = (data ?? []).map((r: any) => r.id);
+}
+
+const hasRestaurant = restaurantIds.length > 0;
+const restaurantId = restaurantIds[0]; // Primary restaurant
+
+let restaurant: any = null;
+let todayReservations: any[] = [];
+let upcomingCount = 0;
+let pendingCount = 0;
+
+if (hasRestaurant) {
+  const { data: rest } = await service.from('restaurants').select('*').eq('id', restaurantId).single();
+  restaurant = rest;
+
+  const today = new Date().toISOString().slice(0, 10);
+  const { data: todayRes } = await service
+    .from('restaurant_reservations')
+    .select('*')
+    .eq('restaurant_id', restaurantId)
+    .eq('date', today)
+    .in('status', ['pending', 'confirmed'])
+    .order('time_slot');
+  todayReservations = todayRes ?? [];
+
+  const { count: upCount } = await service
+    .from('restaurant_reservations')
+    .select('id', { count: 'exact', head: true })
+    .eq('restaurant_id', restaurantId)
+    .gte('date', today)
+    .in('status', ['pending', 'confirmed']);
+  upcomingCount = upCount ?? 0;
+
+  const { count: pCount } = await service
+    .from('restaurant_reservations')
+    .select('id', { count: 'exact', head: true })
+    .eq('restaurant_id', restaurantId)
+    .eq('status', 'pending');
+  pendingCount = pCount ?? 0;
+}
+
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+
+<AdminLayout title="Restaurant Dashboard">
+  <div class="space-y-6">
+    {!hasRestaurant ? (
+      <div class="text-center py-16 text-gray-400">
+        <p class="text-4xl mb-3">🍽️</p>
+        <p class="text-lg">No restaurant assigned to your account yet.</p>
+        <p class="text-sm mt-1">Please contact the administrator.</p>
+      </div>
+    ) : (
+      <>
+        <div class="flex items-center justify-between">
+          <div>
+            <h1 class="text-2xl font-bold text-white">{restaurant.name}</h1>
+            <p class="text-sm text-gray-400">{restaurant.address}{restaurant.city ? `, ${restaurant.city}` : ''}</p>
+          </div>
+          <span class={`px-3 py-1 rounded-full text-xs font-medium ${restaurant.accepts_reservations ? 'bg-green-900/30 text-green-400' : 'bg-red-900/30 text-red-400'}`}>
+            {restaurant.accepts_reservations ? 'Reservations ON' : 'Reservations OFF'}
+          </span>
+        </div>
+
+        {/* Stats */}
+        <div class="grid grid-cols-3 gap-4">
+          <div class="bg-white/5 rounded-xl border border-white/10 p-4 text-center">
+            <p class="text-2xl font-bold text-white">{todayReservations.length}</p>
+            <p class="text-xs text-gray-400">Today</p>
+          </div>
+          <div class="bg-white/5 rounded-xl border border-white/10 p-4 text-center">
+            <p class="text-2xl font-bold text-amber-400">{pendingCount}</p>
+            <p class="text-xs text-gray-400">Pending</p>
+          </div>
+          <div class="bg-white/5 rounded-xl border border-white/10 p-4 text-center">
+            <p class="text-2xl font-bold text-green-400">{upcomingCount}</p>
+            <p class="text-xs text-gray-400">Upcoming</p>
+          </div>
+        </div>
+
+        {/* Today's Timeline */}
+        <div>
+          <h2 class="text-lg font-semibold text-white mb-3">Today's Reservations</h2>
+          {todayReservations.length === 0 ? (
+            <div class="text-center py-8 text-gray-500 bg-white/5 rounded-xl border border-white/10">
+              <p>No reservations for today</p>
+            </div>
+          ) : (
+            <div class="space-y-2">
+              {todayReservations.map((r: any) => (
+                <div class={`bg-white/5 rounded-xl border p-4 flex items-center justify-between ${r.status === 'confirmed' ? 'border-green-500/30' : 'border-amber-500/30'}`}>
+                  <div class="flex items-center gap-4">
+                    <div class="text-center">
+                      <p class="text-lg font-bold text-white">{r.time_slot}</p>
+                    </div>
+                    <div>
+                      <p class="font-semibold text-white">{r.guest_name}</p>
+                      <p class="text-xs text-gray-400">{r.guest_count} guests {r.guest_phone ? `· ${r.guest_phone}` : ''}</p>
+                      {r.special_requests && <p class="text-xs text-[#c9a96e] mt-0.5">"{r.special_requests}"</p>}
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class={`px-2 py-1 rounded-full text-xs font-medium ${r.status === 'confirmed' ? 'bg-green-900/30 text-green-400' : 'bg-amber-900/30 text-amber-400'}`}>
+                      {r.status}
+                    </span>
+                    {r.status === 'pending' && (
+                      <div class="flex gap-1">
+                        <button class="res-action text-xs bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700" data-id={r.id} data-action="confirmed">✓</button>
+                        <button class="res-action text-xs bg-red-600 text-white px-2 py-1 rounded hover:bg-red-700" data-id={r.id} data-action="cancelled">✕</button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div class="flex gap-3">
+          <a href="/admin/restaurant/reservations" class="text-sm text-[#c9a96e] hover:underline">View all reservations →</a>
+          <a href="/admin/restaurant/tables" class="text-sm text-[#c9a96e] hover:underline">Manage tables →</a>
+        </div>
+      </>
+    )}
+  </div>
+</AdminLayout>
+
+<script>
+  document.querySelectorAll('.res-action').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = (btn as HTMLElement).dataset.id!;
+      const action = (btn as HTMLElement).dataset.action!;
+      const res = await fetch(`/api/admin/restaurant/reservations/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: action }),
+      });
+      if (res.ok) location.reload();
+      else alert('Failed to update reservation');
+    });
+  });
+</script>

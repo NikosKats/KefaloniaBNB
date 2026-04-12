@@ -1,0 +1,157 @@
+---
+import '../../styles/global.css';
+
+// Redirect if already logged in
+const session = Astro.locals.session;
+if (session) return Astro.redirect('/admin');
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const L: Record<string, Record<string, string>> = {
+  admin_access:      { en: 'Admin access', el: 'Πρόσβαση διαχειριστή' },
+  err_invalid:       { en: 'Invalid email or password.', el: 'Λανθασμένο email ή κωδικός.' },
+  err_missing:       { en: 'Please enter your email and password.', el: 'Παρακαλώ εισάγετε email και κωδικό.' },
+  err_unauth:        { en: 'Your account does not have admin access.', el: 'Ο λογαριασμός σας δεν έχει πρόσβαση διαχειριστή.' },
+  err_unconfirmed:   { en: 'Please confirm your email address before logging in.', el: 'Παρακαλώ επιβεβαιώστε το email σας πριν συνδεθείτε.' },
+  lbl_email:      { en: 'Email', el: 'Email' },
+  lbl_password:   { en: 'Password', el: 'Κωδικός' },
+  btn_sign_in:    { en: 'Sign In', el: 'Σύνδεση' },
+  back_to_site:   { en: '← Back to website', el: '← Πίσω στην ιστοσελίδα' },
+};
+function al(k: string) { return L[k]?.[lang] ?? L[k]?.en ?? k; }
+
+const errorParam = Astro.url.searchParams.get('error');
+const next  = Astro.url.searchParams.get('next') ?? '/admin';
+const errorMsg = errorParam === 'invalid' ? al('err_invalid')
+               : errorParam === 'missing' ? al('err_missing')
+               : errorParam === 'unauthorized' ? al('err_unauth')
+               : null;
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin Login – KefaloniaBNB</title>
+  <meta name="robots" content="noindex" />
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
+</head>
+<body class="min-h-screen bg-[#1a1a2e] flex items-center justify-center px-4 font-['Inter']">
+  <div class="w-full max-w-sm">
+    <div class="text-center mb-8">
+      <div class="w-12 h-12 bg-[#c9a96e] rounded-xl flex items-center justify-center mx-auto mb-4">
+        <span class="text-white font-bold text-xl">V</span>
+      </div>
+      <h1 class="text-white text-2xl font-bold">KefaloniaBNB</h1>
+      <p class="text-gray-400 text-sm mt-1">{al('admin_access')}</p>
+    </div>
+
+    {errorMsg && (
+      <div class="bg-red-500/10 border border-red-500/30 text-red-400 text-sm p-3 rounded-xl mb-4">
+        {errorMsg}
+      </div>
+    )}
+
+    <div class="bg-white/5 border border-white/10 rounded-2xl p-8">
+      <form method="POST" action="/api/auth/login" class="space-y-4">
+        <input type="hidden" name="next" value={next} />
+        <div>
+          <label class="block text-sm font-medium text-gray-300 mb-1.5">{al('lbl_email')}</label>
+          <input type="email" name="email" required autocomplete="email" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent placeholder-gray-600" placeholder="admin@kefaloniabnb.com" />
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="block text-sm font-medium text-gray-300">{al('lbl_password')}</label>
+            <button type="button" id="forgot-btn" class="text-xs text-[#c9a96e] hover:text-[#b8934a] transition-colors">
+              Forgot password?
+            </button>
+          </div>
+          <input type="password" name="password" id="password-input" required autocomplete="current-password" class="w-full bg-white/5 border border-white/10 rounded-xl px-4 py-3 text-white text-sm outline-none focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent placeholder-gray-600" placeholder="••••••••" />
+        </div>
+        <button type="submit" class="w-full bg-[#c9a96e] hover:bg-[#b8934a] text-white font-semibold py-3 rounded-xl text-sm transition-colors cursor-pointer">
+          {al('btn_sign_in')}
+        </button>
+      </form>
+
+      <!-- Forgot password panel (hidden by default) -->
+      <div id="forgot-panel" class="hidden mt-6 pt-6 border-t border-white/10">
+        <p class="text-sm text-gray-400 mb-3">Enter your email and we'll send a reset link.</p>
+        <div id="forgot-success" class="hidden mb-3 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-sm p-3 rounded-xl"></div>
+        <div id="forgot-error" class="hidden mb-3 bg-red-500/10 border border-red-500/30 text-red-400 text-sm p-3 rounded-xl"></div>
+        <div class="flex gap-2">
+          <input type="email" id="forgot-email" placeholder="your@email.com" autocomplete="email"
+            class="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-white text-sm outline-none focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent placeholder-gray-600" />
+          <button id="forgot-submit" type="button"
+            class="bg-[#c9a96e] hover:bg-[#b8934a] text-white font-semibold px-4 py-2.5 rounded-xl text-sm transition-colors whitespace-nowrap">
+            Send link
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <p class="text-center mt-4">
+      <a href="/" class="text-gray-500 text-xs hover:text-gray-400 transition-colors">{al('back_to_site')}</a>
+    </p>
+  </div>
+
+  <script>
+    const forgotBtn    = document.getElementById('forgot-btn')!;
+    const forgotPanel  = document.getElementById('forgot-panel')!;
+    const forgotSubmit = document.getElementById('forgot-submit')!;
+    const forgotEmail  = document.getElementById('forgot-email') as HTMLInputElement;
+    const forgotSuccess = document.getElementById('forgot-success')!;
+    const forgotError  = document.getElementById('forgot-error')!;
+    const passwordInput = document.getElementById('password-input') as HTMLInputElement;
+
+    forgotBtn.addEventListener('click', () => {
+      forgotPanel.classList.toggle('hidden');
+      if (!forgotPanel.classList.contains('hidden')) {
+        // Pre-fill email from the login field if already typed
+        const loginEmail = (document.querySelector('input[name="email"]') as HTMLInputElement)?.value;
+        if (loginEmail) forgotEmail.value = loginEmail;
+        forgotEmail.focus();
+        // Password not required when using forgot flow
+        passwordInput.removeAttribute('required');
+      } else {
+        passwordInput.setAttribute('required', 'true');
+      }
+    });
+
+    forgotSubmit.addEventListener('click', async () => {
+      forgotError.classList.add('hidden');
+      forgotSuccess.classList.add('hidden');
+
+      const email = forgotEmail.value.trim();
+      if (!email) {
+        forgotError.textContent = 'Please enter your email address.';
+        forgotError.classList.remove('hidden');
+        return;
+      }
+
+      forgotSubmit.textContent = 'Sending…';
+      forgotSubmit.setAttribute('disabled', 'true');
+
+      const res = await fetch('/api/auth/forgot-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      const { error } = await res.json();
+
+      if (error) {
+        forgotError.textContent = error;
+        forgotError.classList.remove('hidden');
+        forgotSubmit.textContent = 'Send link';
+        forgotSubmit.removeAttribute('disabled');
+      } else {
+        forgotSuccess.textContent = 'Reset link sent — check your inbox.';
+        forgotSuccess.classList.remove('hidden');
+        forgotSubmit.classList.add('hidden');
+        forgotEmail.setAttribute('disabled', 'true');
+      }
+    });
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,321 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+const profile = Astro.locals.profile!;
+const role = profile.role;
+const service = getServiceClient();
+
+let restaurantIds = Astro.locals.ownerRestaurantIds ?? [];
+if (role === 'admin' || role === 'super_admin') {
+  const { data } = await service.from('restaurants').select('id');
+  restaurantIds = (data ?? []).map((r: any) => r.id);
+}
+
+const restaurantId = restaurantIds[0];
+if (!restaurantId) return Astro.redirect('/admin/restaurant');
+
+// Date filter (default: today)
+const filterDate = Astro.url.searchParams.get('date') ?? new Date().toISOString().slice(0, 10);
+const filterStatus = Astro.url.searchParams.get('status') ?? 'all';
+
+let query = service
+  .from('restaurant_reservations')
+  .select('*, restaurant_tables(name)')
+  .eq('restaurant_id', restaurantId)
+  .order('time_slot');
+
+if (filterDate) query = query.eq('date', filterDate);
+if (filterStatus && filterStatus !== 'all') query = query.eq('status', filterStatus);
+
+const { data: reservations } = await query;
+
+// Get tables for assignment dropdown
+const { data: tables } = await service
+  .from('restaurant_tables')
+  .select('id, name, capacity')
+  .eq('restaurant_id', restaurantId)
+  .eq('is_active', true)
+  .order('sort_order');
+
+const statusColors: Record<string, string> = {
+  pending: 'border-amber-500/30 bg-amber-900/10',
+  confirmed: 'border-green-500/30 bg-green-900/10',
+  completed: 'border-blue-500/30 bg-blue-900/10',
+  cancelled: 'border-red-500/30 bg-red-900/10',
+  no_show: 'border-gray-500/30 bg-gray-900/10',
+};
+const statusBadge: Record<string, string> = {
+  pending: 'bg-amber-900/30 text-amber-400',
+  confirmed: 'bg-green-900/30 text-green-400',
+  completed: 'bg-blue-900/30 text-blue-400',
+  cancelled: 'bg-red-900/30 text-red-400',
+  no_show: 'bg-gray-700/30 text-gray-400',
+};
+
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+
+<AdminLayout title="Reservations">
+  <div class="space-y-6">
+    <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <h1 class="text-2xl font-bold text-white">Reservations</h1>
+      <button id="open-create-btn" class="w-full sm:w-auto min-h-[44px] bg-[#c9a96e] text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#b89556] transition-colors">+ New Reservation</button>
+    </div>
+
+    <!-- Filters -->
+    <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+      <input type="date" id="date-filter" value={filterDate}
+        class="min-h-[44px] bg-white/10 text-white px-3 py-2.5 rounded-xl border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+      <select id="status-filter" class="min-h-[44px] bg-white/10 text-white px-3 py-2.5 rounded-xl border border-white/20 text-sm outline-none focus:border-[#c9a96e]">
+        <option value="all" selected={filterStatus === 'all'} class="text-black">All Statuses</option>
+        <option value="pending" selected={filterStatus === 'pending'} class="text-black">Pending</option>
+        <option value="confirmed" selected={filterStatus === 'confirmed'} class="text-black">Confirmed</option>
+        <option value="completed" selected={filterStatus === 'completed'} class="text-black">Completed</option>
+        <option value="cancelled" selected={filterStatus === 'cancelled'} class="text-black">Cancelled</option>
+        <option value="no_show" selected={filterStatus === 'no_show'} class="text-black">No Show</option>
+      </select>
+    </div>
+
+    {(!reservations || reservations.length === 0) ? (
+      <div class="text-center py-16 text-gray-500 bg-white/5 rounded-xl border border-white/10">
+        <p class="text-4xl mb-2">📅</p>
+        <p>No reservations found for this date/filter</p>
+      </div>
+    ) : (
+      <div class="space-y-2">
+        {(reservations ?? []).map((r: any) => (
+            <div class={`rounded-xl border p-4 ${statusColors[r.status] ?? ''}`} data-id={r.id}>
+              <!-- Header: time + status -->
+              <div class="flex items-center justify-between gap-2 mb-3">
+                <div class="flex items-center gap-3">
+                  <p class="text-lg font-bold text-white">{r.time_slot}</p>
+                  <p class="text-xs text-gray-400">{r.date}</p>
+                </div>
+                <span class={`px-2.5 py-1 rounded-full text-xs font-medium ${statusBadge[r.status] ?? ''}`}>{r.status}</span>
+              </div>
+
+              <!-- Guest info -->
+              <div class="mb-3">
+                <p class="font-semibold text-white">{r.guest_name}</p>
+                <p class="text-xs text-gray-400 mt-0.5">
+                  {r.guest_count} guests
+                  {r.guest_phone ? ` · ${r.guest_phone}` : ''}
+                  {r.guest_email ? ` · ${r.guest_email}` : ''}
+                  {r.contact_preference ? ` · ${r.contact_preference}` : ''}
+                </p>
+                {r.restaurant_tables?.name && <p class="text-xs text-[#c9a96e] mt-0.5">Table: {r.restaurant_tables.name}</p>}
+                {r.special_requests && <p class="text-xs text-gray-300 mt-1 italic">"{r.special_requests}"</p>}
+                {r.notes && <p class="text-xs text-gray-500 mt-0.5">Note: {r.notes}</p>}
+              </div>
+
+              <!-- Actions -->
+              <div class="flex flex-wrap gap-2">
+                {r.status === 'pending' && (
+                  <>
+                    <button class="res-action min-h-[44px] flex-1 text-sm bg-green-600 text-white px-4 py-2.5 rounded-xl hover:bg-green-700 font-medium" data-id={r.id} data-action="confirmed">Confirm</button>
+                    <button class="res-action min-h-[44px] flex-1 text-sm bg-red-600 text-white px-4 py-2.5 rounded-xl hover:bg-red-700 font-medium" data-id={r.id} data-action="cancelled">Cancel</button>
+                  </>
+                )}
+                {r.status === 'confirmed' && (
+                  <>
+                    <button class="res-action min-h-[44px] flex-1 text-sm bg-blue-600 text-white px-4 py-2.5 rounded-xl hover:bg-blue-700 font-medium" data-id={r.id} data-action="completed">Complete</button>
+                    <button class="res-action min-h-[44px] flex-1 text-sm bg-gray-600 text-white px-4 py-2.5 rounded-xl hover:bg-gray-700 font-medium" data-id={r.id} data-action="no_show">No Show</button>
+                  </>
+                )}
+                {/* Table assignment */}
+                {r.status !== 'cancelled' && r.status !== 'no_show' && (
+                  <select class="assign-table min-h-[44px] w-full text-sm bg-white/10 text-white border border-white/20 rounded-xl px-3 py-2.5 outline-none" data-id={r.id}>
+                    <option value="" class="text-black">No table</option>
+                    {(tables ?? []).map((t: any) => (
+                      <option value={t.id} selected={r.table_id === t.id} class="text-black">{t.name} ({t.capacity})</option>
+                    ))}
+                  </select>
+                )}
+                {/* Quick message buttons */}
+                {r.guest_phone && r.status !== 'cancelled' && r.status !== 'no_show' && (
+                  <div class="flex gap-2">
+                    <a href={`https://wa.me/${r.guest_phone.replace(/[\s\-()]/g, '').replace(/^(?=69)/, '30').replace(/^\+?/, '')}?text=${encodeURIComponent(`Hi ${r.guest_name}, regarding your reservation at ${r.date} ${r.time_slot}...`)}`}
+                      target="_blank" rel="noopener" title="WhatsApp"
+                      class="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-[#25D366]/20 text-[#25D366] hover:bg-[#25D366]/30 text-sm font-bold">W</a>
+                    <a href={`viber://chat?number=${encodeURIComponent(r.guest_phone.replace(/[\s\-()]/g, '').replace(/^(?=69)/, '+30'))}&text=${encodeURIComponent(`Hi ${r.guest_name}, regarding your reservation at ${r.date} ${r.time_slot}...`)}`}
+                      target="_blank" rel="noopener" title="Viber"
+                      class="min-w-[44px] min-h-[44px] flex items-center justify-center rounded-xl bg-[#7360F2]/20 text-[#7360F2] hover:bg-[#7360F2]/30 text-sm font-bold">V</a>
+                  </div>
+                )}
+                <button class="res-delete min-h-[44px] px-4 py-2.5 text-sm text-red-400 hover:text-red-300 font-medium rounded-xl" data-id={r.id} data-name={r.guest_name} title="Delete reservation">
+                  <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="m14.74 9-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 0 1-2.244 2.077H8.084a2.25 2.25 0 0 1-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 0 0-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 0 1 3.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 0 0-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 0 0-7.5 0" /></svg>
+                  Delete
+                </button>
+              </div>
+            </div>
+        ))}
+      </div>
+    )}
+  </div>
+
+  <!-- Create Reservation Modal -->
+  <div id="create-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+    <div class="bg-[#1a1a2e] border border-white/10 rounded-2xl w-full max-w-lg p-5 sm:p-6 space-y-4 max-h-[90vh] overflow-y-auto">
+      <div class="flex items-center justify-between">
+        <h2 class="text-lg font-bold text-white">New Reservation</h2>
+        <button id="close-create-btn" class="min-w-[44px] min-h-[44px] flex items-center justify-center text-gray-400 hover:text-white text-xl">&times;</button>
+      </div>
+      <form id="create-form" class="space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Date *</label>
+            <input type="date" name="date" required class="w-full min-h-[44px] bg-white/10 text-white px-3 py-2.5 rounded-xl border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Time *</label>
+            <input type="time" name="time_slot" required class="w-full min-h-[44px] bg-white/10 text-white px-3 py-2.5 rounded-xl border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Guest Name *</label>
+            <input type="text" name="guest_name" required maxlength="100" class="w-full min-h-[44px] bg-white/10 text-white px-3 py-2.5 rounded-xl border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Party Size *</label>
+            <input type="number" name="guest_count" required min="1" max="50" value="2" class="w-full min-h-[44px] bg-white/10 text-white px-3 py-2.5 rounded-xl border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Phone</label>
+            <input type="tel" name="guest_phone" maxlength="20" class="w-full min-h-[44px] bg-white/10 text-white px-3 py-2.5 rounded-xl border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+          </div>
+          <div>
+            <label class="block text-xs text-gray-400 mb-1">Email</label>
+            <input type="email" name="guest_email" maxlength="200" class="w-full min-h-[44px] bg-white/10 text-white px-3 py-2.5 rounded-xl border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Status</label>
+          <select name="status" class="w-full min-h-[44px] bg-white/10 text-white px-3 py-2.5 rounded-xl border border-white/20 text-sm outline-none focus:border-[#c9a96e]">
+            <option value="confirmed" class="text-black">Confirmed</option>
+            <option value="pending" class="text-black">Pending</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Special Requests</label>
+          <textarea name="special_requests" rows="2" maxlength="500" class="w-full bg-white/10 text-white px-3 py-2.5 rounded-xl border border-white/20 text-sm outline-none focus:border-[#c9a96e] resize-y"></textarea>
+        </div>
+        <div id="create-error" class="hidden text-red-400 text-sm bg-red-900/20 p-3 rounded-xl"></div>
+        <button type="submit" id="create-submit" class="w-full min-h-[44px] bg-[#c9a96e] text-white py-2.5 rounded-xl font-semibold hover:bg-[#b89556] transition-colors text-sm">Create Reservation</button>
+      </form>
+    </div>
+  </div>
+</AdminLayout>
+
+<script define:vars={{ restaurantId }} is:inline>
+  // Filter navigation
+  document.getElementById('date-filter')?.addEventListener('change', function(e) {
+    var date = e.target.value;
+    var status = document.getElementById('status-filter').value;
+    var params = new URLSearchParams();
+    if (date) params.set('date', date);
+    if (status !== 'all') params.set('status', status);
+    window.location.href = '/admin/restaurant/reservations?' + params.toString();
+  });
+
+  document.getElementById('status-filter')?.addEventListener('change', function(e) {
+    var status = e.target.value;
+    var date = document.getElementById('date-filter').value;
+    var params = new URLSearchParams();
+    if (date) params.set('date', date);
+    if (status !== 'all') params.set('status', status);
+    window.location.href = '/admin/restaurant/reservations?' + params.toString();
+  });
+
+  // Status actions
+  document.querySelectorAll('.res-action').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
+      var id = btn.dataset.id;
+      var action = btn.dataset.action;
+      var res = await fetch('/api/admin/restaurant/reservations/' + id, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: action }),
+      });
+      if (res.ok) location.reload();
+      else alert('Failed to update');
+    });
+  });
+
+  // Table assignment
+  document.querySelectorAll('.assign-table').forEach(function(sel) {
+    sel.addEventListener('change', async function() {
+      var id = sel.dataset.id;
+      var tableId = sel.value || null;
+      await fetch('/api/admin/restaurant/reservations/' + id, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ table_id: tableId }),
+      });
+    });
+  });
+
+  // Delete reservation
+  document.querySelectorAll('.res-delete').forEach(function(btn) {
+    btn.addEventListener('click', async function() {
+      var id = btn.dataset.id;
+      var name = btn.dataset.name || 'this reservation';
+      if (!confirm('Delete reservation for ' + name + '? This cannot be undone.')) return;
+      var res = await fetch('/api/admin/restaurant/reservations/' + id, { method: 'DELETE' });
+      if (res.ok) location.reload();
+      else alert('Failed to delete');
+    });
+  });
+
+  // Create reservation modal
+  var modal = document.getElementById('create-modal');
+  document.getElementById('open-create-btn')?.addEventListener('click', function() {
+    modal.classList.remove('hidden');
+  });
+  document.getElementById('close-create-btn')?.addEventListener('click', function() {
+    modal.classList.add('hidden');
+  });
+  modal?.addEventListener('click', function(e) {
+    if (e.target === modal) modal.classList.add('hidden');
+  });
+
+  document.getElementById('create-form')?.addEventListener('submit', async function(e) {
+    e.preventDefault();
+    var form = e.target;
+    var errEl = document.getElementById('create-error');
+    var btn = document.getElementById('create-submit');
+    errEl.classList.add('hidden');
+    btn.disabled = true;
+    btn.textContent = 'Creating...';
+
+    var fd = new FormData(form);
+    try {
+      var res = await fetch('/api/admin/restaurant/reservations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          restaurant_id: restaurantId,
+          date: fd.get('date'),
+          time_slot: fd.get('time_slot'),
+          guest_count: parseInt(fd.get('guest_count')),
+          guest_name: fd.get('guest_name'),
+          guest_email: fd.get('guest_email'),
+          guest_phone: fd.get('guest_phone'),
+          special_requests: fd.get('special_requests'),
+          status: fd.get('status'),
+        }),
+      });
+      var data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      location.reload();
+    } catch (err) {
+      errEl.textContent = err.message;
+      errEl.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = 'Create Reservation';
+    }
+  });
+</script>

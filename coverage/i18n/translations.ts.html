@@ -1,0 +1,1192 @@
+
+<!doctype html>
+<html lang="en">
+
+<head>
+    <title>Code coverage report for i18n/translations.ts</title>
+    <meta charset="utf-8" />
+    <link rel="stylesheet" href="../prettify.css" />
+    <link rel="stylesheet" href="../base.css" />
+    <link rel="shortcut icon" type="image/x-icon" href="../favicon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style type='text/css'>
+        .coverage-summary .sorter {
+            background-image: url(../sort-arrow-sprite.png);
+        }
+    </style>
+</head>
+    
+<body>
+<div class='wrapper'>
+    <div class='pad1'>
+        <h1><a href="../index.html">All files</a> / <a href="index.html">i18n</a> translations.ts</h1>
+        <div class='clearfix'>
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Statements</span>
+                <span class='fraction'>317/317</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">66.66% </span>
+                <span class="quiet">Branches</span>
+                <span class='fraction'>4/6</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Functions</span>
+                <span class='fraction'>2/2</span>
+            </div>
+        
+            
+            <div class='fl pad1y space-right2'>
+                <span class="strong">100% </span>
+                <span class="quiet">Lines</span>
+                <span class='fraction'>317/317</span>
+            </div>
+        
+            
+        </div>
+        <p class="quiet">
+            Press <em>n</em> or <em>j</em> to go to the next uncovered block, <em>b</em>, <em>p</em> or <em>k</em> for the previous block.
+        </p>
+        <template id="filterTemplate">
+            <div class="quiet">
+                Filter:
+                <input type="search" id="fileSearch">
+            </div>
+        </template>
+    </div>
+    <div class='status-line high'></div>
+    <pre><table class="coverage">
+<tr><td class="line-count quiet"><a name='L1'></a><a href='#L1'>1</a>
+<a name='L2'></a><a href='#L2'>2</a>
+<a name='L3'></a><a href='#L3'>3</a>
+<a name='L4'></a><a href='#L4'>4</a>
+<a name='L5'></a><a href='#L5'>5</a>
+<a name='L6'></a><a href='#L6'>6</a>
+<a name='L7'></a><a href='#L7'>7</a>
+<a name='L8'></a><a href='#L8'>8</a>
+<a name='L9'></a><a href='#L9'>9</a>
+<a name='L10'></a><a href='#L10'>10</a>
+<a name='L11'></a><a href='#L11'>11</a>
+<a name='L12'></a><a href='#L12'>12</a>
+<a name='L13'></a><a href='#L13'>13</a>
+<a name='L14'></a><a href='#L14'>14</a>
+<a name='L15'></a><a href='#L15'>15</a>
+<a name='L16'></a><a href='#L16'>16</a>
+<a name='L17'></a><a href='#L17'>17</a>
+<a name='L18'></a><a href='#L18'>18</a>
+<a name='L19'></a><a href='#L19'>19</a>
+<a name='L20'></a><a href='#L20'>20</a>
+<a name='L21'></a><a href='#L21'>21</a>
+<a name='L22'></a><a href='#L22'>22</a>
+<a name='L23'></a><a href='#L23'>23</a>
+<a name='L24'></a><a href='#L24'>24</a>
+<a name='L25'></a><a href='#L25'>25</a>
+<a name='L26'></a><a href='#L26'>26</a>
+<a name='L27'></a><a href='#L27'>27</a>
+<a name='L28'></a><a href='#L28'>28</a>
+<a name='L29'></a><a href='#L29'>29</a>
+<a name='L30'></a><a href='#L30'>30</a>
+<a name='L31'></a><a href='#L31'>31</a>
+<a name='L32'></a><a href='#L32'>32</a>
+<a name='L33'></a><a href='#L33'>33</a>
+<a name='L34'></a><a href='#L34'>34</a>
+<a name='L35'></a><a href='#L35'>35</a>
+<a name='L36'></a><a href='#L36'>36</a>
+<a name='L37'></a><a href='#L37'>37</a>
+<a name='L38'></a><a href='#L38'>38</a>
+<a name='L39'></a><a href='#L39'>39</a>
+<a name='L40'></a><a href='#L40'>40</a>
+<a name='L41'></a><a href='#L41'>41</a>
+<a name='L42'></a><a href='#L42'>42</a>
+<a name='L43'></a><a href='#L43'>43</a>
+<a name='L44'></a><a href='#L44'>44</a>
+<a name='L45'></a><a href='#L45'>45</a>
+<a name='L46'></a><a href='#L46'>46</a>
+<a name='L47'></a><a href='#L47'>47</a>
+<a name='L48'></a><a href='#L48'>48</a>
+<a name='L49'></a><a href='#L49'>49</a>
+<a name='L50'></a><a href='#L50'>50</a>
+<a name='L51'></a><a href='#L51'>51</a>
+<a name='L52'></a><a href='#L52'>52</a>
+<a name='L53'></a><a href='#L53'>53</a>
+<a name='L54'></a><a href='#L54'>54</a>
+<a name='L55'></a><a href='#L55'>55</a>
+<a name='L56'></a><a href='#L56'>56</a>
+<a name='L57'></a><a href='#L57'>57</a>
+<a name='L58'></a><a href='#L58'>58</a>
+<a name='L59'></a><a href='#L59'>59</a>
+<a name='L60'></a><a href='#L60'>60</a>
+<a name='L61'></a><a href='#L61'>61</a>
+<a name='L62'></a><a href='#L62'>62</a>
+<a name='L63'></a><a href='#L63'>63</a>
+<a name='L64'></a><a href='#L64'>64</a>
+<a name='L65'></a><a href='#L65'>65</a>
+<a name='L66'></a><a href='#L66'>66</a>
+<a name='L67'></a><a href='#L67'>67</a>
+<a name='L68'></a><a href='#L68'>68</a>
+<a name='L69'></a><a href='#L69'>69</a>
+<a name='L70'></a><a href='#L70'>70</a>
+<a name='L71'></a><a href='#L71'>71</a>
+<a name='L72'></a><a href='#L72'>72</a>
+<a name='L73'></a><a href='#L73'>73</a>
+<a name='L74'></a><a href='#L74'>74</a>
+<a name='L75'></a><a href='#L75'>75</a>
+<a name='L76'></a><a href='#L76'>76</a>
+<a name='L77'></a><a href='#L77'>77</a>
+<a name='L78'></a><a href='#L78'>78</a>
+<a name='L79'></a><a href='#L79'>79</a>
+<a name='L80'></a><a href='#L80'>80</a>
+<a name='L81'></a><a href='#L81'>81</a>
+<a name='L82'></a><a href='#L82'>82</a>
+<a name='L83'></a><a href='#L83'>83</a>
+<a name='L84'></a><a href='#L84'>84</a>
+<a name='L85'></a><a href='#L85'>85</a>
+<a name='L86'></a><a href='#L86'>86</a>
+<a name='L87'></a><a href='#L87'>87</a>
+<a name='L88'></a><a href='#L88'>88</a>
+<a name='L89'></a><a href='#L89'>89</a>
+<a name='L90'></a><a href='#L90'>90</a>
+<a name='L91'></a><a href='#L91'>91</a>
+<a name='L92'></a><a href='#L92'>92</a>
+<a name='L93'></a><a href='#L93'>93</a>
+<a name='L94'></a><a href='#L94'>94</a>
+<a name='L95'></a><a href='#L95'>95</a>
+<a name='L96'></a><a href='#L96'>96</a>
+<a name='L97'></a><a href='#L97'>97</a>
+<a name='L98'></a><a href='#L98'>98</a>
+<a name='L99'></a><a href='#L99'>99</a>
+<a name='L100'></a><a href='#L100'>100</a>
+<a name='L101'></a><a href='#L101'>101</a>
+<a name='L102'></a><a href='#L102'>102</a>
+<a name='L103'></a><a href='#L103'>103</a>
+<a name='L104'></a><a href='#L104'>104</a>
+<a name='L105'></a><a href='#L105'>105</a>
+<a name='L106'></a><a href='#L106'>106</a>
+<a name='L107'></a><a href='#L107'>107</a>
+<a name='L108'></a><a href='#L108'>108</a>
+<a name='L109'></a><a href='#L109'>109</a>
+<a name='L110'></a><a href='#L110'>110</a>
+<a name='L111'></a><a href='#L111'>111</a>
+<a name='L112'></a><a href='#L112'>112</a>
+<a name='L113'></a><a href='#L113'>113</a>
+<a name='L114'></a><a href='#L114'>114</a>
+<a name='L115'></a><a href='#L115'>115</a>
+<a name='L116'></a><a href='#L116'>116</a>
+<a name='L117'></a><a href='#L117'>117</a>
+<a name='L118'></a><a href='#L118'>118</a>
+<a name='L119'></a><a href='#L119'>119</a>
+<a name='L120'></a><a href='#L120'>120</a>
+<a name='L121'></a><a href='#L121'>121</a>
+<a name='L122'></a><a href='#L122'>122</a>
+<a name='L123'></a><a href='#L123'>123</a>
+<a name='L124'></a><a href='#L124'>124</a>
+<a name='L125'></a><a href='#L125'>125</a>
+<a name='L126'></a><a href='#L126'>126</a>
+<a name='L127'></a><a href='#L127'>127</a>
+<a name='L128'></a><a href='#L128'>128</a>
+<a name='L129'></a><a href='#L129'>129</a>
+<a name='L130'></a><a href='#L130'>130</a>
+<a name='L131'></a><a href='#L131'>131</a>
+<a name='L132'></a><a href='#L132'>132</a>
+<a name='L133'></a><a href='#L133'>133</a>
+<a name='L134'></a><a href='#L134'>134</a>
+<a name='L135'></a><a href='#L135'>135</a>
+<a name='L136'></a><a href='#L136'>136</a>
+<a name='L137'></a><a href='#L137'>137</a>
+<a name='L138'></a><a href='#L138'>138</a>
+<a name='L139'></a><a href='#L139'>139</a>
+<a name='L140'></a><a href='#L140'>140</a>
+<a name='L141'></a><a href='#L141'>141</a>
+<a name='L142'></a><a href='#L142'>142</a>
+<a name='L143'></a><a href='#L143'>143</a>
+<a name='L144'></a><a href='#L144'>144</a>
+<a name='L145'></a><a href='#L145'>145</a>
+<a name='L146'></a><a href='#L146'>146</a>
+<a name='L147'></a><a href='#L147'>147</a>
+<a name='L148'></a><a href='#L148'>148</a>
+<a name='L149'></a><a href='#L149'>149</a>
+<a name='L150'></a><a href='#L150'>150</a>
+<a name='L151'></a><a href='#L151'>151</a>
+<a name='L152'></a><a href='#L152'>152</a>
+<a name='L153'></a><a href='#L153'>153</a>
+<a name='L154'></a><a href='#L154'>154</a>
+<a name='L155'></a><a href='#L155'>155</a>
+<a name='L156'></a><a href='#L156'>156</a>
+<a name='L157'></a><a href='#L157'>157</a>
+<a name='L158'></a><a href='#L158'>158</a>
+<a name='L159'></a><a href='#L159'>159</a>
+<a name='L160'></a><a href='#L160'>160</a>
+<a name='L161'></a><a href='#L161'>161</a>
+<a name='L162'></a><a href='#L162'>162</a>
+<a name='L163'></a><a href='#L163'>163</a>
+<a name='L164'></a><a href='#L164'>164</a>
+<a name='L165'></a><a href='#L165'>165</a>
+<a name='L166'></a><a href='#L166'>166</a>
+<a name='L167'></a><a href='#L167'>167</a>
+<a name='L168'></a><a href='#L168'>168</a>
+<a name='L169'></a><a href='#L169'>169</a>
+<a name='L170'></a><a href='#L170'>170</a>
+<a name='L171'></a><a href='#L171'>171</a>
+<a name='L172'></a><a href='#L172'>172</a>
+<a name='L173'></a><a href='#L173'>173</a>
+<a name='L174'></a><a href='#L174'>174</a>
+<a name='L175'></a><a href='#L175'>175</a>
+<a name='L176'></a><a href='#L176'>176</a>
+<a name='L177'></a><a href='#L177'>177</a>
+<a name='L178'></a><a href='#L178'>178</a>
+<a name='L179'></a><a href='#L179'>179</a>
+<a name='L180'></a><a href='#L180'>180</a>
+<a name='L181'></a><a href='#L181'>181</a>
+<a name='L182'></a><a href='#L182'>182</a>
+<a name='L183'></a><a href='#L183'>183</a>
+<a name='L184'></a><a href='#L184'>184</a>
+<a name='L185'></a><a href='#L185'>185</a>
+<a name='L186'></a><a href='#L186'>186</a>
+<a name='L187'></a><a href='#L187'>187</a>
+<a name='L188'></a><a href='#L188'>188</a>
+<a name='L189'></a><a href='#L189'>189</a>
+<a name='L190'></a><a href='#L190'>190</a>
+<a name='L191'></a><a href='#L191'>191</a>
+<a name='L192'></a><a href='#L192'>192</a>
+<a name='L193'></a><a href='#L193'>193</a>
+<a name='L194'></a><a href='#L194'>194</a>
+<a name='L195'></a><a href='#L195'>195</a>
+<a name='L196'></a><a href='#L196'>196</a>
+<a name='L197'></a><a href='#L197'>197</a>
+<a name='L198'></a><a href='#L198'>198</a>
+<a name='L199'></a><a href='#L199'>199</a>
+<a name='L200'></a><a href='#L200'>200</a>
+<a name='L201'></a><a href='#L201'>201</a>
+<a name='L202'></a><a href='#L202'>202</a>
+<a name='L203'></a><a href='#L203'>203</a>
+<a name='L204'></a><a href='#L204'>204</a>
+<a name='L205'></a><a href='#L205'>205</a>
+<a name='L206'></a><a href='#L206'>206</a>
+<a name='L207'></a><a href='#L207'>207</a>
+<a name='L208'></a><a href='#L208'>208</a>
+<a name='L209'></a><a href='#L209'>209</a>
+<a name='L210'></a><a href='#L210'>210</a>
+<a name='L211'></a><a href='#L211'>211</a>
+<a name='L212'></a><a href='#L212'>212</a>
+<a name='L213'></a><a href='#L213'>213</a>
+<a name='L214'></a><a href='#L214'>214</a>
+<a name='L215'></a><a href='#L215'>215</a>
+<a name='L216'></a><a href='#L216'>216</a>
+<a name='L217'></a><a href='#L217'>217</a>
+<a name='L218'></a><a href='#L218'>218</a>
+<a name='L219'></a><a href='#L219'>219</a>
+<a name='L220'></a><a href='#L220'>220</a>
+<a name='L221'></a><a href='#L221'>221</a>
+<a name='L222'></a><a href='#L222'>222</a>
+<a name='L223'></a><a href='#L223'>223</a>
+<a name='L224'></a><a href='#L224'>224</a>
+<a name='L225'></a><a href='#L225'>225</a>
+<a name='L226'></a><a href='#L226'>226</a>
+<a name='L227'></a><a href='#L227'>227</a>
+<a name='L228'></a><a href='#L228'>228</a>
+<a name='L229'></a><a href='#L229'>229</a>
+<a name='L230'></a><a href='#L230'>230</a>
+<a name='L231'></a><a href='#L231'>231</a>
+<a name='L232'></a><a href='#L232'>232</a>
+<a name='L233'></a><a href='#L233'>233</a>
+<a name='L234'></a><a href='#L234'>234</a>
+<a name='L235'></a><a href='#L235'>235</a>
+<a name='L236'></a><a href='#L236'>236</a>
+<a name='L237'></a><a href='#L237'>237</a>
+<a name='L238'></a><a href='#L238'>238</a>
+<a name='L239'></a><a href='#L239'>239</a>
+<a name='L240'></a><a href='#L240'>240</a>
+<a name='L241'></a><a href='#L241'>241</a>
+<a name='L242'></a><a href='#L242'>242</a>
+<a name='L243'></a><a href='#L243'>243</a>
+<a name='L244'></a><a href='#L244'>244</a>
+<a name='L245'></a><a href='#L245'>245</a>
+<a name='L246'></a><a href='#L246'>246</a>
+<a name='L247'></a><a href='#L247'>247</a>
+<a name='L248'></a><a href='#L248'>248</a>
+<a name='L249'></a><a href='#L249'>249</a>
+<a name='L250'></a><a href='#L250'>250</a>
+<a name='L251'></a><a href='#L251'>251</a>
+<a name='L252'></a><a href='#L252'>252</a>
+<a name='L253'></a><a href='#L253'>253</a>
+<a name='L254'></a><a href='#L254'>254</a>
+<a name='L255'></a><a href='#L255'>255</a>
+<a name='L256'></a><a href='#L256'>256</a>
+<a name='L257'></a><a href='#L257'>257</a>
+<a name='L258'></a><a href='#L258'>258</a>
+<a name='L259'></a><a href='#L259'>259</a>
+<a name='L260'></a><a href='#L260'>260</a>
+<a name='L261'></a><a href='#L261'>261</a>
+<a name='L262'></a><a href='#L262'>262</a>
+<a name='L263'></a><a href='#L263'>263</a>
+<a name='L264'></a><a href='#L264'>264</a>
+<a name='L265'></a><a href='#L265'>265</a>
+<a name='L266'></a><a href='#L266'>266</a>
+<a name='L267'></a><a href='#L267'>267</a>
+<a name='L268'></a><a href='#L268'>268</a>
+<a name='L269'></a><a href='#L269'>269</a>
+<a name='L270'></a><a href='#L270'>270</a>
+<a name='L271'></a><a href='#L271'>271</a>
+<a name='L272'></a><a href='#L272'>272</a>
+<a name='L273'></a><a href='#L273'>273</a>
+<a name='L274'></a><a href='#L274'>274</a>
+<a name='L275'></a><a href='#L275'>275</a>
+<a name='L276'></a><a href='#L276'>276</a>
+<a name='L277'></a><a href='#L277'>277</a>
+<a name='L278'></a><a href='#L278'>278</a>
+<a name='L279'></a><a href='#L279'>279</a>
+<a name='L280'></a><a href='#L280'>280</a>
+<a name='L281'></a><a href='#L281'>281</a>
+<a name='L282'></a><a href='#L282'>282</a>
+<a name='L283'></a><a href='#L283'>283</a>
+<a name='L284'></a><a href='#L284'>284</a>
+<a name='L285'></a><a href='#L285'>285</a>
+<a name='L286'></a><a href='#L286'>286</a>
+<a name='L287'></a><a href='#L287'>287</a>
+<a name='L288'></a><a href='#L288'>288</a>
+<a name='L289'></a><a href='#L289'>289</a>
+<a name='L290'></a><a href='#L290'>290</a>
+<a name='L291'></a><a href='#L291'>291</a>
+<a name='L292'></a><a href='#L292'>292</a>
+<a name='L293'></a><a href='#L293'>293</a>
+<a name='L294'></a><a href='#L294'>294</a>
+<a name='L295'></a><a href='#L295'>295</a>
+<a name='L296'></a><a href='#L296'>296</a>
+<a name='L297'></a><a href='#L297'>297</a>
+<a name='L298'></a><a href='#L298'>298</a>
+<a name='L299'></a><a href='#L299'>299</a>
+<a name='L300'></a><a href='#L300'>300</a>
+<a name='L301'></a><a href='#L301'>301</a>
+<a name='L302'></a><a href='#L302'>302</a>
+<a name='L303'></a><a href='#L303'>303</a>
+<a name='L304'></a><a href='#L304'>304</a>
+<a name='L305'></a><a href='#L305'>305</a>
+<a name='L306'></a><a href='#L306'>306</a>
+<a name='L307'></a><a href='#L307'>307</a>
+<a name='L308'></a><a href='#L308'>308</a>
+<a name='L309'></a><a href='#L309'>309</a>
+<a name='L310'></a><a href='#L310'>310</a>
+<a name='L311'></a><a href='#L311'>311</a>
+<a name='L312'></a><a href='#L312'>312</a>
+<a name='L313'></a><a href='#L313'>313</a>
+<a name='L314'></a><a href='#L314'>314</a>
+<a name='L315'></a><a href='#L315'>315</a>
+<a name='L316'></a><a href='#L316'>316</a>
+<a name='L317'></a><a href='#L317'>317</a>
+<a name='L318'></a><a href='#L318'>318</a>
+<a name='L319'></a><a href='#L319'>319</a>
+<a name='L320'></a><a href='#L320'>320</a>
+<a name='L321'></a><a href='#L321'>321</a>
+<a name='L322'></a><a href='#L322'>322</a>
+<a name='L323'></a><a href='#L323'>323</a>
+<a name='L324'></a><a href='#L324'>324</a>
+<a name='L325'></a><a href='#L325'>325</a>
+<a name='L326'></a><a href='#L326'>326</a>
+<a name='L327'></a><a href='#L327'>327</a>
+<a name='L328'></a><a href='#L328'>328</a>
+<a name='L329'></a><a href='#L329'>329</a>
+<a name='L330'></a><a href='#L330'>330</a>
+<a name='L331'></a><a href='#L331'>331</a>
+<a name='L332'></a><a href='#L332'>332</a>
+<a name='L333'></a><a href='#L333'>333</a>
+<a name='L334'></a><a href='#L334'>334</a>
+<a name='L335'></a><a href='#L335'>335</a>
+<a name='L336'></a><a href='#L336'>336</a>
+<a name='L337'></a><a href='#L337'>337</a>
+<a name='L338'></a><a href='#L338'>338</a>
+<a name='L339'></a><a href='#L339'>339</a>
+<a name='L340'></a><a href='#L340'>340</a>
+<a name='L341'></a><a href='#L341'>341</a>
+<a name='L342'></a><a href='#L342'>342</a>
+<a name='L343'></a><a href='#L343'>343</a>
+<a name='L344'></a><a href='#L344'>344</a>
+<a name='L345'></a><a href='#L345'>345</a>
+<a name='L346'></a><a href='#L346'>346</a>
+<a name='L347'></a><a href='#L347'>347</a>
+<a name='L348'></a><a href='#L348'>348</a>
+<a name='L349'></a><a href='#L349'>349</a>
+<a name='L350'></a><a href='#L350'>350</a>
+<a name='L351'></a><a href='#L351'>351</a>
+<a name='L352'></a><a href='#L352'>352</a>
+<a name='L353'></a><a href='#L353'>353</a>
+<a name='L354'></a><a href='#L354'>354</a>
+<a name='L355'></a><a href='#L355'>355</a>
+<a name='L356'></a><a href='#L356'>356</a>
+<a name='L357'></a><a href='#L357'>357</a>
+<a name='L358'></a><a href='#L358'>358</a>
+<a name='L359'></a><a href='#L359'>359</a>
+<a name='L360'></a><a href='#L360'>360</a>
+<a name='L361'></a><a href='#L361'>361</a>
+<a name='L362'></a><a href='#L362'>362</a>
+<a name='L363'></a><a href='#L363'>363</a>
+<a name='L364'></a><a href='#L364'>364</a>
+<a name='L365'></a><a href='#L365'>365</a>
+<a name='L366'></a><a href='#L366'>366</a>
+<a name='L367'></a><a href='#L367'>367</a>
+<a name='L368'></a><a href='#L368'>368</a>
+<a name='L369'></a><a href='#L369'>369</a>
+<a name='L370'></a><a href='#L370'>370</a></td><td class="line-coverage quiet"><span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">45x</span>
+<span class="cline-any cline-yes">45x</span>
+<span class="cline-any cline-yes">45x</span>
+<span class="cline-any cline-yes">45x</span>
+<span class="cline-any cline-neutral">&nbsp;</span>
+<span class="cline-any cline-yes">1x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-yes">10x</span>
+<span class="cline-any cline-neutral">&nbsp;</span></td><td class="text"><pre class="prettyprint lang-js">export const SUPPORTED_LANGS = ['en', 'el', 'bg', 'ro', 'tr', 'sr'] as const;
+export type Lang = (typeof SUPPORTED_LANGS)[number];
+export const DEFAULT_LANG: Lang = 'en';
+&nbsp;
+export const LANG_LABELS: Record&lt;Lang, string&gt; = {
+  en: 'English',
+  el: 'Ελληνικά',
+  bg: 'Български',
+  ro: 'Română',
+  tr: 'Türkçe',
+  sr: 'Српски',
+};
+&nbsp;
+export const LANG_FLAGS: Record&lt;Lang, string&gt; = {
+  en: '🇬🇧',
+  el: '🇬🇷',
+  bg: '🇧🇬',
+  ro: '🇷🇴',
+  tr: '🇹🇷',
+  sr: '🇷🇸',
+};
+&nbsp;
+// ─── Translation dictionary ────────────────────────────────────────────────
+const translations = {
+  // ── Nav ──────────────────────────────────────────────────────────────────
+  'nav.rentals':   { en: 'Our Rentals', el: 'Τα Ενοικιαζόμενα', bg: 'Нашите Имоти', ro: 'Proprietățile Noastre', tr: 'Kiralıklarımız', sr: 'Наши смештаји' },
+  'nav.blog':      { en: 'Blog',        el: 'Ιστολόγιο',        bg: 'Блог',         ro: 'Blog',                tr: 'Blog', sr: 'Блог' },
+  'nav.about':     { en: 'About',       el: 'Σχετικά',          bg: 'За Нас',       ro: 'Despre',              tr: 'Hakkımızda', sr: 'О нама' },
+  'nav.contact':   { en: 'Contact',     el: 'Επικοινωνία',      bg: 'Контакт',      ro: 'Contact',             tr: 'İletişim', sr: 'Контакт' },
+  'nav.faq':       { en: 'FAQ',         el: 'Συχνές Ερωτήσεις', bg: 'ЧЗВ',          ro: 'Întrebări',           tr: 'SSS', sr: 'ЧПП' },
+  'nav.book_now':  { en: 'Book Now',    el: 'Κράτηση',          bg: 'Резервирай',   ro: 'Rezervă',             tr: 'Rezervasyon', sr: 'Резервишите' },
+&nbsp;
+  // ── Home hero ─────────────────────────────────────────────────────────────
+  'home.hero.title':    { en: 'Find your perfect vacation rental', el: 'Βρείτε το τέλειο σας ενοικιαζόμενο', bg: 'Намерете идеалния си ваканционен имот', ro: 'Găsiți închirierea de vacanță perfectă', tr: 'Mükemmel tatil kiralığınızı bulun', sr: 'Пронађите савршен одмор' },
+  'home.hero.subtitle': { en: 'Handpicked villas, apartments and holiday homes. Book direct — no middlemen, no extra fees, best price guaranteed.', el: 'Επιλεγμένες βίλες, διαμερίσματα και εξοχικές κατοικίες. Απευθείας κράτηση — χωρίς μεσάζοντες, χωρίς επιπλέον χρεώσεις.', bg: 'Внимателно подбрани вили, апартаменти и ваканционни домове. Резервирайте директно — без посредници, без допълнителни такси.', ro: 'Vile, apartamente și case de vacanță selecționate. Rezervați direct — fără intermediari, fără taxe extra.', tr: 'Özenle seçilmiş villalar, daireler ve tatil evleri. Doğrudan rezervasyon — aracı yok, ek ücret yok.', sr: 'Пажљиво одабране виле, апартмани и куће за одмор. Директна резервација — без посредника, без додатних накнада, загарантована најбоља цена.' },
+  'home.hero.cta':      { en: 'Search Properties', el: 'Αναζήτηση Καταλυμάτων', bg: 'Търсене на имоти', ro: 'Caută Proprietăți', tr: 'Mülk Ara', sr: 'Претражи смештаје' },
+&nbsp;
+  // ── Listings page ─────────────────────────────────────────────────────────
+  'listings.title':     { en: 'Our Rentals',        el: 'Τα Ενοικιαζόμενά μας', bg: 'Нашите Имоти',         ro: 'Proprietățile Noastre',  tr: 'Kiralıklarımız', sr: 'Наши смештаји' },
+  'listings.subtitle':  { en: 'Direct booking — best rate guaranteed', el: 'Απευθείας κράτηση — καλύτερη τιμή εγγυημένη', bg: 'Директна резервация — най-добра цена гарантирана', ro: 'Rezervare directă — cel mai bun tarif garantat', tr: 'Doğrudan rezervasyon — en iyi fiyat garantili', sr: 'Директна резервација — загарантована најбоља цена' },
+  'listings.filter.guests':   { en: 'Guests', el: 'Επισκέπτες', bg: 'Гости', ro: 'Oaspeți', tr: 'Misafir', sr: 'Гости' },
+  'listings.filter.bedrooms': { en: 'Bedrooms', el: 'Υπνοδωμάτια', bg: 'Спални', ro: 'Dormitoare', tr: 'Yatak Odası', sr: 'Спаваћих соба' },
+  'listings.filter.pets':     { en: 'Pet friendly', el: 'Κατοικίδια OK', bg: 'Домашни любимци OK', ro: 'Animale OK', tr: 'Evcil hayvan dostu', sr: 'Кућни љубимци OK' },
+  'listings.filter.beach':    { en: 'Beach access', el: 'Πρόσβαση σε παραλία', bg: 'Достъп до плаж', ro: 'Acces la plajă', tr: 'Plaj erişimi', sr: 'Приступ плажи' },
+  'listings.per_night':       { en: '/night', el: '/νύχτα', bg: '/нощ', ro: '/noapte', tr: '/gece', sr: '/ноћ' },
+  'listings.guests':          { en: 'guests', el: 'επισκέπτες', bg: 'гости', ro: 'oaspeți', tr: 'misafir', sr: 'гости' },
+  'listings.bedrooms':        { en: 'bedrooms', el: 'υπνοδωμάτια', bg: 'спални', ro: 'dormitoare', tr: 'yatak odası', sr: 'спаваћих соба' },
+  'listings.view':            { en: 'View Details', el: 'Λεπτομέρειες', bg: 'Виж детайли', ro: 'Vezi Detalii', tr: 'Detayları Gör', sr: 'Погледај детаље' },
+  'listings.from':            { en: 'From', el: 'Από', bg: 'От', ro: 'De la', tr: 'Başlangıç', sr: 'Од' },
+  'listings.available':       { en: 'Check dates', el: 'Διαθεσιμότητα', bg: 'Провери дати', ro: 'Verifică datele', tr: 'Tarihleri kontrol et', sr: 'Провери датуме' },
+  'listings.no_results':      { en: 'No villas found', el: 'Δεν βρέθηκαν βίλες', bg: 'Не са намерени вили', ro: 'Nu s-au găsit vile', tr: 'Villa bulunamadı', sr: 'Нема вила' },
+  'listings.no_results_hint': { en: 'Try adjusting your filters.', el: 'Δοκιμάστε να αλλάξετε τα φίλτρα.', bg: 'Опитайте да промените филтрите.', ro: 'Încercați să ajustați filtrele.', tr: 'Filtrelerinizi ayarlamayı deneyin.', sr: 'Покушајте да промените филтере.' },
+&nbsp;
+  // ── Listing detail ────────────────────────────────────────────────────────
+  'listing.book_now':        { en: 'Book Now', el: 'Κράτηση Τώρα', bg: 'Резервирай', ro: 'Rezervă Acum', tr: 'Hemen Rezervasyon', sr: 'Резервишите' },
+  'listing.check_in':        { en: 'Check-in', el: 'Άφιξη', bg: 'Настаняване', ro: 'Check-in', tr: 'Giriş', sr: 'Долазак' },
+  'listing.check_out':       { en: 'Check-out', el: 'Αναχώρηση', bg: 'Напускане', ro: 'Check-out', tr: 'Çıkış', sr: 'Одлазак' },
+  'listing.guests':          { en: 'Guests', el: 'Επισκέπτες', bg: 'Гости', ro: 'Oaspeți', tr: 'Misafirler', sr: 'Гости' },
+  'listing.nights':          { en: 'nights', el: 'νύχτες', bg: 'нощи', ro: 'nopți', tr: 'gece', sr: 'ноћи' },
+  'listing.reviews':         { en: 'reviews', el: 'κριτικές', bg: 'отзиви', ro: 'recenzii', tr: 'yorum', sr: 'рецензија' },
+  'listing.amenities':       { en: 'Amenities', el: 'Παροχές', bg: 'Удобства', ro: 'Facilități', tr: 'Olanaklar', sr: 'Погодности' },
+  'listing.house_rules':     { en: 'House Rules', el: 'Κανόνες Σπιτιού', bg: 'Правила', ro: 'Regulile Casei', tr: 'Ev Kuralları', sr: 'Правила куће' },
+  'listing.availability':    { en: 'Availability', el: 'Διαθεσιμότητα', bg: 'Наличност', ro: 'Disponibilitate', tr: 'Müsaitlik', sr: 'Доступност' },
+  'listing.location':        { en: 'Location', el: 'Τοποθεσία', bg: 'Местоположение', ro: 'Locație', tr: 'Konum', sr: 'Локација' },
+  'listing.reviews_title':   { en: 'Guest Reviews', el: 'Κριτικές', bg: 'Отзиви от гости', ro: 'Recenzii', tr: 'Misafir Yorumları', sr: 'Рецензије гостију' },
+  'listing.per_night':       { en: 'per night', el: 'ανά νύχτα', bg: 'на нощ', ro: 'pe noapte', tr: 'gecelik', sr: 'по ноћи' },
+  'listing.cleaning_fee':    { en: 'Cleaning fee', el: 'Τέλος καθαριότητας', bg: 'Такса почистване', ro: 'Taxă curățenie', tr: 'Temizlik ücreti', sr: 'Накнада за чишћење' },
+  'listing.total':           { en: 'Total', el: 'Σύνολο', bg: 'Общо', ro: 'Total', tr: 'Toplam', sr: 'Укупно' },
+  'listing.min_nights':      { en: 'minimum nights', el: 'ελάχιστες νύχτες', bg: 'минимален престой', ro: 'nopți minime', tr: 'minimum gece', sr: 'минималан боравак' },
+  'listing.select_dates':    { en: 'Select dates to see price', el: 'Επιλέξτε ημερομηνίες', bg: 'Изберете дати', ro: 'Selectați datele', tr: 'Tarih seçin', sr: 'Изаберите датуме за цену' },
+  'listing.cancellation':    { en: 'Cancellation policy', el: 'Πολιτική ακύρωσης', bg: 'Политика за анулиране', ro: 'Politică de anulare', tr: 'İptal politikası', sr: 'Правила отказивања' },
+&nbsp;
+  // ── Booking page ──────────────────────────────────────────────────────────
+  'book.title':              { en: 'Complete your booking', el: 'Ολοκλήρωση κράτησης', bg: 'Завършете резервацията', ro: 'Finalizați rezervarea', tr: 'Rezervasyonu tamamlayın', sr: 'Завршите резервацију' },
+  'book.your_details':       { en: 'Your details', el: 'Τα στοιχεία σας', bg: 'Вашите данни', ro: 'Datele dvs.', tr: 'Bilgileriniz', sr: 'Ваши подаци' },
+  'book.full_name':          { en: 'Full name', el: 'Ονοματεπώνυμο', bg: 'Пълно име', ro: 'Nume complet', tr: 'Ad Soyad', sr: 'Пуно име' },
+  'book.email':              { en: 'Email', el: 'Email', bg: 'Имейл', ro: 'Email', tr: 'E-posta', sr: 'Имејл' },
+  'book.phone':              { en: 'Phone', el: 'Τηλέφωνο', bg: 'Телефон', ro: 'Telefon', tr: 'Telefon', sr: 'Телефон' },
+  'book.country':            { en: 'Country', el: 'Χώρα', bg: 'Държава', ro: 'Țară', tr: 'Ülke', sr: 'Земља' },
+  'book.message':            { en: 'Message (optional)', el: 'Μήνυμα (προαιρετικό)', bg: 'Съобщение (незадължително)', ro: 'Mesaj (opțional)', tr: 'Mesaj (isteğe bağlı)', sr: 'Порука (опционо)' },
+  'book.payment_method':     { en: 'How would you like to pay?', el: 'Πώς θέλετε να πληρώσετε;', bg: 'Как искате да платите?', ro: 'Cum doriți să plătiți?', tr: 'Nasıl ödeme yapmak istersiniz?', sr: 'Како желите да платите?' },
+  'book.pay_stripe':         { en: 'Pay now by card', el: 'Πληρωμή με κάρτα τώρα', bg: 'Плати сега с карта', ro: 'Plătiți acum cu cardul', tr: 'Şimdi kartla öde', sr: 'Платите картицом сада' },
+  'book.pay_stripe_desc':    { en: 'Secure card payment. Booking confirmed instantly.', el: 'Ασφαλής πληρωμή. Άμεση επιβεβαίωση κράτησης.', bg: 'Сигурно плащане. Незабавно потвърждение.', ro: 'Plată securizată. Confirmare instantă.', tr: 'Güvenli ödeme. Anında onay.', sr: 'Сигурно плаћање картицом. Резервација потврђена одмах.' },
+  'book.pay_bank':           { en: 'Bank transfer (Revolut / Wise / IBAN)', el: 'Τραπεζική μεταφορά (Revolut / Wise / IBAN)', bg: 'Банков превод (Revolut / Wise / IBAN)', ro: 'Transfer bancar (Revolut / Wise / IBAN)', tr: 'Banka transferi (Revolut / Wise / IBAN)', sr: 'Банковни трансфер (Revolut / Wise / IBAN)' },
+  'book.pay_bank_desc':      { en: 'Request first, pay after owner approval. Bank details sent by email.', el: 'Αίτημα πρώτα, πληρωμή μετά έγκριση ιδιοκτήτη. Τραπεζικά στοιχεία στο email σας.', bg: 'Поискайте първо, платете след одобрение. Банкови детайли по имейл.', ro: 'Solicitare întâi, plată după aprobare. Detalii bancare trimise pe email.', tr: 'Önce istek, onaydan sonra ödeme. Banka detayları e-posta ile gönderilir.', sr: 'Прво захтев, плаћање после одобрења власника. Банковни подаци послати имејлом.' },
+  'book.confirm_pay':        { en: 'Confirm &amp; Pay', el: 'Επιβεβαίωση &amp; Πληρωμή', bg: 'Потвърди и Плати', ro: 'Confirmați și Plătiți', tr: 'Onayla ve Öde', sr: 'Потврди и Плати' },
+  'book.request_book':       { en: 'Request to Book', el: 'Αίτημα Κράτησης', bg: 'Заявка за Резервация', ro: 'Solicitare Rezervare', tr: 'Rezervasyon Talebi', sr: 'Захтев за резервацију' },
+  'book.stripe_note':        { en: 'You will be redirected to secure Stripe checkout or pay by bank transfer.', el: 'Θα μεταφερθείτε στο ασφαλές Stripe checkout ή μπορείτε να πληρώσετε με τραπεζική μεταφορά.', bg: 'Ще бъдете пренасочени към сигурното плащане или можете да платите с банков превод.', ro: 'Veți fi redirecționat la plata securizată Stripe sau puteți plăti prin transfer bancar.', tr: 'Güvenli Stripe ödeme sayfasına yönlendirileceksiniz veya banka transferiyle ödeyebilirsiniz.', sr: 'Бићете преусмерени на сигурно Stripe плаћање или можете платити банковним трансфером.' },
+  'book.bank_note':          { en: 'No charge now. Bank details sent after owner approval (usually within a few hours).', el: 'Καμία χρέωση τώρα. Τραπεζικά στοιχεία μετά έγκριση (συνήθως εντός λίγων ωρών).', bg: 'Без такса сега. Банкови детайли след одобрение (обикновено в рамките на часове).', ro: 'Nicio taxă acum. Detalii bancare trimise după aprobare (de obicei în câteva ore).', tr: 'Şimdi ücret yok. Banka detayları onaydan sonra gönderilir (genellikle birkaç saat içinde).', sr: 'Без накнаде сада. Банковни подаци послати после одобрења (обично у року од неколико сати).' },
+  'book.price_summary':      { en: 'Price Summary', el: 'Ανάλυση Τιμής', bg: 'Ценова Справка', ro: 'Sumar Preț', tr: 'Fiyat Özeti', sr: 'Преглед цена' },
+  'book.dates_not_avail':    { en: 'Dates not available', el: 'Ημερομηνίες δεν είναι διαθέσιμες', bg: 'Датите не са налични', ro: 'Date indisponibile', tr: 'Tarihler müsait değil', sr: 'Датуми нису доступни' },
+  'book.back':               { en: 'Back to', el: 'Πίσω στο', bg: 'Назад към', ro: 'Înapoi la', tr: 'Geri dön', sr: 'Назад на' },
+  'book.processing':         { en: 'Processing…', el: 'Επεξεργασία…', bg: 'Обработка…', ro: 'Se procesează…', tr: 'İşleniyor…', sr: 'Обрада…' },
+  'book.dates_error_hint':   { en: 'Sorry, those dates are already booked. Please select different dates.', el: 'Λυπούμαστε, αυτές οι ημερομηνίες είναι ήδη κλεισμένες. Παρακαλώ επιλέξτε άλλες.', bg: 'Съжаляваме, тези дати вече са резервирани. Изберете различни дати.', ro: 'Ne pare rău, acele date sunt deja rezervate. Vă rugăm selectați alte date.', tr: 'Üzgünüz, bu tarihler zaten rezerve. Lütfen farklı tarihler seçin.' },
+  'book.choose_dates':       { en: 'Choose other dates', el: 'Επιλογή άλλων ημερομηνιών', bg: 'Изберете други дати', ro: 'Alegeți alte date', tr: 'Başka tarihler seçin' },
+  'book.adults':             { en: 'Adults', el: 'Ενήλικες', bg: 'Възрастни', ro: 'Adulți', tr: 'Yetişkin' },
+  'book.children':           { en: 'Children', el: 'Παιδιά', bg: 'Деца', ro: 'Copii', tr: 'Çocuk' },
+  'book.infants':            { en: 'Infants', el: 'Βρέφη', bg: 'Бебета', ro: 'Bebeluși', tr: 'Bebek' },
+  'book.pets':               { en: 'Pets', el: 'Κατοικίδια', bg: 'Домашни любимци', ro: 'Animale', tr: 'Evcil hayvan' },
+  'book.instant_badge':      { en: 'Instant', el: 'Άμεσα', bg: 'Моментално', ro: 'Instant', tr: 'Anında' },
+  'book.on_approval_badge':  { en: 'On approval', el: 'Κατόπιν έγκρισης', bg: 'При одобрение', ro: 'La aprobare', tr: 'Onay üzerine' },
+  'book.house_rules_text':   { en: 'House rules: No smoking indoors · Max {n} guests', el: 'Κανόνες σπιτιού: Όχι κάπνισμα εσωτερικά · Μέγ. {n} επισκέπτες', bg: 'Правила: Забранено пушенето вътре · Макс. {n} гости', ro: 'Reguli casă: Fumatul interzis · Max {n} oaspeți', tr: 'Ev kuralları: İç mekanda sigara yasak · Maks. {n} misafir' },
+  'book.extra_guests_fee':   { en: 'Extra guests fee', el: 'Χρέωση επιπλέον επισκεπτών', bg: 'Такса за допълнителни гости', ro: 'Taxă oaspeți suplimentari', tr: 'Ekstra misafir ücreti' },
+  'book.discount_label':     { en: 'Discount', el: 'Έκπτωση', bg: 'Отстъпка', ro: 'Reducere', tr: 'İndirim' },
+  'book.stripe_secured':     { en: 'Card payments secured by Stripe', el: 'Ασφαλείς πληρωμές μέσω Stripe', bg: 'Плащанията с карта са защитени от Stripe', ro: 'Plăți cu cardul securizate de Stripe', tr: 'Kart ödemeleri Stripe tarafından güvence altında' },
+  'book.best_rate':          { en: 'Best rate — book direct', el: 'Καλύτερη τιμή — απευθείας κράτηση', bg: 'Най-добра цена — директна резервация', ro: 'Cel mai bun tarif — rezervare directă', tr: 'En iyi fiyat — doğrudan rezervasyon' },
+&nbsp;
+  // ── Booking success ───────────────────────────────────────────────────────
+  'success.stripe.title':   { en: 'Booking Confirmed!', el: 'Κράτηση Επιβεβαιώθηκε!', bg: 'Резервацията е Потвърдена!', ro: 'Rezervare Confirmată!', tr: 'Rezervasyon Onaylandı!' },
+  'success.stripe.body':    { en: 'Payment received. A confirmation email is on its way.', el: 'Η πληρωμή ελήφθη. Επιβεβαίωση στο email σας.', bg: 'Плащането е получено. Потвърждение по имейл.', ro: 'Plată primită. Email de confirmare în drum.', tr: 'Ödeme alındı. Onay e-postası yolda.' },
+  'success.bank.title':     { en: 'Request Received!', el: 'Αίτημα Ελήφθη!', bg: 'Заявката е Получена!', ro: 'Cerere Primită!', tr: 'Talep Alındı!' },
+  'success.bank.body':      { en: 'We\'ll review your request and send bank transfer details once approved — usually within a few hours.', el: 'Θα εξετάσουμε το αίτημά σας και θα στείλουμε τραπεζικά στοιχεία μόλις εγκριθεί — συνήθως εντός λίγων ωρών.', bg: 'Ще прегледаме заявката и ще изпратим банкови детайли след одобрение — обикновено в рамките на часове.', ro: 'Vom revizui cererea dvs. și vom trimite detalii bancare după aprobare — de obicei în câteva ore.', tr: 'Talebinizi inceleyeceğiz ve onaylandıktan sonra banka detaylarını göndereceğiz — genellikle birkaç saat içinde.' },
+&nbsp;
+  // ── Footer ────────────────────────────────────────────────────────────────
+  'footer.rights':        { en: 'All rights reserved.', el: 'Με επιφύλαξη παντός δικαιώματος.', bg: 'Всички права запазени.', ro: 'Toate drepturile rezervate.', tr: 'Tüm hakları saklıdır.' },
+  'footer.book_direct':   { en: 'Book Direct &amp; Save', el: 'Κράτηση Απευθείας &amp; Εξοικονομήστε', bg: 'Директна Резервация &amp; Спестете', ro: 'Rezervare Directă &amp; Economisiți', tr: 'Doğrudan Rezervasyon Yapın ve Tasarruf Edin' },
+  'footer.tagline':       { en: 'Vacation rentals across Kavala &amp; Thassos, Greece. Book direct, no fees.', el: 'Εξοχικές κατοικίες σε Καβάλα &amp; Θάσο, Ελλάδα. Κράτηση απευθείας, χωρίς χρεώσεις.', bg: 'Ваканционни наеми в Кавала и Тасос, Гърция. Резервирайте директно, без такси.', ro: 'Închirieri de vacanță în Kavala &amp; Thassos, Grecia. Rezervați direct, fără taxe.', tr: 'Kavala ve Tasos, Yunanistan\'da tatil kiralıkları. Doğrudan rezervasyon, ücret yok.' },
+  'footer.explore':       { en: 'Explore', el: 'Εξερεύνηση', bg: 'Разгледайте', ro: 'Explorați', tr: 'Keşfet' },
+  'footer.our_rentals':   { en: 'Our Rentals', el: 'Τα Ενοικιαζόμενα', bg: 'Нашите Имоти', ro: 'Proprietăți', tr: 'Kiralıklar' },
+  'footer.about_us':      { en: 'About Us', el: 'Σχετικά με εμάς', bg: 'За нас', ro: 'Despre noi', tr: 'Hakkımızda' },
+  'footer.area_guide':    { en: 'Area Guide', el: 'Οδηγός Περιοχής', bg: 'Пътеводител', ro: 'Ghid zonă', tr: 'Bölge Rehberi' },
+  'footer.faqs':          { en: 'FAQs', el: 'Συχνές Ερωτήσεις', bg: 'ЧЗВ', ro: 'Întrebări frecvente', tr: 'SSS' },
+  'footer.legal':         { en: 'Legal', el: 'Νομικά', bg: 'Правни', ro: 'Legal', tr: 'Yasal' },
+  'footer.cancellation':  { en: 'Cancellation Policy', el: 'Πολιτική Ακύρωσης', bg: 'Политика за анулиране', ro: 'Politică anulare', tr: 'İptal Politikası' },
+  'footer.terms':         { en: 'Terms &amp; Conditions', el: 'Όροι Χρήσης', bg: 'Общи условия', ro: 'Termeni și condiții', tr: 'Şartlar ve Koşullar' },
+  'footer.privacy':       { en: 'Privacy Policy', el: 'Πολιτική Απορρήτου', bg: 'Политика за поверителност', ro: 'Politică confidențialitate', tr: 'Gizlilik Politikası' },
+  'footer.contact':       { en: 'Contact', el: 'Επικοινωνία', bg: 'Контакт', ro: 'Contact', tr: 'İletişim' },
+  'footer.whatsapp':      { en: 'WhatsApp Us', el: 'WhatsApp', bg: 'WhatsApp', ro: 'WhatsApp', tr: 'WhatsApp' },
+  'footer.book_tagline':  { en: 'Book direct — no platform fees, best rates guaranteed.', el: 'Απευθείας κράτηση — χωρίς προμήθειες πλατφόρμας.', bg: 'Директна резервация — без такси на платформа.', ro: 'Rezervare directă — fără taxe de platformă.', tr: 'Doğrudan rezervasyon — platform ücreti yok.' },
+&nbsp;
+  // ── Policy pages ──────────────────────────────────────────────────────────
+  'policy.last_updated': { en: 'Last updated', el: 'Τελευταία ενημέρωση', bg: 'Последна актуализация', ro: 'Ultima actualizare', tr: 'Son güncelleme' },
+  'policy.questions':    { en: 'Questions?', el: 'Απορίες;', bg: 'Въпроси?', ro: 'Întrebări?', tr: 'Sorularınız mı var?' },
+&nbsp;
+  // ── Area Guide ───────────────────────────────────────────────────────────
+  'area.cta_title': { en: 'Inspired? Book your stay', el: 'Σας άρεσε; Κάντε κράτηση', bg: 'Вдъхновени? Резервирайте', ro: 'Inspirat? Rezervați sejurul', tr: 'İlham aldınız mı? Rezerve edin' },
+  'area.cta_body':  { en: 'Secure your dates directly with us for the best rates.', el: 'Κλείστε τις ημερομηνίες σας απευθείας για τις καλύτερες τιμές.', bg: 'Осигурете датите директно при нас за най-добрите цени.', ro: 'Asigurați datele direct cu noi pentru cele mai bune tarife.', tr: 'En iyi fiyatlar için tarihleri doğrudan bizimle güvence altına alın.' },
+&nbsp;
+  // ── Common ────────────────────────────────────────────────────────────────
+  'common.from':        { en: 'from', el: 'από', bg: 'от', ro: 'de la', tr: 'başlangıç' },
+  'common.night':       { en: 'night', el: 'νύχτα', bg: 'нощ', ro: 'noapte', tr: 'gece' },
+  'common.required':    { en: 'required', el: 'υποχρεωτικό', bg: 'задължително', ro: 'obligatoriu', tr: 'zorunlu' },
+  'common.loading':     { en: 'Loading…', el: 'Φόρτωση…', bg: 'Зареждане…', ro: 'Se încarcă…', tr: 'Yükleniyor…' },
+  'common.error':       { en: 'Something went wrong. Please try again.', el: 'Κάτι πήγε στραβά. Δοκιμάστε ξανά.', bg: 'Нещо се обърка. Опитайте отново.', ro: 'Ceva a mers greșit. Încercați din nou.', tr: 'Bir şeyler ters gitti. Lütfen tekrar deneyin.' },
+  'common.home':        { en: 'Home', el: 'Αρχική', bg: 'Начало', ro: 'Acasă', tr: 'Ana Sayfa' },
+  'common.rentals':     { en: 'Rentals', el: 'Ενοικιαζόμενα', bg: 'Имоти', ro: 'Proprietăți', tr: 'Kiralıklar' },
+  'common.search':      { en: 'Search', el: 'Αναζήτηση', bg: 'Търсене', ro: 'Căutare', tr: 'Ara' },
+  'common.clear':       { en: 'Clear ×', el: 'Καθαρισμός ×', bg: 'Изчисти ×', ro: 'Șterge ×', tr: 'Temizle ×' },
+  'common.back_home':   { en: 'Back to Home', el: 'Αρχική Σελίδα', bg: 'Начална страница', ro: 'Înapoi acasă', tr: 'Ana Sayfaya Dön' },
+  'common.contact_us':  { en: 'Contact Us', el: 'Επικοινωνία', bg: 'Свържете се', ro: 'Contactați-ne', tr: 'Bize Ulaşın' },
+  'common.browse_rentals': { en: 'Browse Rentals', el: 'Δείτε τα Ενοικιαζόμενα', bg: 'Разгледайте Имотите', ro: 'Răsfoiți Proprietăți', tr: 'Kiralamalara Göz At' },
+  'common.check_availability': { en: 'Check Availability', el: 'Έλεγχος Διαθεσιμότητας', bg: 'Провери наличността', ro: 'Verifică Disponibilitatea', tr: 'Müsaitliği Kontrol Et' },
+&nbsp;
+  // ── Contact page ──────────────────────────────────────────────────────────
+  'contact.title':       { en: 'Contact Us', el: 'Επικοινωνία', bg: 'Свържете се с нас', ro: 'Contactați-ne', tr: 'Bize Ulaşın' },
+  'contact.badge':       { en: 'Get in Touch', el: 'Επικοινωνήστε μαζί μας', bg: 'Свържете се', ro: 'Luați legătura', tr: 'İletişime Geçin' },
+  'contact.subtitle':    { en: 'We usually respond within a few hours. You can also reach us via WhatsApp for a faster reply.', el: 'Συνήθως απαντάμε εντός λίγων ωρών. Μπορείτε επίσης να μας βρείτε στο WhatsApp.', bg: 'Обикновено отговаряме в рамките на няколко часа. Може да ни намерите и в WhatsApp.', ro: 'De obicei răspundem în câteva ore. Ne puteți contacta și pe WhatsApp.', tr: 'Genellikle birkaç saat içinde yanıt veririz. WhatsApp üzerinden de ulaşabilirsiniz.' },
+  'contact.email_lbl':   { en: 'Email', el: 'Email', bg: 'Имейл', ro: 'Email', tr: 'E-posta' },
+  'contact.whatsapp_lbl':{ en: 'WhatsApp', el: 'WhatsApp', bg: 'WhatsApp', ro: 'WhatsApp', tr: 'WhatsApp' },
+  'contact.location_lbl':{ en: 'Location', el: 'Τοποθεσία', bg: 'Местоположение', ro: 'Locație', tr: 'Konum' },
+  'contact.form_title':  { en: 'Send us a message', el: 'Στείλτε μας μήνυμα', bg: 'Изпратете ни съобщение', ro: 'Trimiteți-ne un mesaj', tr: 'Bize mesaj gönderin' },
+  'contact.name':        { en: 'Name', el: 'Όνομα', bg: 'Име', ro: 'Nume', tr: 'Ad' },
+  'contact.email_field': { en: 'Email', el: 'Email', bg: 'Имейл', ro: 'Email', tr: 'E-posta' },
+  'contact.checkin_opt': { en: 'Check-in (optional)', el: 'Άφιξη (προαιρετικό)', bg: 'Настаняване (незадължително)', ro: 'Check-in (opțional)', tr: 'Giriş (isteğe bağlı)' },
+  'contact.checkout_opt':{ en: 'Check-out (optional)', el: 'Αναχώρηση (προαιρετικό)', bg: 'Напускане (незадължително)', ro: 'Check-out (opțional)', tr: 'Çıkış (isteğe bağlı)' },
+  'contact.message':     { en: 'Message', el: 'Μήνυμα', bg: 'Съобщение', ro: 'Mesaj', tr: 'Mesaj' },
+  'contact.ph_name':     { en: 'Your name', el: 'Το όνομά σας', bg: 'Вашето име', ro: 'Numele dvs.', tr: 'Adınız' },
+  'contact.ph_email':    { en: 'you@example.com', el: 'you@example.com', bg: 'you@example.com', ro: 'you@example.com', tr: 'you@example.com' },
+  'contact.ph_message':  { en: 'How can we help you?', el: 'Πώς μπορούμε να σας βοηθήσουμε;', bg: 'Как можем да ви помогнем?', ro: 'Cum vă putem ajuta?', tr: 'Size nasıl yardımcı olabiliriz?' },
+  'contact.send':        { en: 'Send Message', el: 'Αποστολή Μηνύματος', bg: 'Изпрати Съобщение', ro: 'Trimiteți Mesajul', tr: 'Mesaj Gönder' },
+  'contact.sending':     { en: 'Sending…', el: 'Αποστολή…', bg: 'Изпращане…', ro: 'Se trimite…', tr: 'Gönderiliyor…' },
+  'contact.success':     { en: '✓ Message sent! We\'ll get back to you shortly.', el: '✓ Το μήνυμα στάλθηκε! Θα επικοινωνήσουμε σύντομα.', bg: '✓ Съобщението е изпратено! Ще се свържем скоро.', ro: '✓ Mesaj trimis! Vă vom contacta în curând.', tr: '✓ Mesaj gönderildi! Kısa sürede geri döneceğiz.' },
+  'contact.error_msg':   { en: 'Something went wrong. Please email us directly.', el: 'Κάτι πήγε στραβά. Στείλτε μας email απευθείας.', bg: 'Нещо се обърка. Моля, изпратете ни имейл директно.', ro: 'Ceva a mers greșit. Trimiteți-ne email direct.', tr: 'Bir şeyler ters gitti. Lütfen bize doğrudan e-posta gönderin.' },
+&nbsp;
+  // ── FAQ page ──────────────────────────────────────────────────────────────
+  'faq.badge':           { en: 'FAQ', el: 'ΣΕΕ', bg: 'ЧЗВ', ro: 'Întrebări', tr: 'SSS' },
+  'faq.title':           { en: 'Frequently Asked Questions', el: 'Συχνές Ερωτήσεις', bg: 'Често задавани въпроси', ro: 'Întrebări frecvente', tr: 'Sıkça Sorulan Sorular' },
+  'faq.no_answer':       { en: 'Can\'t find what you\'re looking for?', el: 'Δεν βρίσκετε αυτό που ψάχνετε;', bg: 'Не намирате отговора?', ro: 'Nu găsiți ce căutați?', tr: 'Aradığınızı bulamıyor musunuz?' },
+  'faq.contact_link':    { en: 'Contact us directly.', el: 'Επικοινωνήστε μαζί μας απευθείας.', bg: 'Свържете се с нас директно.', ro: 'Contactați-ne direct.', tr: 'Bize doğrudan ulaşın.' },
+  'faq.cta_title':       { en: 'Ready to book?', el: 'Έτοιμοι για κράτηση;', bg: 'Готови за резервация?', ro: 'Pregătit să rezervați?', tr: 'Rezervasyon yapmaya hazır mısınız?' },
+  'faq.cta_subtitle':    { en: 'Check availability and secure your dates directly.', el: 'Ελέγξτε διαθεσιμότητα και κλείστε τις ημερομηνίες σας.', bg: 'Проверете наличността и резервирайте директно.', ro: 'Verificați disponibilitatea și rezervați datele direct.', tr: 'Müsaitliği kontrol edin ve tarihlerinizi doğrudan ayırtın.' },
+&nbsp;
+  // ── About page ────────────────────────────────────────────────────────────
+  'about.badge':         { en: 'Our Story', el: 'Η Ιστορία μας', bg: 'Нашата история', ro: 'Povestea noastră', tr: 'Hikayemiz' },
+  'about.title':         { en: 'About Us', el: 'Σχετικά με εμάς', bg: 'За нас', ro: 'Despre noi', tr: 'Hakkımızda' },
+  'about.subtitle':      { en: 'A direct-booking vacation rental marketplace connecting travelers with unique properties and local hosts worldwide.', el: 'Μια αγορά ενοικίασης διακοπών που συνδέει ταξιδιώτες με μοναδικά καταλύματα και ιδιοκτήτες σε όλο τον κόσμο.', bg: 'Платформа за директни резервации, свързваща пътешественици с уникални имоти и местни домакини по целия свят.', ro: 'O platformă de rezervare directă care conectează călătorii cu proprietăți unice și gazde locale din întreaga lume.', tr: 'Dünya genelinde gezginleri benzersiz mülkler ve yerel ev sahipleriyle buluşturan doğrudan rezervasyon platformu.' },
+  'about.love_title':    { en: 'Why we built this platform', el: 'Γιατί δημιουργήσαμε αυτή την πλατφόρμα', bg: 'Защо изградихме тази платформа', ro: 'De ce am creat această platformă', tr: 'Bu platformu neden inşa ettik' },
+  'about.love_p1':       { en: 'We built this platform because we believe the best travel experiences happen when guests connect directly with hosts. No hidden fees, no impersonal call centres — just genuine hospitality and better rates for everyone.', el: 'Δημιουργήσαμε αυτή την πλατφόρμα γιατί πιστεύουμε ότι οι καλύτερες ταξιδιωτικές εμπειρίες γεννιούνται όταν οι επισκέπτες συνδέονται απευθείας με τους οικοδεσπότες. Χωρίς κρυφές χρεώσεις, χωρίς απρόσωπα τηλεφωνικά κέντρα.', bg: 'Създадохме тази платформа, защото вярваме, че най-добрите пътувания се случват, когато гостите се свързват директно с домакините. Без скрити такси, без безлична поддръжка.', ro: 'Am creat această platformă pentru că credem că cele mai bune experiențe de călătorie apar când oaspeții se conectează direct cu gazdele. Fără taxe ascunse, fără servicii impersonale.', tr: 'Bu platformu inşa ettik çünkü en iyi seyahat deneyimlerinin misafirler ev sahipleriyle doğrudan bağlandığında gerçekleştiğine inanıyoruz. Gizli ücret yok, kişisiz çağrı merkezleri yok.' },
+  'about.love_p2':       { en: 'Our curated collection features handpicked properties across beautiful destinations — from coastal villas and mountain retreats to city apartments and countryside cottages. Each listing is managed by a local property owner who cares deeply about the guest experience.', el: 'Η επιμελημένη συλλογή μας περιλαμβάνει επιλεγμένα καταλύματα σε υπέροχους προορισμούς — από παραθαλάσσιες βίλες έως διαμερίσματα στην πόλη και εξοχικές κατοικίες. Κάθε καταχώριση διαχειρίζεται από έναν τοπικό ιδιοκτήτη.', bg: 'Нашата подбрана колекция включва внимателно избрани имоти в красиви дестинации — от крайбрежни вили до градски апартаменти и селски къщи. Всеки имот се управлява от местен собственик.', ro: 'Colecția noastră cuprinde proprietăți selecționate în destinații minunate — de la vile costiere la apartamente în oraș și case la țară. Fiecare proprietate este gestionată de un proprietar local.', tr: 'Seçilmiş koleksiyonumuz güzel destinasyonlarda özenle seçilmiş mülkleri içeriyor — kıyı villalarından dağ tatil evlerine, şehir dairelerine ve kırsal evlere kadar.' },
+  'about.love_p3':       { en: 'By booking directly through our platform, you get the best available rates, direct communication with your host, and a personal touch that large booking platforms simply cannot offer.', el: 'Κάνοντας απευθείας κράτηση μέσω της πλατφόρμας μας, λαμβάνετε τις καλύτερες διαθέσιμες τιμές, άμεση επικοινωνία με τον ιδιοκτήτη και μια προσωπική αγγιγμένη εμπειρία.', bg: 'Резервирайки директно чрез нашата платформа, получавате най-добрите цени, директна комуникация с домакина и лично отношение, което големите платформи не могат да предложат.', ro: 'Rezervând direct prin platforma noastră, obțineți cele mai bune tarife disponibile, comunicare directă cu gazda și o atingere personală pe care platformele mari pur și simplu nu o pot oferi.', tr: 'Platformumuz üzerinden doğrudan rezervasyon yaparak mevcut en iyi fiyatları, ev sahibiyle doğrudan iletişimi ve büyük platformların sunamayacağı kişisel dokunuşu elde edersiniz.' },
+  'about.v1_title':      { en: 'Verified Listings', el: 'Πιστοποιημένα Καταλύματα', bg: 'Проверени обяви', ro: 'Anunțuri Verificate', tr: 'Doğrulanmış İlanlar' },
+  'about.v1_desc':       { en: 'Every property on our platform is reviewed and verified. We only list hosts who meet our quality and hospitality standards.', el: 'Κάθε κατάλυμα στην πλατφόρμα μας ελέγχεται και πιστοποιείται. Φιλοξενούμε μόνο ιδιοκτήτες που πληρούν τα πρότυπά μας.', bg: 'Всеки имот в нашата платформа се преглежда и проверява. Приемаме само домакини, отговарящи на нашите стандарти за качество.', ro: 'Fiecare proprietate de pe platforma noastră este revizuită și verificată. Listăm numai gazde care îndeplinesc standardele noastre de calitate.', tr: 'Platformumuzdaki her mülk incelenir ve doğrulanır. Yalnızca kalite ve misafirperver standartlarımızı karşılayan ev sahiplerine yer veririz.' },
+  'about.v2_title':      { en: 'Direct Communication', el: 'Άμεση Επικοινωνία', bg: 'Директна Комуникация', ro: 'Comunicare Directă', tr: 'Doğrudan İletişim' },
+  'about.v2_desc':       { en: 'Chat directly with your host before and during your stay. No bots, no call centres — real people who know their properties inside out.', el: 'Επικοινωνήστε απευθείας με τον οικοδεσπότη σας πριν και κατά τη διαμονή. Χωρίς bots, χωρίς τηλεφωνικά κέντρα.', bg: 'Общувайте директно с домакина преди и по време на престоя. Без ботове, без кол центрове — само реални хора.', ro: 'Comunicați direct cu gazda înainte și în timpul șederii. Fără roboți, fără call centre — oameni reali care îți cunosc proprietatea.', tr: 'Konaklamanızdan önce ve sırasında ev sahibinizle doğrudan iletişim kurun. Bot yok, çağrı merkezi yok — mülklerini içten dışa bilen gerçek insanlar.' },
+  'about.v3_title':      { en: 'Best Rate Guarantee', el: 'Εγγύηση Καλύτερης Τιμής', bg: 'Гаранция за Най-добра Цена', ro: 'Garanția Celei Mai Bune Rate', tr: 'En İyi Fiyat Garantisi' },
+  'about.v3_desc':       { en: 'Booking directly through our platform means no extra guest fees layered on top. The price you see is the price you pay — always.', el: 'Η απευθείας κράτηση μέσω της πλατφόρμας σημαίνει κανένα επιπλέον τέλος επισκέπτη. Η τιμή που βλέπετε είναι η τιμή που πληρώνετε.', bg: 'Директната резервация означава без допълнителни такси за гости. Цената, която виждате, е цената, която плащате — винаги.', ro: 'Rezervarea directă înseamnă fără taxe suplimentare pentru oaspeți. Prețul pe care îl vedeți este prețul pe care îl plătiți — întotdeauna.', tr: 'Platformumuz üzerinden doğrudan rezervasyon yapmak ek misafir ücreti olmadığı anlamına gelir. Gördüğünüz fiyat ödediğiniz fiyattır — her zaman.' },
+  'about.cta_title':     { en: 'Find your perfect stay', el: 'Βρείτε την ιδανική σας διαμονή', bg: 'Намерете идеалното си настаняване', ro: 'Găsiți cazarea perfectă', tr: 'Mükemmel konaklamanızı bulun' },
+  'about.cta_subtitle':  { en: 'Browse our handpicked properties and book directly with the host for the best rates and most personal service.', el: 'Εξερευνήστε τα επιλεγμένα μας καταλύματα και κάντε απευθείας κράτηση με τον ιδιοκτήτη.', bg: 'Разгледайте нашите подбрани имоти и резервирайте директно с домакина за най-добри цени.', ro: 'Răsfoiți proprietățile noastre selectate și rezervați direct cu gazda pentru cele mai bune tarife.', tr: 'Özenle seçilmiş mülklerimize göz atın ve en iyi fiyatlar için doğrudan ev sahibiyle rezervasyon yapın.' },
+&nbsp;
+  // ── Home page extras ──────────────────────────────────────────────────────
+  'home.badge':          { en: 'Book direct · Best rates guaranteed', el: 'Απευθείας κράτηση · Εγγυημένες καλύτερες τιμές', bg: 'Директна резервация · Гарантирани най-добри цени', ro: 'Rezervare directă · Cele mai bune tarife garantate', tr: 'Doğrudan rezervasyon · En iyi fiyat garantili' },
+  'home.why.badge':      { en: 'Book Direct &amp; Save', el: 'Κράτηση Απευθείας &amp; Εξοικονομήστε', bg: 'Директна Резервация &amp; Спестете', ro: 'Rezervare Directă &amp; Economisiți', tr: 'Doğrudan Rezervasyon Yapın' },
+  'home.why.title':      { en: 'Why book with us directly?', el: 'Γιατί να κάνετε απευθείας κράτηση;', bg: 'Защо да резервирате директно при нас?', ro: 'De ce să rezervați direct cu noi?', tr: 'Neden doğrudan bizden rezervasyon yapmalısınız?' },
+  'home.why.rate_t':     { en: 'Best rate guaranteed', el: 'Καλύτερη τιμή εγγυημένη', bg: 'Гарантирана най-добра цена', ro: 'Cel mai bun tarif garantat', tr: 'En iyi fiyat garantili' },
+  'home.why.rate_d':     { en: 'No platform fees. Pay less than on other booking platforms.', el: 'Χωρίς προμήθειες πλατφόρμας. Πληρώστε λιγότερο από άλλες πλατφόρμες κρατήσεων.', bg: 'Без такси на платформа. Платете по-малко от други платформи за резервации.', ro: 'Fără taxe de platformă. Plătiți mai puțin decât pe alte platforme de rezervări.', tr: 'Platform ücreti yok. Airbnb veya Booking.com\'dan daha az ödeyin.' },
+  'home.why.comm_t':     { en: 'Direct communication', el: 'Άμεση επικοινωνία', bg: 'Директна комуникация', ro: 'Comunicare directă', tr: 'Doğrudan iletişim' },
+  'home.why.comm_d':     { en: 'Talk directly to the owner — no middleman, no delays.', el: 'Μιλήστε απευθείας με τον ιδιοκτήτη — χωρίς μεσάζοντες.', bg: 'Говорете директно с собственика — без посредници.', ro: 'Vorbiți direct cu proprietarul — fără intermediari.', tr: 'Doğrudan sahibiyle konuşun — aracı yok, gecikme yok.' },
+  'home.why.secure_t':   { en: 'Secure payments', el: 'Ασφαλείς πληρωμές', bg: 'Сигурни плащания', ro: 'Plăți securizate', tr: 'Güvenli ödemeler' },
+  'home.why.secure_d':   { en: 'Stripe-powered checkout with full purchase protection.', el: 'Πληρωμή μέσω Stripe με πλήρη προστασία αγοράς.', bg: 'Плащане чрез Stripe с пълна защита на покупката.', ro: 'Checkout Stripe cu protecție completă la cumpărare.', tr: 'Stripe destekli ödeme ile tam satın alma koruması.' },
+  'home.why.flex_t':     { en: 'Flexible terms', el: 'Ευέλικτοι όροι', bg: 'Гъвкави условия', ro: 'Termeni flexibili', tr: 'Esnek koşullar' },
+  'home.why.flex_d':     { en: 'Personalised stays, custom requests, and flexible policies.', el: 'Εξατομικευμένες διαμονές, ειδικές αιτήσεις και ευέλικτες πολιτικές.', bg: 'Персонализирани престои, специални заявки и гъвкави политики.', ro: 'Șederi personalizate, solicitări speciale și politici flexibile.', tr: 'Kişiselleştirilmiş konaklamalar, özel talepler ve esnek politikalar.' },
+  'home.featured.badge': { en: 'Hand-picked stays', el: 'Επιλεγμένα καταλύματα', bg: 'Внимателно подбрани', ro: 'Selecție specială', tr: 'Özenle seçilmiş' },
+  'home.featured.title': { en: 'Featured Rentals', el: 'Επιλεγμένα Ενοικιαζόμενα', bg: 'Избрани Имоти', ro: 'Proprietăți Recomandate', tr: 'Öne Çıkan Kiralıklar' },
+  'home.featured.all':   { en: 'View all →', el: 'Δείτε όλα →', bg: 'Виж всички →', ro: 'Vedeți toate →', tr: 'Tümünü görün →' },
+  'home.how.badge':      { en: 'Simple &amp; transparent', el: 'Απλό &amp; διαφανές', bg: 'Просто и прозрачно', ro: 'Simplu și transparent', tr: 'Basit ve şeffaf' },
+  'home.how.title':      { en: 'How it works', el: 'Πώς λειτουργεί', bg: 'Как работи', ro: 'Cum funcționează', tr: 'Nasıl çalışır' },
+  'home.how.s1_t':       { en: 'Search &amp; compare', el: 'Αναζήτηση &amp; σύγκριση', bg: 'Търси и сравни', ro: 'Caută și compară', tr: 'Ara ve karşılaştır' },
+  'home.how.s1_d':       { en: 'Browse verified properties filtered by dates, guests and location. Every listing is real — no surprises on arrival.', el: 'Περιηγηθείτε σε επαληθευμένα καταλύματα φιλτραρισμένα κατά ημερομηνίες, επισκέπτες και τοποθεσία.', bg: 'Разгледайте проверени имоти, филтрирани по дати, гости и местоположение.', ro: 'Răsfoiți proprietăți verificate filtrate după date, oaspeți și locație.', tr: 'Tarih, misafir ve konuma göre filtrelenmiş doğrulanmış mülkleri inceleyin.' },
+  'home.how.s2_t':       { en: 'Book direct &amp; pay less', el: 'Άμεση κράτηση &amp; εξοικονόμηση', bg: 'Резервирайте директно и спестете', ro: 'Rezervați direct și plătiți mai puțin', tr: 'Doğrudan rezervasyon yapın, daha az ödeyin' },
+  'home.how.s2_d':       { en: 'No OTA platform markups. Secure Stripe checkout or bank transfer. Instant or request-based booking depending on the property.', el: 'Καμία επιπλέον χρέωση πλατφόρμας. Ασφαλής πληρωμή με Stripe ή τραπεζική μεταφορά.', bg: 'Без допълнителни такси. Сигурно плащане чрез Stripe или банков превод.', ro: 'Fără majorări de platformă. Plată securizată Stripe sau transfer bancar.', tr: 'Platform ek ücreti yok. Güvenli Stripe ödemesi veya banka transferi.' },
+  'home.how.s3_t':       { en: 'Arrive &amp; enjoy', el: 'Φτάστε &amp; απολαύστε', bg: 'Пристигнете и се насладете', ro: 'Sosiți și bucurați-vă', tr: 'Gelin ve keyfini çıkarın' },
+  'home.how.s3_d':       { en: 'Self check-in or host welcome — your call. Need anything during your stay? Message the host directly, no call centre.', el: 'Αυτόνομο check-in ή υποδοχή από τον ιδιοκτήτη — επιλογή σας.', bg: 'Самостоятелно настаняване или посрещане от собственика — ваш избор.', ro: 'Check-in autonom sau primire de la proprietar — alegerea dvs.', tr: 'Kendi başına giriş veya ev sahibi karşılaması — sizin tercihiniz.' },
+  'home.hl.badge':       { en: 'The Villa Experience', el: 'Η Βιλα Εμπειρία', bg: 'Изживяването на Вилата', ro: 'Experiența Vilei', tr: 'Villa Deneyimi' },
+  'home.hl.title':       { en: 'Everything for a perfect Greek summer', el: 'Όλα για έναν τέλειο ελληνικό καλοκαίρι', bg: 'Всичко за перфектното гръцко лято', ro: 'Tot pentru un vară grecesc perfect', tr: 'Mükemmel bir Yunan yazı için her şey' },
+  'home.hl.desc':        { en: 'Set within a lush private garden in Keramoti, this villa is designed for unforgettable stays. From alfresco dinners under the stars to morning workouts in your private gym — every detail is taken care of.', el: 'Χτισμένη μέσα σε ένα καταπράσινο ιδιωτικό κήπο στο Κεραμωτί, η βίλα είναι σχεδιασμένη για αξέχαστες διαμονές. Από γεύματα κάτω από τα αστέρια μέχρι πρωινή γυμναστική στο ιδιωτικό γυμναστήριο.', bg: 'Намираща се в буен частен градина в Керамоти, тази вила е проектирана за незабравими престои. От вечери на открито под звездите до сутрешни тренировки в частния фитнес.', ro: 'Amplasată într-o grădină privată luxuriantă în Keramoti, această vilă este concepută pentru șederi de neuitat. De la cine în aer liber sub stele până la antrenamente matinale în sala de sport privată.', tr: 'Keramoti\'deki yemyeşil özel bahçesinde yer alan bu villa, unutulmaz konaklamalar için tasarlanmıştır. Yıldızlar altında açık hava yemeklerinden özel spor salonunuzda sabah egzersizlerine kadar her detay düşünülmüştür.' },
+  'home.hl.cta':         { en: 'View Villa &amp; Book', el: 'Δείτε την Βίλα &amp; Κάντε Κράτηση', bg: 'Вижте Вилата &amp; Резервирайте', ro: 'Vedeți Vila și Rezervați', tr: 'Villayı Görün ve Rezervasyon Yapın' },
+  'home.hl.beach':       { en: 'Beach access', el: 'Πρόσβαση σε παραλία', bg: 'Достъп до плаж', ro: 'Acces la plajă', tr: 'Plaj erişimi' },
+  'home.hl.garden':      { en: 'Private garden', el: 'Ιδιωτικός κήπος', bg: 'Частна градина', ro: 'Grădină privată', tr: 'Özel bahçe' },
+  'home.hl.kitchen':     { en: 'Outdoor kitchen', el: 'Εξωτερική κουζίνα', bg: 'Открита кухня', ro: 'Bucătărie exterior', tr: 'Dış mutfak' },
+  'home.hl.gym':         { en: 'Private gym', el: 'Ιδιωτικό γυμναστήριο', bg: 'Частен фитнес', ro: 'Sală sport privată', tr: 'Özel spor salonu' },
+  'home.hl.firepit':     { en: 'Firepit', el: 'Εστία φωτιάς', bg: 'Огнище', ro: 'Loc de foc', tr: 'Ateş çukuru' },
+  'home.hl.selfcheckin': { en: 'Self check-in', el: 'Αυτόνομο check-in', bg: 'Самостоятелно настаняване', ro: 'Check-in autonom', tr: 'Kendi kendine giriş' },
+  'home.reviews.badge':  { en: 'Guest Reviews', el: 'Κριτικές Επισκεπτών', bg: 'Отзиви от гости', ro: 'Recenzii oaspeți', tr: 'Misafir Yorumları' },
+  'home.reviews.title':  { en: 'What our guests say', el: 'Τι λένε οι επισκέπτες μας', bg: 'Какво казват нашите гости', ro: 'Ce spun oaspeții noștri', tr: 'Misafirlerimiz ne diyor' },
+  'home.reviews.all':    { en: 'Browse all properties', el: 'Δείτε όλα τα καταλύματα', bg: 'Разгледайте всички имоти', ro: 'Vedeți toate proprietățile', tr: 'Tüm mülklere göz atın' },
+  'home.cta.title':      { en: 'Ready to plan your escape?', el: 'Έτοιμοι να σχεδιάσετε τη φυγή σας;', bg: 'Готови да планирате бягството си?', ro: 'Pregătit să vă planificați evadarea?', tr: 'Kaçışınızı planlamaya hazır mısınız?' },
+  'home.cta.subtitle':   { en: 'Browse our curated properties and book direct — no fees, best rates, personal service.', el: 'Δείτε τα επιλεγμένα καταλύματά μας και κάντε απευθείας κράτηση — χωρίς προμήθειες, καλύτερες τιμές.', bg: 'Разгледайте нашите подбрани имоти и резервирайте директно — без такси, най-добри цени.', ro: 'Răsfoiți proprietățile noastre selecționate și rezervați direct — fără taxe, tarife maxime.', tr: 'Seçilmiş mülklerimize göz atın ve doğrudan rezervasyon yapın — ücretsiz, en iyi fiyatlar.' },
+  'home.cta.browse':     { en: 'Browse all properties', el: 'Δείτε όλα τα καταλύματα', bg: 'Виж всички имоти', ro: 'Vedeți toate proprietățile', tr: 'Tüm mülklere göz at' },
+  'home.cta.inquiry':    { en: 'Send an Inquiry', el: 'Στείλτε Ερώτηση', bg: 'Изпратете запитване', ro: 'Trimiteți o întrebare', tr: 'Soru Gönderin' },
+&nbsp;
+  // ── Listing detail extras ─────────────────────────────────────────────────
+  'listing.available_badge':  { en: '✓ Available', el: '✓ Διαθέσιμο', bg: '✓ Налично', ro: '✓ Disponibil', tr: '✓ Müsait' },
+  'listing.highlights_title': { en: 'Highlights', el: 'Κύρια Χαρακτηριστικά', bg: 'Основни предимства', ro: 'Puncte forte', tr: 'Öne Çıkanlar' },
+  'listing.about_prop':       { en: 'About this property', el: 'Σχετικά με το κατάλυμα', bg: 'За имота', ro: 'Despre această proprietate', tr: 'Bu mülk hakkında' },
+  'listing.show_more':        { en: 'Show more', el: 'Περισσότερα', bg: 'Покажи повече', ro: 'Arată mai mult', tr: 'Daha fazla göster' },
+  'listing.amenities_title':  { en: 'What this place offers', el: 'Τι προσφέρει αυτό το κατάλυμα', bg: 'Какво предлага това място', ro: 'Ce oferă acest loc', tr: 'Bu yer ne sunuyor' },
+  'listing.sleeping':         { en: 'Sleeping arrangements', el: 'Κοιτώνες', bg: 'Условия за сън', ro: 'Aranjamente de dormit', tr: 'Uyku düzenlemeleri' },
+  'listing.bedroom_label':    { en: 'Bedroom', el: 'Υπνοδωμάτιο', bg: 'Спалня', ro: 'Dormitor', tr: 'Yatak odası' },
+  'listing.beds_range':       { en: '1–2 beds', el: '1–2 κρεβάτια', bg: '1–2 легла', ro: '1–2 paturi', tr: '1–2 yatak' },
+  'listing.min_stay_label':   { en: 'Minimum stay', el: 'Ελάχιστη διαμονή', bg: 'Минимален престой', ro: 'Ședere minimă', tr: 'Minimum konaklama' },
+  'listing.no_reviews_yet':   { en: 'No reviews yet — be the first to stay!', el: 'Δεν υπάρχουν κριτικές ακόμα — γίνετε οι πρώτοι!', bg: 'Все още няма отзиви — бъдете първите!', ro: 'Nicio recenzie încă — fiți primul care stă!', tr: 'Henüz yorum yok — ilk kalan siz olun!' },
+  'listing.secure_pay':       { en: 'Secure Stripe payment or bank transfer', el: 'Ασφαλής πληρωμή Stripe ή τραπεζική μεταφορά', bg: 'Сигурно плащане чрез Stripe или банков превод', ro: 'Plată securizată Stripe sau transfer bancar', tr: 'Güvenli Stripe ödemesi veya banka transferi' },
+  'listing.free_cancel':      { en: 'Free cancellation (see policy)', el: 'Δωρεάν ακύρωση (δείτε πολιτική)', bg: 'Безплатно анулиране (вижте политика)', ro: 'Anulare gratuită (vezi politica)', tr: 'Ücretsiz iptal (politikaya bakın)' },
+  'listing.confirm_email':    { en: 'Confirmation email sent instantly', el: 'Email επιβεβαίωσης αποστέλλεται αμέσως', bg: 'Потвърдителен имейл изпратен незабавно', ro: 'Email de confirmare trimis instant', tr: 'Onay e-postası anında gönderilir' },
+  'listing.have_questions':   { en: 'Have questions?', el: 'Έχετε απορίες;', bg: 'Имате въпроси?', ro: 'Aveți întrebări?', tr: 'Sorularınız mı var?' },
+  'listing.send_inquiry':     { en: 'Send an inquiry →', el: 'Στείλτε ερώτηση →', bg: 'Изпратете запитване →', ro: 'Trimiteți o întrebare →', tr: 'Soru gönderin →' },
+  'listing.msg_host':         { en: 'Message the host', el: 'Μήνυμα στον ιδιοκτήτη', bg: 'Съобщение до домакина', ro: 'Mesaj gazdei', tr: 'Ev sahibine mesaj' },
+  'listing.msg_name':         { en: 'Your name', el: 'Όνομα', bg: 'Вашето име', ro: 'Numele dvs.', tr: 'Adınız' },
+  'listing.msg_email':        { en: 'Your email', el: 'Email', bg: 'Имейл', ro: 'Email', tr: 'E-postanız' },
+  'listing.msg_phone':        { en: 'Phone / WhatsApp', el: 'Τηλέφωνο / WhatsApp', bg: 'Телефон / WhatsApp', ro: 'Telefon / WhatsApp', tr: 'Telefon / WhatsApp' },
+  'listing.msg_ph_phone':     { en: '+1 555 000 0000', el: '+30 69X XXX XXXX', bg: '+359 8X XXX XXXX', ro: '+40 7XX XXX XXX', tr: '+90 5XX XXX XXXX' },
+  'listing.msg_message':      { en: 'Message', el: 'Μήνυμα', bg: 'Съобщение', ro: 'Mesaj', tr: 'Mesaj' },
+  'listing.msg_ph_message':   { en: 'Questions about the property, availability, special requests…', el: 'Ερωτήσεις σχετικά με το κατάλυμα, διαθεσιμότητα, ειδικά αιτήματα…', bg: 'Въпроси за имота, наличност, специални заявки…', ro: 'Întrebări despre proprietate, disponibilitate, cereri speciale…', tr: 'Mülk, müsaitlik, özel talepler hakkında sorular…' },
+  'listing.msg_send':         { en: 'Send message', el: 'Αποστολή', bg: 'Изпрати', ro: 'Trimite', tr: 'Gönder' },
+  'listing.msg_sending':      { en: 'Sending…', el: 'Αποστολή…', bg: 'Изпращане…', ro: 'Se trimite…', tr: 'Gönderiliyor…' },
+  'listing.msg_sent':         { en: '✓ Message sent! The host will reply to your email.', el: '✓ Το μήνυμα στάλθηκε! Ο ιδιοκτήτης θα σας απαντήσει.', bg: '✓ Съобщението е изпратено! Домакинът ще ви отговори.', ro: '✓ Mesaj trimis! Gazda vă va răspunde.', tr: '✓ Mesaj gönderildi! Ev sahibi size e-posta ile yanıt verecek.' },
+  'listing.msg_error':        { en: 'Something went wrong. Please try again.', el: 'Κάτι πήγε στραβά. Παρακαλούμε δοκιμάστε ξανά.', bg: 'Нещо се обърка. Моля, опитайте отново.', ro: 'Ceva a mers greșit. Vă rugăm să încercați din nou.', tr: 'Bir şeyler ters gitti. Lütfen tekrar deneyin.' },
+  'listing.check_dates':      { en: 'Check Dates', el: 'Έλεγχος Ημερομηνιών', bg: 'Провери дати', ro: 'Verificați datele', tr: 'Tarihleri Kontrol Et' },
+  'listing.checkin_from':     { en: 'Check-in: from', el: 'Άφιξη: από', bg: 'Настаняване: от', ro: 'Check-in: de la', tr: 'Giriş: saat' },
+  'listing.checkout_by':      { en: 'Check-out: by', el: 'Αναχώρηση: έως', bg: 'Напускане: до', ro: 'Check-out: până la', tr: 'Çıkış: en geç' },
+  'listing.guests_stat':      { en: 'guests', el: 'επισκέπτες', bg: 'гости', ro: 'oaspeți', tr: 'misafir' },
+  'listing.bedrooms_stat':    { en: 'bedrooms', el: 'υπνοδωμάτια', bg: 'спални', ro: 'dormitoare', tr: 'yatak odası' },
+  'listing.beds_stat':        { en: 'beds', el: 'κρεβάτια', bg: 'легла', ro: 'paturi', tr: 'yatak' },
+  'listing.baths_stat':       { en: 'baths', el: 'μπάνια', bg: 'бани', ro: 'băi', tr: 'banyo' },
+  'listing.map_title':        { en: 'Property location map', el: 'Χάρτης τοποθεσίας', bg: 'Карта на местоположението', ro: 'Hartă locație proprietate', tr: 'Mülk konum haritası' },
+  'listing.open_maps':        { en: 'Open in Google Maps', el: 'Άνοιγμα στο Google Maps', bg: 'Отвори в Google Maps', ro: 'Deschide în Google Maps', tr: 'Google Haritalar\'da aç' },
+&nbsp;
+  // ── Booking widget ────────────────────────────────────────────────────────
+  'widget.per_night':    { en: '/ night', el: '/ νύχτα', bg: '/ нощ', ro: '/ noapte', tr: '/ gece' },
+  'widget.checkin':      { en: 'Check-in', el: 'Άφιξη', bg: 'Настаняване', ro: 'Check-in', tr: 'Giriş' },
+  'widget.checkout':     { en: 'Check-out', el: 'Αναχώρηση', bg: 'Напускане', ro: 'Check-out', tr: 'Çıkış' },
+  'widget.guests':       { en: 'Guests', el: 'Επισκέπτες', bg: 'Гости', ro: 'Oaspeți', tr: 'Misafirler' },
+  'widget.guest':        { en: 'guest', el: 'επισκέπτης', bg: 'гост', ro: 'oaspete', tr: 'misafir' },
+  'widget.guests_pl':    { en: 'guests', el: 'επισκέπτες', bg: 'гости', ro: 'oaspeți', tr: 'misafir' },
+  'widget.cleaning':     { en: 'Cleaning fee', el: 'Τέλος καθαριότητας', bg: 'Такса почистване', ro: 'Taxă curățenie', tr: 'Temizlik ücreti' },
+  'widget.extra_guest':  { en: 'Extra guest fee', el: 'Χρέωση επιπλέον επισκεπτών', bg: 'Такса за допълнителни гости', ro: 'Taxă oaspeți extra', tr: 'Ekstra misafir ücreti' },
+  'widget.discount':     { en: 'Discount', el: 'Έκπτωση', bg: 'Отстъпка', ro: 'Reducere', tr: 'İndirim' },
+  'widget.total':        { en: 'Total', el: 'Σύνολο', bg: 'Общо', ro: 'Total', tr: 'Toplam' },
+  'widget.promo':        { en: 'Promo code', el: 'Κωδικός προσφοράς', bg: 'Промо код', ro: 'Cod promoțional', tr: 'Promosyon kodu' },
+  'widget.apply':        { en: 'Apply', el: 'Εφαρμογή', bg: 'Приложи', ro: 'Aplică', tr: 'Uygula' },
+  'widget.min_nights':   { en: 'Minimum stay', el: 'Ελάχιστη διαμονή', bg: 'Минимален престой', ro: 'Ședere minimă', tr: 'Minimum konaklama' },
+  'widget.nights':       { en: 'nights', el: 'νύχτες', bg: 'нощи', ro: 'nopți', tr: 'gece' },
+  'widget.book_now':     { en: 'Book Now', el: 'Κράτηση Τώρα', bg: 'Резервирай сега', ro: 'Rezervă Acum', tr: 'Hemen Rezervasyon' },
+  'widget.request_book': { en: 'Request to Book', el: 'Αίτημα Κράτησης', bg: 'Заявка за Резервация', ro: 'Solicitare Rezervare', tr: 'Rezervasyon Talebi' },
+  'widget.no_charge':    { en: 'No charge yet · Best rate guaranteed', el: 'Καμία χρέωση ακόμα · Καλύτερη τιμή εγγυημένη', bg: 'Все още без такса · Гарантирана най-добра цена', ro: 'Nicio taxă încă · Cel mai bun tarif garantat', tr: 'Henüz ücret yok · En iyi fiyat garantili' },
+  'widget.select_dates': { en: 'Please select check-in and check-out dates.', el: 'Παρακαλώ επιλέξτε ημερομηνίες άφιξης και αναχώρησης.', bg: 'Моля, изберете дати за настаняване и напускане.', ro: 'Vă rugăm să selectați datele de check-in și check-out.', tr: 'Lütfen giriş ve çıkış tarihlerini seçin.' },
+&nbsp;
+  // ── Reviews ────────────────────────────────────────────────────────────────
+  'reviews.verified':    { en: 'Verified stay', el: 'Επαληθευμένη διαμονή', bg: 'Потвърден престой', ro: 'Ședere verificată', tr: 'Doğrulanmış konaklama' },
+  'reviews.review':      { en: 'review', el: 'κριτική', bg: 'отзив', ro: 'recenzie', tr: 'yorum' },
+  'reviews.reviews_pl':  { en: 'reviews', el: 'κριτικές', bg: 'отзиви', ro: 'recenzii', tr: 'yorum' },
+&nbsp;
+  // ── Availability calendar ─────────────────────────────────────────────────
+  'cal.available':       { en: 'Available', el: 'Διαθέσιμο', bg: 'Налично', ro: 'Disponibil', tr: 'Müsait' },
+  'cal.unavailable':     { en: 'Unavailable', el: 'Μη Διαθέσιμο', bg: 'Недостъпно', ro: 'Indisponibil', tr: 'Müsait değil' },
+  'cal.selected':        { en: 'Selected', el: 'Επιλεγμένο', bg: 'Избрано', ro: 'Selectat', tr: 'Seçildi' },
+  'cal.days':            { en: 'Su,Mo,Tu,We,Th,Fr,Sa', el: 'Κυ,Δε,Τρ,Τε,Πε,Πα,Σα', bg: 'Нд,Пн,Вт,Ср,Чт,Пт,Сб', ro: 'Du,Lu,Ma,Mi,Jo,Vi,Sâ', tr: 'Pz,Pt,Sa,Ça,Pe,Cu,Ct' },
+&nbsp;
+  // ── Success page extras ────────────────────────────────────────────────────
+  'success.what_next':     { en: 'What happens next?', el: 'Τι γίνεται στη συνέχεια;', bg: 'Какво следва?', ro: 'Ce urmează?', tr: 'Sırada ne var?' },
+  'success.step1':         { en: 'Owner reviews your request (usually within a few hours)', el: 'Ο ιδιοκτήτης εξετάζει το αίτημά σας (συνήθως εντός λίγων ωρών)', bg: 'Собственикът разглежда заявката (обикновено в рамките на часове)', ro: 'Proprietarul revizuiește cererea dvs. (de obicei în câteva ore)', tr: 'Sahibi talebinizi inceler (genellikle birkaç saat içinde)' },
+  'success.step2':         { en: 'You receive an email with bank transfer details', el: 'Λαμβάνετε email με τραπεζικά στοιχεία', bg: 'Получавате имейл с банкови детайли', ro: 'Primiți un email cu detalii bancare', tr: 'Banka transfer detaylarını içeren bir e-posta alırsınız' },
+  'success.step3':         { en: 'Send the payment using the provided details', el: 'Στείλτε την πληρωμή χρησιμοποιώντας τα στοιχεία', bg: 'Изпратете плащането, използвайки предоставените данни', ro: 'Trimiteți plata folosind detaliile furnizate', tr: 'Sağlanan detayları kullanarak ödemeyi gönderin' },
+  'success.step4':         { en: 'Booking is confirmed once payment is received', el: 'Η κράτηση επιβεβαιώνεται μόλις ληφθεί η πληρωμή', bg: 'Резервацията се потвърждава след получаване на плащането', ro: 'Rezervarea se confirmă după primirea plății', tr: 'Ödeme alındığında rezervasyon onaylanır' },
+  'success.prop':          { en: 'Property', el: 'Κατάλυμα', bg: 'Имот', ro: 'Proprietate', tr: 'Mülk' },
+  'success.checkin':       { en: 'Check-in', el: 'Άφιξη', bg: 'Настаняване', ro: 'Check-in', tr: 'Giriş' },
+  'success.checkout':      { en: 'Check-out', el: 'Αναχώρηση', bg: 'Напускане', ro: 'Check-out', tr: 'Çıkış' },
+  'success.guests':        { en: 'Guests', el: 'Επισκέπτες', bg: 'Гости', ro: 'Oaspeți', tr: 'Misafirler' },
+  'success.total':         { en: 'Total', el: 'Σύνολο', bg: 'Общо', ro: 'Total', tr: 'Toplam' },
+  'success.ref':           { en: 'Booking ref', el: 'Κωδ. κράτησης', bg: 'Рез. номер', ro: 'Ref. rezervare', tr: 'Rezervasyon ref.' },
+&nbsp;
+  // ── Cancellation policy descriptions ─────────────────────────────────────
+  'cancel.flexible': {
+    en: 'Full refund if cancelled 30+ days before check-in. 50% refund within 14–30 days. No refund within 14 days.',
+    el: 'Πλήρης επιστροφή αν ακυρωθεί 30+ ημέρες πριν την άφιξη. 50% εντός 14–30 ημερών. Χωρίς επιστροφή εντός 14 ημερών.',
+    bg: 'Пълно възстановяване при анулиране 30+ дни преди настаняване. 50% в рамките на 14–30 дни. Без връщане в рамките на 14 дни.',
+    ro: 'Rambursare integrală dacă se anulează cu 30+ zile înainte de check-in. 50% în termen de 14–30 de zile. Fără rambursare în 14 zile.',
+    tr: 'Girişten 30+ gün önce iptal edilirse tam iade. 14–30 gün içinde %50 iade. 14 gün içinde iade yok.',
+  },
+  'cancel.moderate': {
+    en: 'Full refund if cancelled 30+ days before check-in. 50% refund within 14–30 days. No refund within 14 days.',
+    el: 'Πλήρης επιστροφή αν ακυρωθεί 30+ ημέρες πριν την άφιξη. 50% εντός 14–30 ημερών. Χωρίς επιστροφή εντός 14 ημερών.',
+    bg: 'Пълно възстановяване при анулиране 30+ дни преди настаняване. 50% в рамките на 14–30 дни. Без връщане в рамките на 14 дни.',
+    ro: 'Rambursare integrală dacă se anulează cu 30+ zile înainte de check-in. 50% în termen de 14–30 de zile. Fără rambursare în 14 zile.',
+    tr: 'Girişten 30+ gün önce iptal edilirse tam iade. 14–30 gün içinde %50 iade. 14 gün içinde iade yok.',
+  },
+  'cancel.strict': {
+    en: 'Full refund within 48h of booking. 50% refund if cancelled 30+ days before check-in. No refund within 30 days.',
+    el: 'Πλήρης επιστροφή εντός 48ω από την κράτηση. 50% αν ακυρωθεί 30+ ημέρες πριν. Χωρίς επιστροφή εντός 30 ημερών.',
+    bg: 'Пълно възстановяване в рамките на 48ч от резервацията. 50% при анулиране 30+ дни преди. Без връщане в рамките на 30 дни.',
+    ro: 'Rambursare integrală în 48h de la rezervare. 50% dacă se anulează cu 30+ zile înainte. Fără rambursare în 30 de zile.',
+    tr: 'Rezervasyondan sonra 48 saat içinde tam iade. Girişten 30+ gün önce %50 iade. 30 gün içinde iade yok.',
+  },
+&nbsp;
+  // ── Calendar month names (passed as locale string) ────────────────────────
+  'cal.locale': { en: 'en-US', el: 'el-GR', bg: 'bg-BG', ro: 'ro-RO', tr: 'tr-TR' },
+&nbsp;
+  // ── Amenity categories ────────────────────────────────────────────────────
+  'amenity.outdoor':       { en: 'Outdoor &amp; Garden', el: 'Εξωτερικοί Χώροι &amp; Κήπος', bg: 'Открито &amp; Градина', ro: 'Exterior &amp; Grădină', tr: 'Dış Alan &amp; Bahçe' },
+  'amenity.kitchen':       { en: 'Kitchen &amp; Dining', el: 'Κουζίνα &amp; Τραπεζαρία', bg: 'Кухня &amp; Хранене', ro: 'Bucătărie &amp; Sufragerie', tr: 'Mutfak &amp; Yemek' },
+  'amenity.general':       { en: 'General', el: 'Γενικά', bg: 'Общи', ro: 'General', tr: 'Genel' },
+  'amenity.entertainment': { en: 'Entertainment', el: 'Ψυχαγωγία', bg: 'Забавления', ro: 'Divertisment', tr: 'Eğlence' },
+  'amenity.safety':        { en: 'Safety', el: 'Ασφάλεια', bg: 'Безопасност', ro: 'Siguranță', tr: 'Güvenlik' },
+  'amenity.bathroom':      { en: 'Bathroom', el: 'Μπάνιο', bg: 'Баня', ro: 'Baie', tr: 'Banyo' },
+  'amenity.bedroom':       { en: 'Bedroom', el: 'Υπνοδωμάτιο', bg: 'Спалня', ro: 'Dormitor', tr: 'Yatak Odası' },
+  'amenity.accessibility': { en: 'Accessibility', el: 'Προσβασιμότητα', bg: 'Достъпност', ro: 'Accesibilitate', tr: 'Erişilebilirlik' },
+} as const;
+&nbsp;
+// ─── Helper ────────────────────────────────────────────────────────────────
+&nbsp;
+export function t(lang: Lang, key: string): string {
+  const entry = (translations as Record&lt;string, Record&lt;string, string&gt;&gt;)[key];
+  if (!entry) return key;
+  return entry[lang<span class="branch-0 cbranch-no" title="branch not covered" >] ?? entry[DEFAULT_LANG<span class="branch-0 cbranch-no" title="branch not covered" >] ?? k</span>ey;</span>
+}
+&nbsp;
+export function isValidLang(lang: string): lang is Lang {
+  return SUPPORTED_LANGS.includes(lang as Lang);
+}
+&nbsp;</pre></td></tr></table></pre>
+
+                <div class='push'></div><!-- for sticky footer -->
+            </div><!-- /wrapper -->
+            <div class='footer quiet pad2 space-top1 center small'>
+                Code coverage generated by
+                <a href="https://istanbul.js.org/" target="_blank" rel="noopener noreferrer">istanbul</a>
+                at 2026-04-03T20:07:34.900Z
+            </div>
+        <script src="../prettify.js"></script>
+        <script>
+            window.onload = function () {
+                prettyPrint();
+            };
+        </script>
+        <script src="../sorter.js"></script>
+        <script src="../block-navigation.js"></script>
+    </body>
+</html>
+    

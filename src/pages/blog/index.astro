@@ -1,0 +1,122 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const service = getServiceClient();
+const { data: posts } = await service
+  .from('blog_posts')
+  .select('id, slug, title, excerpt, cover_image, author, published_at, tags')
+  .eq('is_published', true)
+  .order('published_at', { ascending: false });
+
+const all = posts ?? [];
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://kefaloniabnb.com';
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const breadcrumbSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'BreadcrumbList',
+  itemListElement: [
+    { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+    { '@type': 'ListItem', position: 2, name: 'Blog', item: `${siteUrl}/blog` },
+  ],
+};
+---
+
+<BaseLayout
+  title="Travel Guide & Blog — KefaloniaBNB"
+  description="Discover the best things to do in Kefalonia and Keramoti, Greece. Travel tips, local guides, beach recommendations, and holiday inspiration from KefaloniaBNB."
+  ogType="website"
+  schema={breadcrumbSchema}
+>
+  <!-- Hero -->
+  <section class="bg-[#1a1a2e] text-white py-16 px-4">
+    <div class="max-w-4xl mx-auto text-center">
+      <p class="text-[#c9a96e] text-sm font-semibold uppercase tracking-widest mb-3">{isEl ? 'Οδηγοί Ταξιδιών' : isBg ? 'Пътеводители' : isSr ? 'Путовођи' : isTr ? 'Seyahat Rehberleri' : isRo ? 'Ghiduri de Călătorie' : 'Travel Guides'}</p>
+      <h1 class="text-4xl sm:text-5xl font-bold leading-tight mb-4">{isEl ? 'Εξερευνήστε Καβάλα & Κεραμωτή' : isBg ? 'Разгледайте Kefalonia & Keramoti' : isSr ? 'Истражите Кавалу и Керамоти' : isTr ? 'Kefalonia & Keramoti\'yi Keşfedin' : isRo ? 'Explorează Kefalonia & Keramoti' : 'Explore Kefalonia & Keramoti'}</h1>
+      <p class="text-gray-300 text-lg max-w-2xl mx-auto">
+        {isEl ? 'Τοπικές συμβουλές, οδηγοί παραλιών και εμπνεύσεις για ταξίδια που θα σας βοηθήσουν να αξιοποιήσετε στο έπακρο τη διαμονή σας στη Βόρεια Ελλάδα.' : isBg ? 'Местни съвети, пътеводители за плажове и вдъхновение за пътувания, за да се насладите максимално на престоя си в Северна Гърция.' : isSr ? 'Локални савети, водичи за плаже и путнички надахнући да вам помогну да максимално искористите боравак у северној Грчкој.' : isTr ? 'Kuzey Yunanistan\'daki konaklamanızdan en iyi şekilde yararlanmanıza yardımcı olacak yerel ipuçları, plaj rehberleri ve seyahat ilhamı.' : isRo ? 'Sfaturi locale, ghiduri de plajă și inspirație de călătorie pentru a profita la maximum de sejurul dumneavoastră în Grecia de Nord.' : 'Local tips, beach guides, and travel inspiration to help you make the most of your stay in Northern Greece.'}
+      </p>
+    </div>
+  </section>
+
+  <!-- Posts grid -->
+  <section class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+    {all.length === 0 ? (
+      <div class="text-center py-20 text-gray-400">
+        <p class="text-5xl mb-4">✍️</p>
+        <p class="text-xl font-medium text-gray-700">{isEl ? 'Έρχεται σύντομα' : isBg ? 'Очаквайте скоро' : isSr ? 'Ускоро' : isTr ? 'Yakında' : isRo ? 'În curând' : 'Coming soon'}</p>
+        <p class="mt-2">{isEl ? 'Γράφουμε τις καλύτερες τοπικές συμβουλές μας — ελάτε σύντομα!' : isBg ? 'Подготвяме най-добрите ни местни съвети — проверете отново скоро!' : isSr ? 'Пишемо наше најбоље локалне савете — свратите ускоро!' : isTr ? 'En iyi yerel ipuçlarımızı yazıyoruz — yakında tekrar kontrol edin!' : isRo ? 'Scriem cele mai bune sfaturi locale — reveniți în curând!' : "We're writing up our best local tips — check back soon!"}</p>
+      </div>
+    ) : (
+      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+        {all.map((post: any) => (
+          <article class="bg-white rounded-2xl overflow-hidden border border-gray-100 hover:shadow-lg transition-shadow group">
+            <a href={`/blog/${post.slug}`} class="block">
+              {post.cover_image ? (
+                <div class="aspect-video overflow-hidden">
+                  <img
+                    src={post.cover_image}
+                    alt={post.title}
+                    class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                    loading="lazy"
+                  />
+                </div>
+              ) : (
+                <div class="aspect-video bg-gradient-to-br from-[#1a1a2e] to-[#2d2d4e] flex items-center justify-center">
+                  <span class="text-4xl">🏛️</span>
+                </div>
+              )}
+            </a>
+            <div class="p-5">
+              {(post.tags ?? []).length > 0 && (
+                <div class="flex flex-wrap gap-1.5 mb-3">
+                  {(post.tags as string[]).slice(0, 3).map((tag: string) => (
+                    <span class="text-xs font-medium text-[#c9a96e] bg-[#c9a96e]/10 px-2 py-0.5 rounded-full">
+                      {tag}
+                    </span>
+                  ))}
+                </div>
+              )}
+              <h2 class="font-bold text-gray-900 text-lg leading-snug mb-2 group-hover:text-[#c9a96e] transition-colors">
+                <a href={`/blog/${post.slug}`}>{post.title}</a>
+              </h2>
+              {post.excerpt && (
+                <p class="text-gray-500 text-sm leading-relaxed line-clamp-3">{post.excerpt}</p>
+              )}
+              <div class="flex items-center justify-between mt-4 pt-4 border-t border-gray-50">
+                <span class="text-xs text-gray-400">{post.author ?? 'KefaloniaBNB'}</span>
+                {post.published_at && (
+                  <time class="text-xs text-gray-400" datetime={post.published_at}>
+                    {fmtDate(post.published_at)}
+                  </time>
+                )}
+              </div>
+            </div>
+          </article>
+        ))}
+      </div>
+    )}
+  </section>
+
+  <!-- CTA -->
+  <section class="bg-gray-50 border-t border-gray-100 py-16 px-4">
+    <div class="max-w-2xl mx-auto text-center">
+      <h2 class="text-2xl font-bold text-gray-900 mb-3">{isEl ? 'Έτοιμοι να επισκεφθείτε την Καβάλα;' : isBg ? 'Готови ли сте да посетите Kefalonia?' : isSr ? 'Спремни за посету Кавали?' : isTr ? 'Kefalonia\'yı ziyaret etmeye hazır mısınız?' : isRo ? 'Sunteți gata să vizitați Kefalonia?' : 'Ready to visit Kefalonia?'}</h2>
+      <p class="text-gray-600 mb-6">{isEl ? 'Δείτε τις επιλεγμένες εξοχικές κατοικίες μας στην Κεραμωτή και την Καβάλα — απευθείας κράτηση, χωρίς κρυφές χρεώσεις.' : isBg ? 'Разгледайте нашите внимателно подбрани ваканционни имоти в Keramoti и Kefalonia — директна резервация, без скрити такси.' : isSr ? 'Прегледајте наше пажљиво одабране одморалиште у Керамотију и Кавали — директна резервација, без скривених накнада.' : isTr ? 'Keramoti ve Kefalonia\'daki özenle seçilmiş tatil kiralıklarımıza göz atın — doğrudan rezervasyon, gizli ücret yok.' : isRo ? 'Răsfoiți închirierile noastre de vacanță selectate manual în Keramoti și Kefalonia — rezervare directă, fără taxe ascunse.' : 'Browse our hand-picked vacation rentals in Keramoti and Kefalonia — direct booking, no hidden fees.'}</p>
+      <a href="/rentals" class="inline-flex items-center gap-2 bg-[#1a1a2e] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#2d2d4e] transition-colors">
+        {isEl ? 'Δείτε Όλες τις Κατοικίες →' : isBg ? 'Вижте всички имоти →' : isSr ? 'Погледајте све смештаје →' : isTr ? 'Tüm Kiralıkları Görüntüle →' : isRo ? 'Vezi Toate Închirierile →' : 'View All Rentals →'}
+      </a>
+    </div>
+  </section>
+</BaseLayout>

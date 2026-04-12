@@ -1,0 +1,139 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const L: Record<string, Record<string, string>> = {
+  th_guest:       { en: 'Guest', el: 'Επισκέπτης' },
+  th_listing:     { en: 'Listing', el: 'Καταχώριση' },
+  th_rating:      { en: 'Rating', el: 'Βαθμολογία' },
+  th_review:      { en: 'Review', el: 'Κριτική' },
+  th_published:   { en: 'Published', el: 'Δημοσιευμένη' },
+  published:      { en: 'Published', el: 'Δημοσιευμένη' },
+  hidden:         { en: 'Hidden', el: 'Κρυφή' },
+  delete:         { en: 'Delete', el: 'Διαγραφή' },
+  delete_confirm: { en: 'Delete this review?', el: 'Διαγραφή αυτής της κριτικής;' },
+};
+function al(k: string) { return L[k]?.[lang] ?? L[k]?.en ?? k; }
+
+const service = getServiceClient();
+const { data: reviews } = await service
+  .from('reviews')
+  .select('*, listings(title)')
+  .order('created_at', { ascending: false });
+---
+
+<AdminLayout title="Reviews">
+  <!-- Mobile card view -->
+  <div class="lg:hidden space-y-3">
+    {(reviews ?? []).length === 0 && (
+      <div class="bg-white rounded-2xl border border-gray-100 p-8 text-center text-gray-400">No reviews yet.</div>
+    )}
+    {(reviews ?? []).map((r: any) => (
+      <div class="bg-white rounded-2xl border border-gray-100 p-4 space-y-3">
+        <div class="flex items-start justify-between gap-2">
+          <div>
+            <p class="font-medium text-gray-900">{r.guest_name}</p>
+            <p class="text-gray-400 text-xs">{r.guest_country ?? ''}</p>
+          </div>
+          <span class="font-medium whitespace-nowrap">{'⭐'.repeat(r.rating)}</span>
+        </div>
+        <p class="text-xs text-gray-500">{r.listings?.title ?? '—'}</p>
+        {r.title && <p class="font-medium text-gray-800 text-sm">{r.title}</p>}
+        <p class="text-gray-500 text-sm line-clamp-3">{r.body}</p>
+        <div class="flex items-center gap-2 pt-1">
+          <button
+            class="toggle-published min-h-[44px] px-4 py-2.5 rounded-full text-sm font-medium cursor-pointer transition-colors"
+            class:list={[r.is_published ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600']}
+            data-id={r.id}
+            data-published={r.is_published}
+            type="button"
+          >
+            {r.is_published ? al('published') : al('hidden')}
+          </button>
+          <button class="delete-review min-h-[44px] px-4 py-2.5 text-red-400 hover:text-red-600 text-sm transition-colors cursor-pointer" data-id={r.id} data-confirm={al('delete_confirm')} type="button">{al('delete')}</button>
+        </div>
+      </div>
+    ))}
+  </div>
+
+  <!-- Desktop table -->
+  <div class="hidden lg:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-gray-50 border-b border-gray-100">
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">{al('th_guest')}</th>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">{al('th_listing')}</th>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">{al('th_rating')}</th>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">{al('th_review')}</th>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">{al('th_published')}</th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          {(reviews ?? []).map((r: any) => (
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="px-4 py-3">
+                <p class="font-medium text-gray-900">{r.guest_name}</p>
+                <p class="text-gray-400 text-xs">{r.guest_country ?? ''}</p>
+              </td>
+              <td class="px-4 py-3 text-gray-600 text-xs">{r.listings?.title ?? '—'}</td>
+              <td class="px-4 py-3">
+                <span class="font-medium">{'⭐'.repeat(r.rating)}</span>
+              </td>
+              <td class="px-4 py-3 max-w-xs">
+                {r.title && <p class="font-medium text-gray-800 text-xs mb-0.5">{r.title}</p>}
+                <p class="text-gray-500 text-xs line-clamp-2">{r.body}</p>
+              </td>
+              <td class="px-4 py-3">
+                <button
+                  class="toggle-published px-2 py-1 rounded-full text-xs font-medium cursor-pointer transition-colors"
+                  class:list={[r.is_published ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600']}
+                  data-id={r.id}
+                  data-published={r.is_published}
+                  type="button"
+                >
+                  {r.is_published ? al('published') : al('hidden')}
+                </button>
+              </td>
+              <td class="px-4 py-3">
+                <button class="delete-review text-red-400 hover:text-red-600 text-xs transition-colors cursor-pointer" data-id={r.id} data-confirm={al('delete_confirm')} type="button">{al('delete')}</button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</AdminLayout>
+
+<script>
+  document.querySelectorAll('.toggle-published').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = (btn as HTMLElement).dataset.id;
+      const current = (btn as HTMLElement).dataset.published === 'true';
+      const res = await fetch(`/api/reviews/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ is_published: !current }) });
+      if (res.ok) {
+        (window as any).adminToast(current ? '🔕 Review unpublished' : '✅ Review published', current ? 'info' : 'success');
+        setTimeout(() => window.location.reload(), 1200);
+      } else {
+        (window as any).adminToast('❌ Failed to update review', 'error');
+      }
+    });
+  });
+
+  document.querySelectorAll('.delete-review').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirm((btn as HTMLElement).dataset.confirm ?? 'Delete this review?')) return;
+      const id = (btn as HTMLElement).dataset.id;
+      const res = await fetch(`/api/reviews/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        (window as any).adminToast('🗑 Review deleted', 'info');
+        setTimeout(() => window.location.reload(), 1200);
+      } else {
+        (window as any).adminToast('❌ Failed to delete review', 'error');
+      }
+    });
+  });
+</script>

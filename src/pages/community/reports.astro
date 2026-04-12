@@ -1,0 +1,213 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+const isLoggedIn = !!Astro.locals.session;
+const currentUserId = Astro.locals.session?.user?.id ?? null;
+
+const service = getServiceClient();
+const { data: reports } = await service
+  .from('reports')
+  .select('id, title, category, status, severity, location, created_at, author_id')
+  .in('status', ['open', 'in_progress', 'resolved'])
+  .order('created_at', { ascending: false })
+  .limit(50);
+
+// Fetch user's own reports (all statuses)
+let myReports: any[] = [];
+if (currentUserId) {
+  const { data } = await service
+    .from('reports')
+    .select('id, title, category, status, severity, location, created_at')
+    .eq('author_id', currentUserId)
+    .order('created_at', { ascending: false });
+  myReports = data ?? [];
+}
+
+const categoryLabels: Record<string, { en: string; el: string; bg: string; sr: string; tr: string; ro: string; icon: string }> = {
+  road_damage:      { en: 'Road Damage',      el: 'Φθορά Οδοστρώματος',    bg: 'Повреда на пътя',       sr: 'Oštećenje puta',       tr: 'Yol Hasarı',          ro: 'Deteriorare drum',     icon: '🛣️' },
+  water_supply:     { en: 'Water Supply',      el: 'Ύδρευση',               bg: 'Водоснабдяване',        sr: 'Vodosnabdevanje',      tr: 'Su Temini',            ro: 'Alimentare cu apă',    icon: '💧' },
+  electricity:      { en: 'Electricity',       el: 'Ηλεκτρικό Ρεύμα',      bg: 'Електричество',         sr: 'Struja',               tr: 'Elektrik',             ro: 'Electricitate',        icon: '⚡' },
+  waste:            { en: 'Waste / Litter',    el: 'Σκουπίδια / Απόβλητα',  bg: 'Отпадъци / Боклук',     sr: 'Otpad / Smeće',        tr: 'Atık / Çöp',           ro: 'Deșeuri / Gunoi',      icon: '🗑️' },
+  street_lighting:  { en: 'Street Lighting',   el: 'Δημοτικός Φωτισμός',    bg: 'Улично осветление',     sr: 'Ulična rasveta',       tr: 'Sokak Aydınlatması',   ro: 'Iluminat stradal',     icon: '💡' },
+  stray_animals:    { en: 'Stray Animals',     el: 'Αδέσποτα Ζώα',          bg: 'Бездомни животни',      sr: 'Lutalice',             tr: 'Başıboş Hayvanlar',    ro: 'Animale fără stăpân',  icon: '🐕' },
+  noise:            { en: 'Noise',             el: 'Θόρυβος',               bg: 'Шум',                   sr: 'Buka',                 tr: 'Gürültü',              ro: 'Zgomot',               icon: '🔊' },
+  flooding:         { en: 'Flooding',          el: 'Πλημμύρα',              bg: 'Наводнение',            sr: 'Poplava',              tr: 'Sel',                  ro: 'Inundație',            icon: '🌊' },
+  other:            { en: 'Other',             el: 'Άλλο',                  bg: 'Друго',                 sr: 'Ostalo',               tr: 'Diğer',                ro: 'Altele',               icon: '📋' },
+};
+
+const statusLabels: Record<string, { en: string; el: string; bg: string; sr: string; tr: string; ro: string; color: string }> = {
+  open:        { en: 'Open',        el: 'Ανοικτό',         bg: 'Отворено',       sr: 'Otvoreno',       tr: 'Açık',          ro: 'Deschis',         color: 'bg-red-100 text-red-700' },
+  in_progress: { en: 'In Progress', el: 'Σε Εξέλιξη',     bg: 'В процес',       sr: 'U toku',         tr: 'Devam Ediyor',  ro: 'În desfășurare',  color: 'bg-amber-100 text-amber-700' },
+  resolved:    { en: 'Resolved',    el: 'Επιλύθηκε',       bg: 'Решено',         sr: 'Rešeno',         tr: 'Çözüldü',       ro: 'Rezolvat',        color: 'bg-green-100 text-green-700' },
+};
+
+const severityColors: Record<string, string> = {
+  low: 'border-l-gray-300',
+  medium: 'border-l-amber-400',
+  high: 'border-l-orange-500',
+  critical: 'border-l-red-600',
+};
+
+const openCount = (reports ?? []).filter(r => r.status === 'open').length;
+const inProgressCount = (reports ?? []).filter(r => r.status === 'in_progress').length;
+const resolvedCount = (reports ?? []).filter(r => r.status === 'resolved').length;
+---
+
+<BaseLayout
+  title={isEl ? 'Αναφορές Κοινότητας — KefaloniaBNB' : isBg ? 'Доклади на общността — KefaloniaBNB' : isSr ? 'Izveštaji zajednice — KefaloniaBNB' : isTr ? 'Topluluk Raporları — KefaloniaBNB' : isRo ? 'Rapoarte Comunitate — KefaloniaBNB' : 'Community Reports — KefaloniaBNB'}
+  description={isEl ? 'Δείτε και αναφέρετε προβλήματα στην περιοχή Κεραμωτής' : isBg ? 'Вижте и докладвайте местни проблеми в района на Керамоти' : isSr ? 'Pogledajte i prijavite lokalne probleme u oblasti Keramotija' : isTr ? 'Keramoti bölgesindeki yerel sorunları görüntüleyin ve bildirin' : isRo ? 'Vizualizează și raportează probleme locale din zona Keramoti' : 'View and report local issues in the Keramoti area'}
+>
+  <section class="bg-[#1a1a2e] py-16 sm:py-20">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+      <h1 class="text-3xl sm:text-4xl font-bold text-white mb-3">{isEl ? 'Αναφορές Κοινότητας' : isBg ? 'Доклади на общността' : isSr ? 'Izveštaji zajednice' : isTr ? 'Topluluk Raporları' : isRo ? 'Rapoarte Comunitate' : 'Community Reports'}</h1>
+      <p class="text-gray-300 max-w-2xl mx-auto">{isEl ? 'Βοηθήστε μας να βελτιώσουμε την περιοχή μας. Αναφέρετε προβλήματα και παρακολουθήστε την πρόοδο.' : isBg ? 'Помогнете ни да подобрим общността. Докладвайте проблеми и следете тяхното решаване.' : isSr ? 'Pomozite nam da poboljšamo zajednicu. Prijavite probleme i pratite njihovo rešavanje.' : isTr ? 'Topluluğumuzu geliştirmemize yardımcı olun. Sorunları bildirin ve çözümlerini takip edin.' : isRo ? 'Ajută-ne să îmbunătățim comunitatea. Raportează probleme și urmărește rezolvarea lor.' : 'Help us improve our community. Report issues and track their resolution.'}</p>
+      <div class="flex justify-center gap-6 mt-8">
+        <div class="text-center">
+          <div class="text-2xl font-bold text-red-400">{openCount}</div>
+          <div class="text-xs text-gray-400 mt-1">{isEl ? 'Ανοικτά' : isBg ? 'Отворени' : isSr ? 'Otvoreno' : isTr ? 'Açık' : isRo ? 'Deschise' : 'Open'}</div>
+        </div>
+        <div class="text-center">
+          <div class="text-2xl font-bold text-amber-400">{inProgressCount}</div>
+          <div class="text-xs text-gray-400 mt-1">{isEl ? 'Σε Εξέλιξη' : isBg ? 'В процес' : isSr ? 'U toku' : isTr ? 'Devam Ediyor' : isRo ? 'În desfășurare' : 'In Progress'}</div>
+        </div>
+        <div class="text-center">
+          <div class="text-2xl font-bold text-green-400">{resolvedCount}</div>
+          <div class="text-xs text-gray-400 mt-1">{isEl ? 'Επιλυμένα' : isBg ? 'Решени' : isSr ? 'Rešeno' : isTr ? 'Çözülmüş' : isRo ? 'Rezolvate' : 'Resolved'}</div>
+        </div>
+      </div>
+      <div class="flex justify-center gap-3 mt-8">
+        <a href="/community/reports/new" class="inline-flex items-center gap-2 bg-[#c9a96e] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#b89556] transition-colors">
+          {isEl ? 'Υποβολή Αναφοράς' : isBg ? 'Подайте доклад' : isSr ? 'Pošalji izveštaj' : isTr ? 'Rapor Gönder' : isRo ? 'Trimite un Raport' : 'Submit a Report'}
+        </a>
+        {isLoggedIn && (
+          <a href="/community/board" class="inline-flex items-center gap-2 bg-white/10 text-white px-6 py-3 rounded-xl font-semibold hover:bg-white/20 transition-colors">
+            {isEl ? 'Κοινότητα' : isBg ? 'Общност' : isSr ? 'Zajednica' : isTr ? 'Topluluk' : isRo ? 'Panoul Comunității' : 'Community Board'}
+          </a>
+        )}
+      </div>
+    </div>
+  </section>
+
+  <section class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+    {/* My Reports - only for logged-in users who have reports */}
+    {isLoggedIn && myReports.length > 0 && (
+      <div class="mb-10">
+        <h2 class="text-lg font-bold text-gray-900 mb-4">{isEl ? 'Οι Αναφορές Μου' : isBg ? 'Моите доклади' : isSr ? 'Moji izveštaji' : isTr ? 'Raporlarım' : isRo ? 'Rapoartele Mele' : 'My Reports'} ({myReports.length})</h2>
+        <div class="space-y-2 mb-6">
+          {myReports.map((r: any) => {
+            const cat = categoryLabels[r.category] ?? categoryLabels.other;
+            const st = statusLabels[r.status] ?? statusLabels.open;
+            const sevColor = severityColors[r.severity] ?? severityColors.medium;
+            const date = new Date(r.created_at).toLocaleDateString(isEl ? 'el-GR' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+            return (
+              <div class={`my-report-row bg-white rounded-xl border border-gray-100 p-4 sm:p-5 border-l-4 ${sevColor}`} data-id={r.id}>
+                <div class="flex items-start justify-between gap-3">
+                  <div class="flex items-start gap-3 min-w-0">
+                    <span class="text-2xl flex-shrink-0 mt-0.5">{cat.icon}</span>
+                    <div class="min-w-0">
+                      <h3 class="font-semibold text-gray-900 truncate">{r.title}</h3>
+                      <div class="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-gray-500">
+                        <span class="bg-gray-100 px-2 py-0.5 rounded">{isEl ? cat.el : isBg ? cat.bg : isSr ? cat.sr : isTr ? cat.tr : isRo ? cat.ro : cat.en}</span>
+                        {r.location && <span class="truncate max-w-[200px]">📍 {r.location}</span>}
+                        <span>{date}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 flex-shrink-0">
+                    <span class={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${st.color}`}>{isEl ? st.el : isBg ? st.bg : isSr ? st.sr : isTr ? st.tr : isRo ? st.ro : st.en}</span>
+                    <button class="delete-my-report text-xs text-red-400 hover:text-red-600" data-id={r.id} title={isEl ? 'Διαγραφή' : isBg ? 'Изтрийте' : isSr ? 'Obriši' : isTr ? 'Sil' : isRo ? 'Șterge' : 'Delete'}>✕</button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <hr class="border-gray-200" />
+      </div>
+    )}
+
+    <!-- Filter tabs -->
+    <h2 class="text-lg font-bold text-gray-900 mb-4">{isEl ? 'Όλες οι Αναφορές' : isBg ? 'Всички доклади' : isSr ? 'Svi izveštaji' : isTr ? 'Tüm Raporlar' : isRo ? 'Toate Rapoartele' : 'All Reports'}</h2>
+    <div class="flex flex-wrap gap-2 mb-8" id="status-filters">
+      <button data-filter="all" class="filter-btn px-4 py-2 rounded-lg text-sm font-medium bg-[#1a1a2e] text-white">{isEl ? 'Όλα' : isBg ? 'Всички' : isSr ? 'Sve' : isTr ? 'Tümü' : isRo ? 'Toate' : 'All'}</button>
+      <button data-filter="open" class="filter-btn px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200">{isEl ? 'Ανοικτά' : isBg ? 'Отворени' : isSr ? 'Otvoreno' : isTr ? 'Açık' : isRo ? 'Deschise' : 'Open'}</button>
+      <button data-filter="in_progress" class="filter-btn px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200">{isEl ? 'Σε Εξέλιξη' : isBg ? 'В процес' : isSr ? 'U toku' : isTr ? 'Devam Ediyor' : isRo ? 'În desfășurare' : 'In Progress'}</button>
+      <button data-filter="resolved" class="filter-btn px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200">{isEl ? 'Επιλυμένα' : isBg ? 'Решени' : isSr ? 'Rešeno' : isTr ? 'Çözülmüş' : isRo ? 'Rezolvate' : 'Resolved'}</button>
+    </div>
+
+    {(!reports || reports.length === 0) ? (
+      <div class="text-center py-16 text-gray-400">
+        <div class="text-5xl mb-4">📋</div>
+        <p class="text-lg font-medium">{isEl ? 'Δεν υπάρχουν αναφορές ακόμα' : isBg ? 'Все още няма доклади' : isSr ? 'Još nema izveštaja' : isTr ? 'Henüz rapor yok' : isRo ? 'Niciun raport încă' : 'No reports yet'}</p>
+        <p class="text-sm mt-1">{isEl ? 'Γίνετε ο πρώτος που θα αναφέρει ένα πρόβλημα!' : isBg ? 'Бъдете първият, който ще докладва проблем!' : isSr ? 'Budite prvi koji će prijaviti problem!' : isTr ? 'Bir sorun bildiren ilk siz olun!' : isRo ? 'Fii primul care raportează o problemă!' : 'Be the first to report an issue!'}</p>
+      </div>
+    ) : (
+      <div class="space-y-3" id="reports-list">
+        {(reports ?? []).map((r: any) => {
+          const cat = categoryLabels[r.category] ?? categoryLabels.other;
+          const st = statusLabels[r.status] ?? statusLabels.open;
+          const sevColor = severityColors[r.severity] ?? severityColors.medium;
+          const date = new Date(r.created_at).toLocaleDateString(isEl ? 'el-GR' : 'en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+          const isOwn = currentUserId && r.author_id === currentUserId;
+          return (
+            <div class={`report-card bg-white rounded-xl border border-gray-100 p-4 sm:p-5 border-l-4 ${sevColor} hover:shadow-md transition-shadow`} data-status={r.status} data-id={r.id}>
+              <div class="flex items-start justify-between gap-3">
+                <div class="flex items-start gap-3 min-w-0">
+                  <span class="text-2xl flex-shrink-0 mt-0.5">{cat.icon}</span>
+                  <div class="min-w-0">
+                    <h3 class="font-semibold text-gray-900 truncate">{r.title}</h3>
+                    <div class="flex flex-wrap items-center gap-2 mt-1.5 text-xs text-gray-500">
+                      <span class="bg-gray-100 px-2 py-0.5 rounded">{isEl ? cat.el : isBg ? cat.bg : isSr ? cat.sr : isTr ? cat.tr : isRo ? cat.ro : cat.en}</span>
+                      {r.location && <span class="truncate max-w-[200px]">📍 {r.location}</span>}
+                      <span>{date}</span>
+                      {isOwn && <span class="text-[#c9a96e] font-medium">{isEl ? 'Δική μου' : isBg ? 'Моят' : isSr ? 'Moj' : isTr ? 'Benim' : isRo ? 'Al meu' : 'Mine'}</span>}
+                    </div>
+                  </div>
+                </div>
+                <div class="flex items-center gap-2 flex-shrink-0">
+                  <span class={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap ${st.color}`}>{isEl ? st.el : isBg ? st.bg : isSr ? st.sr : isTr ? st.tr : isRo ? st.ro : st.en}</span>
+                  {isOwn && <button class="delete-my-report text-xs text-red-400 hover:text-red-600" data-id={r.id} title={isEl ? 'Διαγραφή' : isBg ? 'Изтрийте' : isSr ? 'Obriši' : isTr ? 'Sil' : isRo ? 'Șterge' : 'Delete'}>✕</button>}
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </section>
+</BaseLayout>
+
+<script>
+  // Filter tabs
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const filter = (btn as HTMLElement).dataset.filter;
+      document.querySelectorAll('.filter-btn').forEach(b => {
+        b.className = 'filter-btn px-4 py-2 rounded-lg text-sm font-medium bg-gray-100 text-gray-700 hover:bg-gray-200';
+      });
+      btn.className = 'filter-btn px-4 py-2 rounded-lg text-sm font-medium bg-[#1a1a2e] text-white';
+      document.querySelectorAll('.report-card').forEach(card => {
+        const status = (card as HTMLElement).dataset.status;
+        (card as HTMLElement).style.display = (filter === 'all' || status === filter) ? '' : 'none';
+      });
+    });
+  });
+
+  // Delete own report
+  document.querySelectorAll('.delete-my-report').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = (btn as HTMLElement).dataset.id!;
+      if (!confirm('Delete this report?')) return;
+      const res = await fetch(`/api/reports/${id}`, { method: 'DELETE' });
+      if (res.ok) location.reload();
+      else alert('Failed to delete');
+    });
+  });
+</script>

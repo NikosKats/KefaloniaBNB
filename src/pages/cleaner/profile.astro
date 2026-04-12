@@ -1,0 +1,208 @@
+---
+import CleanerLayout from '../../layouts/CleanerLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+
+const userId = Astro.locals.session.user.id;
+const service = getServiceClient();
+
+const { data: profile } = await service
+  .from('cleaner_profiles')
+  .select('*, cleaner_services(*), cleaner_service_areas(*)')
+  .eq('user_id', userId)
+  .single();
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isBg = lang === 'bg';
+const isEl = lang === 'el';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const tTitle = isEl ? 'Προφίλ Καθαριστή' : isBg ? 'Профил на чистач' : isSr ? 'Profil čistača' : isTr ? 'Temizlikçi Profili' : isRo ? 'Profil Curățenie' : 'Cleaner Profile';
+const tAboutYou = isEl ? 'Σχετικά με εσάς' : isBg ? 'За вас' : isSr ? 'O vama' : isTr ? 'Hakkınızda' : isRo ? 'Despre dvs.' : 'About You';
+const tBio = isEl ? 'Βιογραφικό' : isBg ? 'Биография' : isSr ? 'Biografija' : isTr ? 'Biyografi' : isRo ? 'Biografie' : 'Bio';
+const tBioPlaceholder = isEl ? 'Περιγράψτε την εμπειρία σας, ειδικότητες…' : isBg ? 'Опишете опита си, специалности…' : isSr ? 'Opišite iskustvo, specijalnosti…' : isTr ? 'Deneyiminizi, uzmanlıklarınızı açıklayın…' : isRo ? 'Descrieți experiența dvs., specialități…' : 'Describe your experience, specialties…';
+const tLanguages = isEl ? 'Γλώσσες (διαχωρισμένες με κόμμα)' : isBg ? 'Езици (разделени със запетая)' : isSr ? 'Jezici (razdvojeni zarezom)' : isTr ? 'Diller (virgülle ayrılmış)' : isRo ? 'Limbi (separate prin virgulă)' : 'Languages (comma-separated)';
+const tLangPlaceholder = isEl ? 'π.χ. Αγγλικά, Ελληνικά' : isBg ? 'напр. Английски, Гръцки' : isSr ? 'npr. Engleski, Grčki' : isTr ? 'örn. İngilizce, Yunanca' : isRo ? 'ex. Engleză, Greacă' : 'e.g. English, Greek';
+const tSaveChanges = isEl ? 'Αποθήκευση' : isBg ? 'Запазване' : isSr ? 'Sačuvaj' : isTr ? 'Kaydet' : isRo ? 'Salvează' : 'Save Changes';
+const tCreateProfile = isEl ? 'Δημιουργία Προφίλ' : isBg ? 'Създаване на профил' : isSr ? 'Kreiraj profil' : isTr ? 'Profil Oluştur' : isRo ? 'Creare Profil' : 'Create Profile';
+const tMyServices = isEl ? 'Οι Υπηρεσίες μου' : isBg ? 'Моите услуги' : isSr ? 'Moje usluge' : isTr ? 'Hizmetlerim' : isRo ? 'Serviciile Mele' : 'My Services';
+const tAddService = isEl ? '+ Προσθήκη Υπηρεσίας' : isBg ? '+ Добавяне на услуга' : isSr ? '+ Dodaj uslugu' : isTr ? '+ Hizmet Ekle' : isRo ? '+ Adaugă Serviciu' : '+ Add Service';
+const tRemove = isEl ? 'Αφαίρεση' : isBg ? 'Премахване' : isSr ? 'Ukloni' : isTr ? 'Kaldır' : isRo ? 'Elimină' : 'Remove';
+const tNoServices = isEl ? 'Δεν υπάρχουν υπηρεσίες ακόμα. Προσθέστε μία για να λαμβάνετε αιτήματα.' : isBg ? 'Все още няма услуги. Добавете, за да получавате заявки.' : isSr ? 'Još nema usluga. Dodajte da primate zahteve za posao.' : isTr ? 'Henüz hizmet yok. İş talepleri almak için bir tane ekleyin.' : isRo ? 'Niciun serviciu încă. Adăugați unul pentru a primi cereri de lucrări.' : 'No services yet. Add one to receive job requests.';
+const tPropertyType = isEl ? 'Τύπος Ακινήτου' : isBg ? 'Тип имот' : isSr ? 'Tip nekretnine' : isTr ? 'Mülk Tipi' : isRo ? 'Tip Proprietate' : 'Property Type';
+const tPrice = isEl ? 'Τιμή (€)' : isBg ? 'Цена (€)' : isSr ? 'Cena (€)' : isTr ? 'Fiyat (€)' : isRo ? 'Preț (€)' : 'Price (€)';
+const tMinBR = isEl ? 'Ελάχ. ΥΔ' : isBg ? 'Мин. СП' : isSr ? 'Min SP' : isTr ? 'Min YO' : isRo ? 'Min DR' : 'Min BR';
+const tMaxBR = isEl ? 'Μέγ. ΥΔ' : isBg ? 'Макс. СП' : isSr ? 'Maks SP' : isTr ? 'Maks YO' : isRo ? 'Max DR' : 'Max BR';
+const tDuration = isEl ? 'Διάρκεια (ω)' : isBg ? 'Продължителност (ч)' : isSr ? 'Trajanje (h)' : isTr ? 'Süre (sa)' : isRo ? 'Durată (h)' : 'Duration (h)';
+const tSaveService = isEl ? 'Αποθήκευση Υπηρεσίας' : isBg ? 'Запазване на услуга' : isSr ? 'Sačuvaj uslugu' : isTr ? 'Hizmeti Kaydet' : isRo ? 'Salvează Serviciu' : 'Save Service';
+const tCancel = isEl ? 'Ακύρωση' : isBg ? 'Отказ' : isSr ? 'Otkaži' : isTr ? 'İptal' : isRo ? 'Anulare' : 'Cancel';
+const tAvailability = isEl ? 'Κατάσταση Διαθεσιμότητας' : isBg ? 'Статус на наличност' : isSr ? 'Status dostupnosti' : isTr ? 'Uygunluk Durumu' : isRo ? 'Status Disponibilitate' : 'Availability Status';
+const tActiveAccepting = isEl ? 'Ενεργός — δέχεται νέες εργασίες' : isBg ? 'Активен — приема нови работи' : isSr ? 'Aktivan — prima nove poslove' : isTr ? 'Aktif — yeni iş kabul ediyor' : isRo ? 'Activ — acceptă lucrări noi' : 'Active — accepting new jobs';
+const tFailedToSave = isEl ? 'Αποτυχία αποθήκευσης' : isBg ? 'Неуспешно запазване' : isSr ? 'Čuvanje neuspešno' : isTr ? 'Kaydetme başarısız' : isRo ? 'Salvare eșuată' : 'Failed to save';
+const tRemoveService = isEl ? 'Αφαίρεση αυτής της υπηρεσίας;' : isBg ? 'Премахване на тази услуга?' : isSr ? 'Ukloniti ovu uslugu?' : isTr ? 'Bu hizmet kaldırılsın mı?' : isRo ? 'Eliminați acest serviciu?' : 'Remove this service?';
+const tFailedRemove = isEl ? 'Αποτυχία αφαίρεσης' : isBg ? 'Неуспешно премахване' : isSr ? 'Uklanjanje neuspešno' : isTr ? 'Kaldırma başarısız' : isRo ? 'Eliminare eșuată' : 'Failed to remove';
+const tFailed = isEl ? 'Αποτυχία' : isBg ? 'Неуспешно' : isSr ? 'Neuspešno' : isTr ? 'Başarısız' : isRo ? 'Eșuat' : 'Failed';
+---
+
+<CleanerLayout title={tTitle}>
+  <div class="max-w-2xl mx-auto space-y-8">
+    <h1 class="text-xl font-bold text-gray-900">{tTitle}</h1>
+
+    <!-- Basic Profile -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <h2 class="text-sm font-semibold text-gray-700 mb-4">{tAboutYou}</h2>
+      <div class="space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{tBio}</label>
+          <textarea id="bio" rows="4" placeholder={tBioPlaceholder}
+            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none resize-none"
+          >{profile?.bio ?? ''}</textarea>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">{tLanguages}</label>
+          <input type="text" id="languages" value={profile?.languages?.join(', ') ?? ''}
+            placeholder={tLangPlaceholder}
+            class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none" />
+        </div>
+        <button id="save-profile-btn" class="bg-[#1a1a2e] text-white font-semibold px-5 py-2 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">
+          {profile ? tSaveChanges : tCreateProfile}
+        </button>
+      </div>
+    </div>
+
+    <!-- Services -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <div class="flex justify-between items-center mb-4">
+        <h2 class="text-sm font-semibold text-gray-700">{tMyServices}</h2>
+        <button id="add-service-btn" class="text-xs text-[#c9a96e] font-medium hover:opacity-80">{tAddService}</button>
+      </div>
+
+      <div id="services-list" class="space-y-3 mb-4">
+        {(profile?.cleaner_services ?? []).map((s: any) => (
+          <div class="flex items-center justify-between p-3 bg-gray-50 rounded-xl text-sm">
+            <div>
+              <p class="font-medium text-gray-900">{s.property_type} · {s.bedrooms_min}–{s.bedrooms_max} BR</p>
+              <p class="text-xs text-gray-500">€{s.base_price} · {s.duration_hours}h</p>
+            </div>
+            <button class="delete-service-btn text-red-400 hover:text-red-600 text-xs" data-id={s.id}>{tRemove}</button>
+          </div>
+        ))}
+        {(profile?.cleaner_services ?? []).length === 0 && (
+          <p class="text-sm text-gray-400">{tNoServices}</p>
+        )}
+      </div>
+
+      <!-- Add Service Form (hidden) -->
+      <div id="new-service-form" class="hidden border-t border-gray-100 pt-4 space-y-3">
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-xs font-medium text-gray-600 mb-1 block">{tPropertyType}</label>
+            <select id="svc-type" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-[#c9a96e] outline-none">
+              <option>villa</option><option>apartment</option><option>cottage</option><option>house</option><option>studio</option>
+            </select>
+          </div>
+          <div>
+            <label class="text-xs font-medium text-gray-600 mb-1 block">{tPrice}</label>
+            <input type="number" id="svc-price" min="10" step="1" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-[#c9a96e] outline-none" />
+          </div>
+        </div>
+        <div class="grid grid-cols-3 gap-3">
+          <div>
+            <label class="text-xs font-medium text-gray-600 mb-1 block">{tMinBR}</label>
+            <input type="number" id="svc-br-min" value="0" min="0" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-[#c9a96e] outline-none" />
+          </div>
+          <div>
+            <label class="text-xs font-medium text-gray-600 mb-1 block">{tMaxBR}</label>
+            <input type="number" id="svc-br-max" value="5" min="0" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-[#c9a96e] outline-none" />
+          </div>
+          <div>
+            <label class="text-xs font-medium text-gray-600 mb-1 block">{tDuration}</label>
+            <input type="number" id="svc-duration" value="3" min="1" step="0.5" class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:ring-2 focus:ring-[#c9a96e] outline-none" />
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <button id="save-service-btn" class="bg-[#1a1a2e] text-white text-xs font-semibold px-4 py-2 rounded-xl hover:bg-[#2d2d4e]">{tSaveService}</button>
+          <button id="cancel-service-btn" class="text-xs text-gray-500 px-4 py-2 rounded-xl hover:bg-gray-100">{tCancel}</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Status -->
+    {profile && (
+      <div class="bg-white rounded-2xl border border-gray-100 p-6">
+        <h2 class="text-sm font-semibold text-gray-700 mb-3">{tAvailability}</h2>
+        <div class="flex items-center gap-3">
+          <label class="relative inline-flex items-center cursor-pointer">
+            <input type="checkbox" id="is-active" class="sr-only peer" checked={profile.is_active} />
+            <div class="w-11 h-6 bg-gray-200 rounded-full peer peer-checked:bg-emerald-500 after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:after:translate-x-5"></div>
+          </label>
+          <span class="text-sm text-gray-700">{tActiveAccepting}</span>
+        </div>
+      </div>
+    )}
+  </div>
+</CleanerLayout>
+
+<script define:vars={{ hasProfile: !!profile, tFailedToSave, tRemoveService, tFailedRemove, tFailed }}>
+  document.getElementById('save-profile-btn')?.addEventListener('click', async () => {
+    const bio = document.getElementById('bio').value.trim() || undefined;
+    const langsStr = document.getElementById('languages').value;
+    const languages = langsStr ? langsStr.split(',').map(l => l.trim()).filter(Boolean) : undefined;
+    const isActiveEl = document.getElementById('is-active');
+    const is_active = isActiveEl ? isActiveEl.checked : undefined;
+
+    const method = hasProfile ? 'PATCH' : 'POST';
+    const res = await fetch('/api/cleaner/profile', {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ bio, languages, is_active }),
+    });
+    if (res.ok) window.location.href = '/cleaner/dashboard';
+    else {
+      const d = await res.json();
+      alert(d.error ?? tFailedToSave);
+    }
+  });
+
+  document.getElementById('add-service-btn')?.addEventListener('click', () => {
+    document.getElementById('new-service-form').classList.toggle('hidden');
+  });
+
+  document.getElementById('cancel-service-btn')?.addEventListener('click', () => {
+    document.getElementById('new-service-form').classList.add('hidden');
+  });
+
+  document.getElementById('save-service-btn')?.addEventListener('click', async () => {
+    const property_type = document.getElementById('svc-type').value;
+    const base_price = parseFloat(document.getElementById('svc-price').value);
+    const bedrooms_min = parseInt(document.getElementById('svc-br-min').value);
+    const bedrooms_max = parseInt(document.getElementById('svc-br-max').value);
+    const duration_hours = parseFloat(document.getElementById('svc-duration').value);
+
+    const res = await fetch('/api/cleaner/services', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ property_type, base_price, bedrooms_min, bedrooms_max, duration_hours }),
+    });
+    if (res.ok) window.location.reload();
+    else {
+      const d = await res.json();
+      alert(d.error ?? tFailed);
+    }
+  });
+
+  document.querySelectorAll('.delete-service-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm(tRemoveService)) return;
+      const res = await fetch('/api/cleaner/services', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: btn.dataset.id }),
+      });
+      if (res.ok) window.location.reload();
+      else alert(tFailedRemove);
+    });
+  });
+</script>

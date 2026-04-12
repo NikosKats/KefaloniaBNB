@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+:root {
+  --color-brand: #FF385C;
+  --color-brand-dark: #E31C5F;
+}
+
+html {
+  font-family: 'Circular', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  scroll-behavior: smooth;
+}
+
+.btn-primary {
+  @apply bg-[#FF385C] hover:bg-[#E31C5F] text-white font-semibold py-3 px-6 rounded-xl transition-colors duration-200 cursor-pointer;
+}
+
+.btn-secondary {
+  @apply border-2 border-gray-800 text-gray-800 font-semibold py-3 px-6 rounded-xl hover:bg-gray-50 transition-colors duration-200 cursor-pointer;
+}
+
+.input-field {
+  @apply w-full border border-gray-300 rounded-xl px-4 py-3 text-gray-900 focus:outline-none focus:ring-2 focus:ring-[#FF385C] focus:border-transparent;
+}
+
+.card {
+  @apply bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden;
+}
+
+/* ─── Dark Theme ─────────────────────────────────────────────────────────── */
+html.dark {
+  color-scheme: dark;
+}
+html.dark body {
+  background-color: #0b0b18;
+  color: #e8e8f2;
+}
+
+/* Backgrounds */
+html.dark .bg-white           { background-color: #13132a !important; }
+html.dark .bg-gray-50         { background-color: #0f0f22 !important; }
+html.dark .bg-gray-100        { background-color: #1a1a30 !important; }
+html.dark .bg-gray-200        { background-color: #1e1e38 !important; }
+
+/* Text */
+html.dark .text-gray-900      { color: #f0f0f8 !important; }
+html.dark .text-gray-800      { color: #d8d8ee !important; }
+html.dark .text-gray-700      { color: #b8b8d8 !important; }
+html.dark .text-gray-600      { color: #9898b8 !important; }
+html.dark .text-gray-500      { color: #7878a0 !important; }
+html.dark .text-gray-400      { color: #6060888 !important; }
+
+/* Borders */
+html.dark .border-gray-50     { border-color: rgba(255,255,255,0.04) !important; }
+html.dark .border-gray-100    { border-color: rgba(255,255,255,0.07) !important; }
+html.dark .border-gray-200    { border-color: rgba(255,255,255,0.11) !important; }
+html.dark .border-gray-300    { border-color: rgba(255,255,255,0.16) !important; }
+
+/* Dividers */
+html.dark .divide-gray-50  > * + * { border-color: rgba(255,255,255,0.04) !important; }
+html.dark .divide-y        > * + * { border-color: rgba(255,255,255,0.07) !important; }
+
+/* Hover */
+html.dark .hover\:bg-gray-50:hover  { background-color: #1a1a32 !important; }
+html.dark .hover\:bg-gray-100:hover { background-color: #1e1e38 !important; }
+html.dark .hover\:bg-white:hover    { background-color: #1a1a2e !important; }
+
+/* Inputs */
+html.dark input:not([type="checkbox"]):not([type="radio"]):not([type="date"]):not([type="submit"]):not([type="button"]),
+html.dark textarea,
+html.dark select {
+  background-color: #1a1a30 !important;
+  color: #f0f0f8 !important;
+  border-color: rgba(255,255,255,0.15) !important;
+}
+html.dark input[type="date"] {
+  background-color: #1a1a30 !important;
+  color: #f0f0f8 !important;
+}
+html.dark .input-field {
+  background-color: #1a1a30 !important;
+  color: #f0f0f8 !important;
+  border-color: rgba(255,255,255,0.15) !important;
+}
+
+/* Cards */
+html.dark .card {
+  background-color: #13132a !important;
+  border-color: rgba(255,255,255,0.07) !important;
+}
+
+/* Shadows — soften in dark mode */
+html.dark .shadow-sm,
+html.dark .shadow-md,
+html.dark .shadow-lg,
+html.dark .shadow-xl,
+html.dark .shadow-2xl { box-shadow: 0 1px 3px rgba(0,0,0,0.5) !important; }
+
+/* Admin — slightly lighter dark for readability */
+html.dark .bg-white.rounded-2xl { background-color: #15152e !important; }
+
+/* btn-secondary dark */
+html.dark .btn-secondary {
+  border-color: rgba(255,255,255,0.25) !important;
+  color: #e0e0f0 !important;
+}
+html.dark .btn-secondary:hover {
+  background-color: rgba(255,255,255,0.06) !important;
+}

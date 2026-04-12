@@ -1,0 +1,446 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+const profile = Astro.locals.profile!;
+const isOwner = profile.role === 'property_owner';
+const ownerListingIds = Astro.locals.ownerListingIds ?? [];
+
+const service = getServiceClient();
+
+// For iCal tab: fetch listings (scoped for owners)
+let listingsQuery = service
+  .from('listings')
+  .select('id,title,slug,ical_url,ical_last_synced')
+  .order('title');
+
+if (isOwner) {
+  if (ownerListingIds.length > 0) {
+    listingsQuery = listingsQuery.in('id', ownerListingIds);
+  } else {
+    listingsQuery = listingsQuery.eq('id', '00000000-0000-0000-0000-000000000000');
+  }
+}
+
+const { data: listings } = await listingsQuery;
+---
+
+<AdminLayout title="Import Listing">
+  <div class="flex items-center gap-3 mb-6">
+    <a href="/admin/listings" class="text-gray-400 hover:text-gray-600 text-sm transition-colors">← All listings</a>
+    <span class="text-gray-300">/</span>
+    <span class="text-sm text-gray-700 font-medium">Import</span>
+  </div>
+
+  <!-- Tabs -->
+  <div class="flex gap-1 mb-6 bg-gray-100 rounded-xl p-1 w-fit">
+    <button id="tab-import" class="tab-btn px-4 py-2 text-sm font-medium rounded-lg bg-white text-gray-900 shadow-sm transition-all" data-tab="import">
+      Import from URL
+    </button>
+    <button id="tab-ical" class="tab-btn px-4 py-2 text-sm font-medium rounded-lg text-gray-500 hover:text-gray-700 transition-all" data-tab="ical">
+      iCal Sync
+    </button>
+  </div>
+
+  <!-- ═══════════════ Import Tab ═══════════════ -->
+  <div id="panel-import" class="tab-panel">
+    <div class="bg-white rounded-2xl border border-gray-100 p-6 mb-6">
+      <h2 class="font-semibold text-gray-900 mb-1">Import from Airbnb or Booking.com</h2>
+      <p class="text-sm text-gray-500 mb-4">Paste a listing URL and we'll extract the details. You can review and edit before creating.</p>
+
+      <div class="flex gap-3">
+        <input
+          id="scrape-url"
+          type="url"
+          placeholder="https://www.airbnb.com/rooms/12345 or https://www.booking.com/hotel/..."
+          class="flex-1 px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40 focus:border-[#c9a96e]"
+        />
+        <button id="scrape-btn" class="bg-[#1a1a2e] text-white font-semibold px-6 py-2.5 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors whitespace-nowrap">
+          Scrape
+        </button>
+      </div>
+      <p id="scrape-error" class="hidden text-sm text-red-600 mt-2"></p>
+    </div>
+
+    <!-- Loading -->
+    <div id="scrape-loading" class="hidden text-center py-12">
+      <div class="w-8 h-8 border-3 border-gray-200 border-t-[#1a1a2e] rounded-full animate-spin mx-auto mb-3"></div>
+      <p class="text-sm text-gray-500">Scraping listing data...</p>
+    </div>
+
+    <!-- Preview (hidden until scraped) -->
+    <div id="scrape-preview" class="hidden space-y-6">
+      <!-- Photos carousel -->
+      <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div class="relative">
+          <div id="preview-photos" class="flex overflow-x-auto gap-2 p-4 snap-x snap-mandatory"></div>
+          <div id="photo-count" class="absolute bottom-2 right-4 bg-black/60 text-white text-xs px-2 py-1 rounded-full"></div>
+        </div>
+      </div>
+
+      <!-- Editable fields -->
+      <div class="bg-white rounded-2xl border border-gray-100 p-6">
+        <h3 class="font-semibold text-gray-900 text-sm mb-4">Review & Edit</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div class="md:col-span-2">
+            <label class="block text-xs font-medium text-gray-600 mb-1">Title</label>
+            <input id="edit-title" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40" />
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-xs font-medium text-gray-600 mb-1">Description</label>
+            <textarea id="edit-description" rows="4" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40"></textarea>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Property Type</label>
+            <select id="edit-property-type" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40">
+              <option value="villa">Villa</option>
+              <option value="apartment">Apartment</option>
+              <option value="house">House</option>
+              <option value="studio">Studio</option>
+              <option value="cottage">Cottage</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Base Price (€/night)</label>
+            <input id="edit-price" type="number" min="1" step="1" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">City</label>
+            <input id="edit-city" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Address</label>
+            <input id="edit-address" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Bedrooms</label>
+            <input id="edit-bedrooms" type="number" min="0" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Bathrooms</label>
+            <input id="edit-bathrooms" type="number" min="0" step="0.5" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Max Guests</label>
+            <input id="edit-guests" type="number" min="1" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">Min Nights</label>
+            <input id="edit-min-nights" type="number" min="1" value="1" class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40" />
+          </div>
+        </div>
+
+        <!-- Detected amenities -->
+        <div id="amenities-section" class="hidden mt-4">
+          <label class="block text-xs font-medium text-gray-600 mb-2">Detected Amenities</label>
+          <div id="amenities-list" class="flex flex-wrap gap-2"></div>
+        </div>
+
+        <!-- Source info -->
+        <div class="mt-4 flex items-center gap-2 text-xs text-gray-400">
+          <span id="source-badge" class="px-2 py-0.5 rounded-full font-medium"></span>
+          <span>Imported from <a id="source-link" href="#" target="_blank" class="underline hover:text-gray-600"></a></span>
+        </div>
+
+        <div class="mt-6 flex gap-3">
+          <button id="confirm-btn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-6 py-2.5 rounded-xl text-sm transition-colors">
+            Create Draft Listing
+          </button>
+          <button id="reset-btn" class="border border-gray-200 text-gray-600 hover:bg-gray-50 px-4 py-2.5 rounded-xl text-sm transition-colors">
+            Start Over
+          </button>
+        </div>
+        <p id="confirm-error" class="hidden text-sm text-red-600 mt-2"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ iCal Tab ═══════════════ -->
+  <div id="panel-ical" class="tab-panel hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 p-6 mb-6">
+      <h2 class="font-semibold text-gray-900 mb-1">iCal Calendar Sync</h2>
+      <p class="text-sm text-gray-500">Sync availability from Airbnb, Booking.com, or any platform that provides an iCal feed. Blocked dates will be imported automatically.</p>
+    </div>
+
+    {(!listings || listings.length === 0) ? (
+      <div class="text-center py-12 text-gray-400">
+        <p class="text-3xl mb-2">📅</p>
+        <p class="text-sm">No listings found. Create a listing first.</p>
+      </div>
+    ) : (
+      <div class="space-y-3">
+        {(listings ?? []).map((listing: any) => (
+          <div class="bg-white rounded-2xl border border-gray-100 p-4 flex flex-col sm:flex-row sm:items-center gap-3" data-listing-id={listing.id}>
+            <div class="min-w-0 flex-shrink-0 sm:w-48">
+              <p class="font-medium text-gray-900 text-sm truncate">{listing.title}</p>
+              {listing.ical_last_synced && (
+                <p class="text-xs text-gray-400 mt-0.5">
+                  Last sync: {new Date(listing.ical_last_synced).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                </p>
+              )}
+            </div>
+            <div class="flex-1 flex gap-2">
+              <input
+                type="url"
+                placeholder="Paste iCal URL (e.g. from Airbnb export)"
+                value={listing.ical_url || ''}
+                class="ical-url-input flex-1 px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/40"
+                data-listing-id={listing.id}
+              />
+              <button
+                class="ical-sync-btn bg-[#1a1a2e] text-white font-medium px-4 py-2 rounded-lg text-sm hover:bg-[#2d2d4e] transition-colors whitespace-nowrap"
+                data-listing-id={listing.id}
+              >
+                Sync
+              </button>
+            </div>
+            <p class="ical-status text-xs hidden" data-listing-id={listing.id}></p>
+          </div>
+        ))}
+      </div>
+    )}
+
+    <div class="mt-6 bg-gray-50 rounded-xl p-4">
+      <h3 class="font-medium text-gray-700 text-sm mb-2">Where to find your iCal URL</h3>
+      <ul class="text-xs text-gray-500 space-y-1.5">
+        <li><strong>Airbnb:</strong> Listing → Availability → scroll to "Connect calendars" → Export Calendar</li>
+        <li><strong>Booking.com:</strong> Property → Rates & availability → Sync calendars → Copy URL</li>
+        <li><strong>VRBO:</strong> Calendar → Import/Export → Export link</li>
+      </ul>
+    </div>
+  </div>
+</AdminLayout>
+
+<script>
+  // ── Tab switching ─────────────────────────────────────────────────────────
+  const tabs = document.querySelectorAll('.tab-btn');
+  const panels = document.querySelectorAll('.tab-panel');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const target = (tab as HTMLElement).dataset.tab!;
+      tabs.forEach(t => {
+        t.classList.toggle('bg-white', (t as HTMLElement).dataset.tab === target);
+        t.classList.toggle('text-gray-900', (t as HTMLElement).dataset.tab === target);
+        t.classList.toggle('shadow-sm', (t as HTMLElement).dataset.tab === target);
+        t.classList.toggle('text-gray-500', (t as HTMLElement).dataset.tab !== target);
+      });
+      panels.forEach(p => {
+        p.classList.toggle('hidden', p.id !== `panel-${target}`);
+      });
+    });
+  });
+
+  // ── Scrape flow ───────────────────────────────────────────────────────────
+  let scrapedData: any = null;
+
+  const scrapeBtn = document.getElementById('scrape-btn')!;
+  const scrapeUrl = document.getElementById('scrape-url') as HTMLInputElement;
+  const scrapeError = document.getElementById('scrape-error')!;
+  const scrapeLoading = document.getElementById('scrape-loading')!;
+  const scrapePreview = document.getElementById('scrape-preview')!;
+
+  scrapeBtn.addEventListener('click', async () => {
+    const url = scrapeUrl.value.trim();
+    if (!url) return;
+
+    scrapeError.classList.add('hidden');
+    scrapePreview.classList.add('hidden');
+    scrapeLoading.classList.remove('hidden');
+    (scrapeBtn as HTMLButtonElement).disabled = true;
+    scrapeBtn.textContent = 'Scraping…';
+
+    try {
+      const res = await fetch('/api/admin/listings/import/scrape', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Scrape failed');
+
+      scrapedData = json.scraped;
+      populatePreview(scrapedData);
+      scrapeLoading.classList.add('hidden');
+      scrapePreview.classList.remove('hidden');
+    } catch (err: any) {
+      scrapeLoading.classList.add('hidden');
+      scrapeError.textContent = err.message;
+      scrapeError.classList.remove('hidden');
+    } finally {
+      (scrapeBtn as HTMLButtonElement).disabled = false;
+      scrapeBtn.textContent = 'Scrape';
+    }
+  });
+
+  function populatePreview(data: any) {
+    // Photos
+    const photosEl = document.getElementById('preview-photos')!;
+    const countEl = document.getElementById('photo-count')!;
+    if (data.photos?.length) {
+      photosEl.innerHTML = data.photos.slice(0, 20).map((url: string) =>
+        `<img src="${url}" class="h-48 w-auto rounded-lg snap-start object-cover flex-shrink-0" loading="lazy" />`
+      ).join('');
+      countEl.textContent = `${data.photos.length} photos`;
+    } else {
+      photosEl.innerHTML = '<p class="text-gray-400 text-sm p-8">No photos found</p>';
+      countEl.textContent = '';
+    }
+
+    // Fields
+    (document.getElementById('edit-title') as HTMLInputElement).value = data.title || '';
+    (document.getElementById('edit-description') as HTMLTextAreaElement).value = data.description || '';
+    (document.getElementById('edit-city') as HTMLInputElement).value = data.location?.city || '';
+    (document.getElementById('edit-address') as HTMLInputElement).value = data.location?.address || '';
+    (document.getElementById('edit-bedrooms') as HTMLInputElement).value = String(data.bedrooms || 1);
+    (document.getElementById('edit-bathrooms') as HTMLInputElement).value = String(data.bathrooms || 1);
+    (document.getElementById('edit-guests') as HTMLInputElement).value = String(data.maxGuests || 4);
+    (document.getElementById('edit-price') as HTMLInputElement).value = '';
+
+    // Property type
+    const typeSelect = document.getElementById('edit-property-type') as HTMLSelectElement;
+    const pt = (data.propertyType || '').toLowerCase();
+    if (pt.includes('villa')) typeSelect.value = 'villa';
+    else if (pt.includes('apartment') || pt.includes('flat')) typeSelect.value = 'apartment';
+    else if (pt.includes('studio')) typeSelect.value = 'studio';
+    else if (pt.includes('cottage')) typeSelect.value = 'cottage';
+    else typeSelect.value = 'house';
+
+    // Amenities
+    const amenSection = document.getElementById('amenities-section')!;
+    const amenList = document.getElementById('amenities-list')!;
+    if (data.amenities?.length) {
+      amenList.innerHTML = data.amenities.map((a: string) =>
+        `<span class="px-2.5 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">${a}</span>`
+      ).join('');
+      amenSection.classList.remove('hidden');
+    } else {
+      amenSection.classList.add('hidden');
+    }
+
+    // Source badge
+    const badge = document.getElementById('source-badge')!;
+    const link = document.getElementById('source-link')! as HTMLAnchorElement;
+    if (data.source === 'airbnb') {
+      badge.textContent = 'Airbnb';
+      badge.className = 'px-2 py-0.5 rounded-full font-medium bg-rose-100 text-rose-700';
+    } else {
+      badge.textContent = 'Booking.com';
+      badge.className = 'px-2 py-0.5 rounded-full font-medium bg-blue-100 text-blue-700';
+    }
+    link.href = data.sourceUrl;
+    link.textContent = data.sourceUrl.replace(/^https?:\/\/(www\.)?/, '').slice(0, 50) + '…';
+  }
+
+  // ── Confirm / create listing ──────────────────────────────────────────────
+  const confirmBtn = document.getElementById('confirm-btn')!;
+  const confirmError = document.getElementById('confirm-error')!;
+
+  confirmBtn.addEventListener('click', async () => {
+    if (!scrapedData) return;
+
+    const price = parseFloat((document.getElementById('edit-price') as HTMLInputElement).value);
+    if (!price || price <= 0) {
+      confirmError.textContent = 'Please enter a base price.';
+      confirmError.classList.remove('hidden');
+      return;
+    }
+
+    confirmError.classList.add('hidden');
+    (confirmBtn as HTMLButtonElement).disabled = true;
+    confirmBtn.textContent = 'Creating…';
+
+    const overrides = {
+      title: (document.getElementById('edit-title') as HTMLInputElement).value,
+      description: (document.getElementById('edit-description') as HTMLTextAreaElement).value,
+      property_type: (document.getElementById('edit-property-type') as HTMLSelectElement).value,
+      base_price: price,
+      city: (document.getElementById('edit-city') as HTMLInputElement).value,
+      address: (document.getElementById('edit-address') as HTMLInputElement).value,
+      bedrooms: parseInt((document.getElementById('edit-bedrooms') as HTMLInputElement).value) || 1,
+      bathrooms: parseFloat((document.getElementById('edit-bathrooms') as HTMLInputElement).value) || 1,
+      max_guests: parseInt((document.getElementById('edit-guests') as HTMLInputElement).value) || 4,
+      min_nights: parseInt((document.getElementById('edit-min-nights') as HTMLInputElement).value) || 1,
+    };
+
+    try {
+      const res = await fetch('/api/admin/listings/import/confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scraped: scrapedData, overrides }),
+      });
+
+      const json = await res.json();
+      if (!res.ok) throw new Error(json.error || 'Failed to create listing');
+
+      // Start photo download in background
+      fetch('/api/admin/listings/import/download-photos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listingId: json.listing.id }),
+      }).catch(() => {});
+
+      (window as any).adminToast?.('Listing imported as draft! Redirecting…', 'success');
+      setTimeout(() => {
+        window.location.href = `/admin/listings/${json.listing.id}`;
+      }, 1500);
+    } catch (err: any) {
+      confirmError.textContent = err.message;
+      confirmError.classList.remove('hidden');
+      (confirmBtn as HTMLButtonElement).disabled = false;
+      confirmBtn.textContent = 'Create Draft Listing';
+    }
+  });
+
+  // Reset
+  document.getElementById('reset-btn')?.addEventListener('click', () => {
+    scrapedData = null;
+    scrapePreview.classList.add('hidden');
+    scrapeUrl.value = '';
+  });
+
+  // ── iCal Sync ─────────────────────────────────────────────────────────────
+  document.querySelectorAll('.ical-sync-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const listingId = (btn as HTMLElement).dataset.listingId!;
+      const input = document.querySelector(`.ical-url-input[data-listing-id="${listingId}"]`) as HTMLInputElement;
+      const status = document.querySelector(`.ical-status[data-listing-id="${listingId}"]`)!;
+      const icalUrl = input.value.trim();
+
+      if (!icalUrl) {
+        status.textContent = 'Please enter an iCal URL';
+        status.className = 'ical-status text-xs text-red-600';
+        status.classList.remove('hidden');
+        return;
+      }
+
+      (btn as HTMLButtonElement).disabled = true;
+      (btn as HTMLElement).textContent = 'Syncing…';
+      status.classList.add('hidden');
+
+      try {
+        const res = await fetch('/api/admin/listings/ical-sync', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ listingId, icalUrl }),
+        });
+
+        const json = await res.json();
+        if (!res.ok) throw new Error(json.error || 'Sync failed');
+
+        status.textContent = `Synced: ${json.added} added, ${json.removed} removed (${json.total} events in feed)`;
+        status.className = 'ical-status text-xs text-emerald-600';
+        status.classList.remove('hidden');
+        (window as any).adminToast?.(`Calendar synced: ${json.added} dates imported`, 'success');
+      } catch (err: any) {
+        status.textContent = err.message;
+        status.className = 'ical-status text-xs text-red-600';
+        status.classList.remove('hidden');
+      } finally {
+        (btn as HTMLButtonElement).disabled = false;
+        (btn as HTMLElement).textContent = 'Sync';
+      }
+    });
+  });
+</script>

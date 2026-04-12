@@ -1,0 +1,324 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isBg = lang === 'bg';
+const isEl = lang === 'el';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://kefaloniabnb.com';
+const effectiveDate = '1 June 2025';
+const contactEmail = 'info@kefaloniabnb.com';
+
+const tLegal = isEl ? 'Νομικά' : isBg ? 'Правна информация' : isSr ? 'Правне информације' : isTr ? 'Yasal' : isRo ? 'Juridic' : 'Legal';
+const tTitle = isEl ? 'Πολιτική Ακύρωσης' : isBg ? 'Политика за анулиране' : isSr ? 'Политика отказивања' : isTr ? 'İptal Politikası' : isRo ? 'Politica de Anulare' : 'Cancellation Policy';
+const tEffective = isEl ? 'Ημερομηνία ισχύος' : isBg ? 'Дата на влизане в сила' : isSr ? 'Датум ступања на снагу' : isTr ? 'Yürürlük tarihi' : isRo ? 'În vigoare' : 'Effective date';
+const tUpdated = isEl ? 'Τελευταία ενημέρωση' : isBg ? 'Последна актуализация' : isSr ? 'Последње ажурирање' : isTr ? 'Son güncelleme' : isRo ? 'Actualizat' : 'Last updated';
+const tLegalNote = isEl ? 'Η παρούσα πολιτική είναι διαθέσιμη στα Αγγλικά ως νομικά δεσμευτικό κείμενο.' : isBg ? 'Тази политика е достъпна на английски като правно обвързващ документ.' : isSr ? 'Ова политика је доступна на енглеском као правно обавезујући документ.' : isTr ? 'Bu politika yasal olarak bağlayıcı metin olarak İngilizce olarak sunulmaktadır.' : isRo ? 'Această politică este disponibilă în engleză ca document obligatoriu din punct de vedere juridic.' : '';
+
+const schemas = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'Cancellation Policy', item: `${siteUrl}/cancellation-policy` },
+    ],
+  },
+];
+---
+
+<BaseLayout
+  title="Cancellation Policy — KefaloniaBNB"
+  description="Read the KefaloniaBNB Cancellation Policy. Understand refund timelines, no-show rules, owner cancellations, force majeure, and how disputes are handled."
+  schema={schemas}
+>
+
+  <!-- Hero -->
+  <section class="relative bg-[#1a1a2e] overflow-hidden">
+    <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(ellipse at 70% 50%, #c9a96e 0%, transparent 60%);"></div>
+    <div class="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 text-center">
+      <p class="text-[#c9a96e] text-xs font-semibold uppercase tracking-[0.2em] mb-4">{tLegal}</p>
+      <h1 class="text-4xl sm:text-5xl font-bold text-white leading-tight mb-6">{tTitle}</h1>
+      <p class="text-white/50 text-sm">{tEffective}: {effectiveDate} &nbsp;·&nbsp; {tUpdated}: {effectiveDate}</p>
+      {tLegalNote && <p class="text-white/40 text-xs mt-3">{tLegalNote}</p>}
+    </div>
+  </section>
+
+  <!-- Body -->
+  <section class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16 sm:py-24">
+
+    <div class="prose prose-gray max-w-none
+      prose-headings:font-bold prose-headings:text-gray-900
+      prose-h2:text-2xl prose-h2:mt-14 prose-h2:mb-4 prose-h2:pb-2 prose-h2:border-b prose-h2:border-gray-100
+      prose-h3:text-lg prose-h3:mt-8 prose-h3:mb-3
+      prose-p:text-gray-600 prose-p:leading-relaxed
+      prose-li:text-gray-600 prose-li:leading-relaxed
+      prose-a:text-[#c9a96e] prose-a:no-underline hover:prose-a:underline
+      prose-strong:text-gray-800">
+
+      <p class="text-gray-500 text-sm bg-amber-50 border border-amber-100 rounded-lg px-5 py-4 not-prose mb-10">
+        <strong class="text-amber-800">Important:</strong> By completing a booking through KefaloniaBNB — by any payment method including bank transfer, Stripe, or Telegram Direct agreement — you confirm that you have read and accepted this Cancellation Policy in full. This policy forms part of your agreement with us and with the property owner.
+      </p>
+
+      <!-- 1 -->
+      <h2>1. Definitions</h2>
+      <ul>
+        <li><strong>"Booking confirmation"</strong> — the moment a booking is confirmed, either by successful online payment, by bank transfer receipt acknowledged by the owner, or by written acceptance via Telegram Direct.</li>
+        <li><strong>"Check-in date"</strong> — the first day of the booked stay as stated on the booking confirmation.</li>
+        <li><strong>"No-show"</strong> — a guest who fails to arrive by midnight on the check-in date without prior written notice of cancellation.</li>
+        <li><strong>"Qualifying cancellation"</strong> — a cancellation made by the guest in writing (email or message) to <a href={`mailto:${contactEmail}`}>{contactEmail}</a> and confirmed as received by us.</li>
+        <li><strong>"Service fee"</strong> — any platform or processing fee charged by KefaloniaBNB at the time of booking, separate from the accommodation amount.</li>
+        <li><strong>"Stripe transaction fee"</strong> — the payment processing fee charged by Stripe, Inc. on card payments, currently approximately 1.4–2.9% + €0.25 per transaction.</li>
+      </ul>
+
+      <!-- 2 -->
+      <h2>2. Guest Cancellation — Standard Policy</h2>
+      <p>
+        The following cancellation terms apply to all bookings unless a different policy is explicitly stated on the individual Listing page at the time of booking. Where a Listing displays a stricter policy, that policy takes precedence.
+      </p>
+
+      <!-- Table -->
+      <div class="not-prose overflow-x-auto mb-8 mt-6">
+        <table class="w-full text-sm border-collapse">
+          <thead>
+            <tr class="bg-[#1a1a2e]">
+              <th class="text-left px-5 py-3 text-white font-semibold border border-gray-700">Cancellation notice before check-in</th>
+              <th class="text-left px-5 py-3 text-white font-semibold border border-gray-700">Refund to guest</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr class="bg-green-50">
+              <td class="px-5 py-3 text-gray-700 border border-gray-200 font-medium">More than 60 days</td>
+              <td class="px-5 py-3 text-gray-700 border border-gray-200"><strong class="text-green-700">100% of accommodation amount</strong>, minus Stripe transaction fee (if applicable) and service fee</td>
+            </tr>
+            <tr class="bg-blue-50">
+              <td class="px-5 py-3 text-gray-700 border border-gray-200 font-medium">30–60 days</td>
+              <td class="px-5 py-3 text-gray-700 border border-gray-200"><strong class="text-blue-700">50% of accommodation amount</strong>, minus Stripe transaction fee and service fee</td>
+            </tr>
+            <tr class="bg-orange-50">
+              <td class="px-5 py-3 text-gray-700 border border-gray-200 font-medium">14–29 days</td>
+              <td class="px-5 py-3 text-gray-700 border border-gray-200"><strong class="text-orange-700">25% of accommodation amount</strong>, minus Stripe transaction fee and service fee</td>
+            </tr>
+            <tr class="bg-red-50">
+              <td class="px-5 py-3 text-gray-700 border border-gray-200 font-medium">Less than 14 days</td>
+              <td class="px-5 py-3 text-gray-700 border border-gray-200"><strong class="text-red-700">No refund</strong></td>
+            </tr>
+            <tr class="bg-red-100">
+              <td class="px-5 py-3 text-gray-700 border border-gray-200 font-medium">No-show</td>
+              <td class="px-5 py-3 text-gray-700 border border-gray-200"><strong class="text-red-700">No refund — full amount forfeited</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>
+        Days are counted as full calendar days from the moment the written cancellation request is received and confirmed by us, to midnight of the check-in date (Greece time, <strong>Europe/Athens</strong>).
+      </p>
+
+      <!-- 3 -->
+      <h2>3. Non-Refundable Items</h2>
+      <p>Regardless of when a cancellation is made, the following are <strong>never refundable</strong>:</p>
+      <ul>
+        <li>Stripe payment processing fees (charged at the time of the original transaction).</li>
+        <li>Any platform service fee charged by KefaloniaBNB.</li>
+        <li>Cleaning fees, if charged separately and already incurred.</li>
+        <li>Any add-on services (transfers, early check-in, late check-out, equipment hire) that have already been arranged or paid to a third party.</li>
+      </ul>
+
+      <!-- 4 -->
+      <h2>4. Deposit Bookings</h2>
+      <p>
+        Where a booking is secured with a partial deposit:
+      </p>
+      <ul>
+        <li>If the guest cancels before the balance due date and more than 60 days before check-in, the deposit is refunded in full minus non-refundable fees.</li>
+        <li>If the guest cancels after the balance due date, or fails to pay the balance by the due date, the deposit is <strong>fully forfeited</strong> and the booking is automatically cancelled.</li>
+        <li>Failure to pay the remaining balance by the due date stated at booking is treated as a guest cancellation — no refund of the deposit will be issued.</li>
+      </ul>
+
+      <!-- 5 -->
+      <h2>5. Telegram Direct Bookings</h2>
+      <p>
+        For bookings made through our Telegram Direct channel, where payment is arranged privately between the guest and the owner outside of the KefaloniaBNB payment infrastructure:
+      </p>
+      <ul>
+        <li>Cancellation and refund terms are <strong>agreed directly between the guest and the owner</strong> at the time of booking.</li>
+        <li>KefaloniaBNB is not a party to that agreement and accepts <strong>no responsibility for administering, enforcing, or mediating</strong> any refund or cancellation dispute.</li>
+        <li>Guests are strongly advised to agree cancellation terms in writing before making any payment to the owner.</li>
+        <li>This policy serves as a reference baseline; the owner may apply stricter or more lenient terms.</li>
+      </ul>
+
+      <!-- 6 -->
+      <h2>6. Early Departure</h2>
+      <p>
+        If a guest checks out before the agreed check-out date, <strong>no refund will be issued</strong> for unused nights. The full booking amount remains due and payable. This applies regardless of the reason for early departure, including personal circumstances, dissatisfaction, or events outside the guest's control (other than those covered under Section 9).
+      </p>
+
+      <!-- 7 -->
+      <h2>7. No-Show Policy</h2>
+      <p>
+        A guest who does not arrive by midnight on the check-in date without having submitted a qualifying cancellation will be treated as a no-show. In such cases:
+      </p>
+      <ul>
+        <li>The full booking amount is forfeited — no refund will be issued.</li>
+        <li>The owner is not obliged to hold the property beyond midnight on the check-in date.</li>
+        <li>Any subsequent attempt to check in after a no-show is at the owner's sole discretion.</li>
+        <li>KefaloniaBNB accepts no liability for losses arising from a no-show, including the guest's travel costs or alternative accommodation costs.</li>
+      </ul>
+
+      <!-- 8 -->
+      <h2>8. Owner Cancellation</h2>
+      <p>
+        In the rare event that an Owner cancels a confirmed booking:
+      </p>
+      <ul>
+        <li>The guest will receive a <strong>full refund</strong> of all amounts paid through the KefaloniaBNB payment infrastructure, including any service fee.</li>
+        <li>KefaloniaBNB will make reasonable efforts to suggest alternative properties but is under no obligation to provide a replacement.</li>
+        <li>KefaloniaBNB is <strong>not liable</strong> for any additional costs incurred by the guest as a result of an owner cancellation, including but not limited to: travel costs, alternative accommodation costs, lost wages, or any other consequential losses.</li>
+        <li>Repeated owner cancellations may result in the owner's listings being suspended or removed from the Platform.</li>
+        <li>For Telegram Direct bookings, any refund from the owner to the guest is a matter strictly between those two parties. KefaloniaBNB has no role and accepts no liability.</li>
+      </ul>
+
+      <!-- 9 -->
+      <h2>9. Force Majeure and Extraordinary Circumstances</h2>
+      <p>
+        Neither KefaloniaBNB nor the Owner will be held liable for cancellations caused by events beyond reasonable control, including but not limited to:
+      </p>
+      <ul>
+        <li>Natural disasters (earthquakes, floods, wildfires, severe storms).</li>
+        <li>Acts of war, terrorism, civil unrest, or government-imposed travel bans.</li>
+        <li>Epidemics or pandemics declared by the World Health Organization or Greek authorities.</li>
+        <li>Strikes, airport closures, or infrastructure failures.</li>
+        <li>Government orders requiring closure of accommodation properties.</li>
+      </ul>
+      <p>
+        In force majeure events affecting the <strong>guest</strong>, standard cancellation terms apply — KefaloniaBNB does not automatically offer refunds due to travel disruption, illness, or personal emergencies. Guests are strongly advised to purchase comprehensive travel insurance covering cancellation, medical emergencies, and travel disruption before making any booking.
+      </p>
+      <p>
+        In force majeure events affecting the <strong>property or owner</strong> (e.g. the property becomes uninhabitable due to a natural disaster), the owner may cancel without penalty and the guest will receive a full refund of amounts paid through our payment infrastructure. No further compensation is payable by KefaloniaBNB.
+      </p>
+
+      <!-- 10 -->
+      <h2>10. Travel Insurance — Strong Recommendation</h2>
+      <p>
+        <strong>KefaloniaBNB strongly recommends that all guests purchase comprehensive travel insurance</strong> before booking, covering at minimum:
+      </p>
+      <ul>
+        <li>Trip cancellation and interruption for any reason.</li>
+        <li>Medical expenses and emergency evacuation.</li>
+        <li>Personal liability.</li>
+        <li>Luggage loss or delay.</li>
+      </ul>
+      <p>
+        KefaloniaBNB accepts no responsibility for any losses that would have been covered by appropriate travel insurance.
+      </p>
+
+      <!-- 11 -->
+      <h2>11. How to Cancel</h2>
+      <p>
+        To submit a qualifying cancellation, the guest must:
+      </p>
+      <ol>
+        <li>Send a written cancellation request to <a href={`mailto:${contactEmail}`}>{contactEmail}</a> with the subject line: <strong>"Cancellation — [Booking Reference]"</strong>.</li>
+        <li>Include the booking reference number, full name, property name, and check-in date.</li>
+        <li>Wait for a written confirmation of cancellation from KefaloniaBNB before assuming the cancellation is processed.</li>
+      </ol>
+      <p>
+        Cancellations communicated only to the owner via Telegram, phone, or any channel other than the email address above do not constitute a qualifying cancellation for refund purposes until confirmed in writing by KefaloniaBNB.
+      </p>
+      <p>
+        The cancellation date and time is the moment we confirm receipt of the cancellation request in writing — not the time the guest sends the request.
+      </p>
+
+      <!-- 12 -->
+      <h2>12. Refund Processing</h2>
+      <p>
+        Approved refunds will be processed as follows:
+      </p>
+      <ul>
+        <li><strong>Stripe payments:</strong> refunded to the original card within <strong>5–10 business days</strong>, subject to Stripe's processing times. We are not responsible for delays caused by the guest's bank.</li>
+        <li><strong>Bank transfers:</strong> refunded to the account from which payment was received within <strong>10–14 business days</strong> of written confirmation of the refund. The guest is responsible for providing accurate bank details; we accept no liability for refunds sent to incorrect accounts.</li>
+        <li><strong>Telegram Direct / offline payments:</strong> refunded directly by the owner under the terms agreed between owner and guest. KefaloniaBNB has no role in this process.</li>
+      </ul>
+      <p>
+        KefaloniaBNB is not responsible for currency conversion losses, bank charges imposed by the guest's bank, or any other third-party fees deducted from a refund.
+      </p>
+
+      <!-- 13 -->
+      <h2>13. Modifications to a Booking</h2>
+      <p>
+        Requests to modify a confirmed booking (change of dates, reduction in nights, change of property) are treated as follows:
+      </p>
+      <ul>
+        <li>Modifications are subject to availability and owner approval and are not guaranteed.</li>
+        <li>A <strong>reduction in nights</strong> is treated as a partial cancellation — the cancellation policy applies to the nights being removed, calculated from the date the modification is requested.</li>
+        <li>A <strong>date change</strong> that results in a shorter stay is treated as a partial cancellation of the original booking combined with a new booking for the revised dates.</li>
+        <li>Any difference in price resulting from a modification is payable immediately by the guest or refunded according to this policy.</li>
+        <li>KefaloniaBNB does not guarantee that modifications can be accommodated and accepts no liability for losses arising from an unsuccessful modification request.</li>
+      </ul>
+
+      <!-- 14 -->
+      <h2>14. Disputes</h2>
+      <p>
+        In the event of a dispute regarding a cancellation or refund:
+      </p>
+      <ul>
+        <li>The guest must contact us at <a href={`mailto:${contactEmail}`}>{contactEmail}</a> within <strong>14 days</strong> of the cancellation or check-out date (whichever is earlier). Disputes raised after this period will not be considered.</li>
+        <li>We will review the dispute and respond within 10 business days.</li>
+        <li>Our decision, taking into account this policy and the facts presented, is final and binding subject only to applicable consumer protection law.</li>
+        <li>Disputes relating to payments made directly to the owner (bank transfer, cash, Telegram Direct) are exclusively between the guest and the owner. KefaloniaBNB will not intervene, mediate, or be held liable.</li>
+        <li>Initiating a chargeback or payment dispute with a bank or card issuer before contacting us and allowing 14 business days for resolution is a breach of these terms. We reserve the right to contest any chargeback where this policy has been violated and to recover our costs from the guest.</li>
+      </ul>
+
+      <!-- 15 -->
+      <h2>15. Chargebacks</h2>
+      <p>
+        If a guest initiates a chargeback through their bank or card issuer without first following the dispute resolution process in Section 14, we reserve the right to:
+      </p>
+      <ul>
+        <li>Contest the chargeback with full documentation of the booking, this policy, and all communications.</li>
+        <li>Recover from the guest any chargeback fees imposed on us by Stripe or our bank (currently up to €25 per chargeback).</li>
+        <li>Permanently ban the guest from making future bookings on the Platform.</li>
+        <li>Pursue any outstanding amount through civil proceedings under Greek law.</li>
+      </ul>
+
+      <!-- 16 -->
+      <h2>16. Platform Liability Cap</h2>
+      <p>
+        KefaloniaBNB acts as an intermediary between guests and owners. Our maximum liability in connection with any cancellation — regardless of cause — is strictly limited to the amount of any platform service fee actually received by KefaloniaBNB for the specific booking in question. We accept no liability for accommodation costs, travel costs, consequential losses, or any other amount beyond this cap.
+      </p>
+
+      <!-- 17 -->
+      <h2>17. Changes to This Policy</h2>
+      <p>
+        We reserve the right to amend this Cancellation Policy at any time. Changes take effect immediately upon publication on this page. The policy in force at the time of booking confirmation governs that specific booking — a later change does not retroactively alter the terms of a confirmed booking.
+      </p>
+
+      <!-- 18 -->
+      <h2>18. Governing Law</h2>
+      <p>
+        This Cancellation Policy is governed by the laws of the <strong>Hellenic Republic (Greece)</strong>. Any dispute shall be subject to the exclusive jurisdiction of the courts of <strong>Kefalonia, Greece</strong>, without prejudice to any mandatory EU consumer protection rights you may hold.
+      </p>
+
+      <!-- 19 -->
+      <h2>19. Contact</h2>
+      <p>
+        For all cancellation requests and related enquiries:
+      </p>
+      <p>
+        <strong>KefaloniaBNB</strong><br />
+        Email: <a href={`mailto:${contactEmail}`}>{contactEmail}</a> — Subject: <em>"Cancellation — [Your Booking Reference]"</em><br />
+        Website: <a href={siteUrl}>{siteUrl}</a>
+      </p>
+
+      <div class="not-prose mt-16 pt-8 border-t border-gray-100 text-sm text-gray-400">
+        This Cancellation Policy was last updated on {effectiveDate}. Prior versions are available on request.
+      </div>
+
+    </div>
+  </section>
+
+</BaseLayout>

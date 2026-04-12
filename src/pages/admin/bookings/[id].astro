@@ -1,0 +1,567 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const L: Record<string, Record<string, string>> = {
+  all_bookings:     { en: '← All bookings', el: '← Όλες οι κρατήσεις' },
+  ref:              { en: 'Ref:', el: 'Αρ. κράτ.:' },
+  booking_details:  { en: 'Booking Details', el: 'Στοιχεία Κράτησης' },
+  property:         { en: 'Property', el: 'Ακίνητο' },
+  nights:           { en: 'Nights', el: 'Διανυκτερεύσεις' },
+  check_in:         { en: 'Check-in', el: 'Άφιξη' },
+  check_out:        { en: 'Check-out', el: 'Αναχώρηση' },
+  adults:           { en: 'Adults', el: 'Ενήλικες' },
+  children:         { en: 'Children', el: 'Παιδιά' },
+  guest:            { en: 'Guest', el: 'Επισκέπτης' },
+  name:             { en: 'Name', el: 'Όνομα' },
+  email:            { en: 'Email', el: 'Email' },
+  phone:            { en: 'Phone', el: 'Τηλέφωνο' },
+  country:          { en: 'Country', el: 'Χώρα' },
+  message:          { en: 'Message', el: 'Μήνυμα' },
+  internal_notes:   { en: 'Internal Notes', el: 'Εσωτερικές Σημειώσεις' },
+  notes_placeholder:{ en: 'Add internal notes...', el: 'Προσθήκη εσωτερικών σημειώσεων...' },
+  save_notes:       { en: 'Save notes', el: 'Αποθήκευση σημειώσεων' },
+  saved:            { en: '✓ Saved', el: '✓ Αποθηκεύτηκε' },
+  pricing:          { en: 'Pricing', el: 'Τιμολόγηση' },
+  base:             { en: 'Base', el: 'Βάση' },
+  cleaning_fee:     { en: 'Cleaning fee', el: 'Τέλος καθαριότητας' },
+  extra_guests:     { en: 'Extra guests', el: 'Επιπλέον επισκέπτες' },
+  discount:         { en: 'Discount', el: 'Έκπτωση' },
+  total:            { en: 'Total', el: 'Σύνολο' },
+  payment:          { en: 'Payment', el: 'Πληρωμή' },
+  actions:          { en: 'Actions', el: 'Ενέργειες' },
+  confirm_booking:  { en: 'Confirm Booking', el: 'Επιβεβαίωση Κράτησης' },
+  cancel_booking:   { en: 'Cancel Booking', el: 'Ακύρωση Κράτησης' },
+  mark_completed:   { en: 'Mark Completed', el: 'Σημείωση ως Ολοκληρωμένη' },
+  email_guest:      { en: 'Email Guest', el: 'Email Επισκέπτη' },
+  cancel_prompt:    { en: 'Cancellation reason (optional):', el: 'Λόγος ακύρωσης (προαιρετικό):' },
+  action_failed:    { en: 'Action failed. Please try again.', el: 'Αποτυχία ενέργειας. Παρακαλώ δοκιμάστε ξανά.' },
+};
+function al(k: string) { return L[k]?.[lang] ?? L[k]?.en ?? k; }
+
+const { id } = Astro.params;
+const service = getServiceClient();
+
+const { data: booking } = await service
+  .from('bookings')
+  .select('*, listings(title,slug,city,check_in_time,check_out_time)')
+  .eq('id', id)
+  .single();
+
+if (!booking) return Astro.redirect('/admin/bookings');
+
+const isSuperAdmin = Astro.locals.profile?.role === 'super_admin';
+
+// Payout split
+const platformFee  = (booking as any).platform_fee  ?? 0;
+const ownerPayout  = (booking as any).owner_payout   ?? 0;
+const payoutStatus = (booking as any).payout_status  ?? null;
+const commissionPct = booking.total_price > 0
+  ? Math.round((platformFee / booking.total_price) * 100)
+  : 0;
+
+// Normalise phone for messaging deep links — strip everything except digits and leading +
+const rawPhone = booking.guest_phone ?? '';
+const dialPhone = rawPhone.replace(/[^\d]/g, ''); // digits only, e.g. "306943649190"
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+}
+
+const statusColors: Record<string, string> = {
+  pending: 'bg-amber-100 text-amber-800',
+  confirmed: 'bg-emerald-100 text-emerald-800',
+  cancelled: 'bg-red-100 text-red-800',
+  completed: 'bg-gray-100 text-gray-800',
+};
+---
+
+<AdminLayout title={`Booking – ${booking.guest_name}`}>
+  <div class="max-w-4xl">
+    <div class="flex flex-wrap items-center gap-3 mb-6">
+      <a href="/admin/bookings" class="min-h-[44px] flex items-center text-gray-400 hover:text-gray-600 transition-colors">{al('all_bookings')}</a>
+      <span class={`px-3 py-1.5 rounded-full text-sm font-medium ${statusColors[booking.status] ?? 'bg-gray-100'}`}>
+        {booking.status}
+      </span>
+      <span class="text-xs text-gray-400">{al('ref')} {id?.slice(0, 8).toUpperCase()}</span>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- Main info -->
+      <div class="lg:col-span-2 space-y-6">
+        <div class="bg-white rounded-2xl border border-gray-100 p-6">
+          <h2 class="font-semibold text-gray-900 mb-4">{al('booking_details')}</h2>
+          <dl class="grid grid-cols-2 gap-4 text-sm">
+            <div><dt class="text-gray-400 mb-0.5">{al('property')}</dt><dd class="font-medium">{(booking as any).listings?.title}</dd></div>
+            <div><dt class="text-gray-400 mb-0.5">{al('nights')}</dt><dd class="font-medium">{booking.nights}</dd></div>
+            <div><dt class="text-gray-400 mb-0.5">{al('check_in')}</dt><dd class="font-medium">{fmtDate(booking.check_in)}</dd></div>
+            <div><dt class="text-gray-400 mb-0.5">{al('check_out')}</dt><dd class="font-medium">{fmtDate(booking.check_out)}</dd></div>
+            <div><dt class="text-gray-400 mb-0.5">{al('adults')}</dt><dd class="font-medium">{booking.guests_adults}</dd></div>
+            <div><dt class="text-gray-400 mb-0.5">{al('children')}</dt><dd class="font-medium">{booking.guests_children}</dd></div>
+          </dl>
+        </div>
+
+        <div class="bg-white rounded-2xl border border-gray-100 p-6">
+          <h2 class="font-semibold text-gray-900 mb-4">{al('guest')}</h2>
+          <dl class="grid grid-cols-2 gap-4 text-sm">
+            <div><dt class="text-gray-400 mb-0.5">{al('name')}</dt><dd class="font-medium">{booking.guest_name}</dd></div>
+            <div><dt class="text-gray-400 mb-0.5">{al('email')}</dt><dd><a href={`mailto:${booking.guest_email}`} class="text-[#1a1a2e] hover:underline">{booking.guest_email}</a></dd></div>
+            <div class="col-span-2">
+              <dt class="text-gray-400 mb-1">{al('phone')}</dt>
+              <dd class="flex items-center gap-3 flex-wrap">
+                <span class="font-medium">{booking.guest_phone ?? '—'}</span>
+                {dialPhone && (
+                  <div class="flex flex-wrap gap-2">
+                    <a
+                      href={`https://wa.me/${dialPhone}`}
+                      target="_blank"
+                      rel="noopener"
+                      title="WhatsApp"
+                      class="min-h-[44px] flex items-center gap-1.5 px-4 py-2.5 bg-[#25D366] hover:bg-[#1ebe5d] text-white text-sm font-semibold rounded-xl transition-colors"
+                    >
+                      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                      WhatsApp
+                    </a>
+                    <a
+                      href={`viber://chat?number=%2B${dialPhone}`}
+                      title="Viber"
+                      class="min-h-[44px] flex items-center gap-1.5 px-4 py-2.5 bg-[#7360F2] hover:bg-[#5f4de0] text-white text-sm font-semibold rounded-xl transition-colors"
+                    >
+                      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M11.4 0C6.6.2 2.9 1.8 1.3 5.4.5 7.2.2 9.1.2 11.4c-.1 2.2.1 4 .6 5.6.9 3 3.2 4.8 6.2 5.4.4.1.8.1 1.2.2v2.2c0 .3.2.5.5.5.2 0 .3-.1.4-.2l2.2-2.5c1.7-.1 3.2-.4 4.5-.9 2.9-1.1 4.7-3.3 5.1-6.4.1-.6.1-1.1.1-1.7.2-5.7-2.3-9.8-9.6-13.3zM17.9 16c-.5 1.4-2 2.3-3.5 2.7-1.2.3-2.5.5-3.8.3-.3 0-.5.1-.7.3l-1.5 1.7v-1.5c0-.4-.3-.6-.6-.7-2.6-.6-4.3-2-5-4.4-.4-1.4-.6-3-.5-4.9.1-2 .3-3.6 1-5C5 2.1 8 .9 11.5.7c6.3.8 9.2 4.1 9 10-.1.6-.1 1.2-.2 1.7-.2 1.4-.6 2.6-2.4 3.6zm-3.4-4.3c-.3-.1-.5-.2-.8-.3-.3-.1-.6 0-.8.2-.3.3-.5.6-.8.8-.2.1-.4.1-.6 0-1.3-.6-2.3-1.5-3.1-2.7-.2-.3-.2-.6 0-.9.2-.2.3-.5.5-.7.1-.2.2-.5.1-.7L8.5 6c-.2-.5-.7-.8-1.2-.7-.4 0-.7.2-1 .5-.4.4-.7.9-.7 1.5 0 .3 0 .6.1.9.4 1.4 1.2 2.6 2.2 3.7.9 1 2 1.8 3.2 2.3.6.3 1.3.4 1.9.2.7-.2 1.2-.7 1.5-1.3.2-.4.1-.9-.2-1.1l-1.8-1.3z"/></svg>
+                      Viber
+                    </a>
+                    <a
+                      href={`https://t.me/+${dialPhone}`}
+                      target="_blank"
+                      rel="noopener"
+                      title="Telegram"
+                      class="min-h-[44px] flex items-center gap-1.5 px-4 py-2.5 bg-[#2AABEE] hover:bg-[#1a9bd8] text-white text-sm font-semibold rounded-xl transition-colors"
+                    >
+                      <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+                      Telegram
+                    </a>
+                  </div>
+                )}
+              </dd>
+            </div>
+            <div><dt class="text-gray-400 mb-0.5">{al('country')}</dt><dd class="font-medium">{booking.guest_country ?? '—'}</dd></div>
+            {booking.guest_message && (
+              <div class="col-span-2"><dt class="text-gray-400 mb-0.5">{al('message')}</dt><dd class="text-gray-700 leading-relaxed">{booking.guest_message}</dd></div>
+            )}
+          </dl>
+        </div>
+
+        <!-- Internal notes -->
+        <div class="bg-white rounded-2xl border border-gray-100 p-6">
+          <h2 class="font-semibold text-gray-900 mb-3">{al('internal_notes')}</h2>
+          <textarea
+            id="notes-input"
+            rows="3"
+            class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-[#1a1a2e] resize-none"
+            placeholder={al('notes_placeholder')}
+          >{booking.internal_notes ?? ''}</textarea>
+          <button id="save-notes" data-id={id} data-label={al('save_notes')} data-saved={al('saved')} class="mt-2 text-sm font-medium text-[#1a1a2e] hover:text-[#c9a96e] transition-colors cursor-pointer">{al('save_notes')}</button>
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <div class="space-y-6">
+        <!-- Pricing -->
+        <div class="bg-white rounded-2xl border border-gray-100 p-6">
+          <h2 class="font-semibold text-gray-900 mb-4">{al('pricing')}</h2>
+          <div class="space-y-2 text-sm">
+            <div class="flex justify-between text-gray-600"><span>{al('base')} ({booking.nights}n)</span><span>€{booking.base_total}</span></div>
+            <div class="flex justify-between text-gray-600"><span>{al('cleaning_fee')}</span><span>€{booking.cleaning_fee}</span></div>
+            {booking.extra_guest_fee > 0 && <div class="flex justify-between text-gray-600"><span>{al('extra_guests')}</span><span>€{booking.extra_guest_fee}</span></div>}
+            {booking.coupon_discount > 0 && <div class="flex justify-between text-emerald-600"><span>{al('discount')}</span><span>-€{booking.coupon_discount}</span></div>}
+            <div class="flex justify-between font-bold text-gray-900 pt-2 border-t border-gray-100"><span>{al('total')}</span><span>€{booking.total_price}</span></div>
+            {(booking as any).payment_type === 'deposit' && (
+              <>
+                <div class="flex justify-between text-amber-700 text-xs font-medium bg-amber-50 rounded-lg px-2 py-1.5 mt-1">
+                  <span>Deposit paid</span>
+                  <span>€{(booking as any).deposit_amount ?? 0}</span>
+                </div>
+                <div class="flex justify-between text-gray-500 text-xs">
+                  <span>Remaining on arrival</span>
+                  <span class="font-medium text-gray-700">€{(booking as any).remaining_amount ?? 0}</span>
+                </div>
+              </>
+            )}
+            <div class="flex justify-between text-gray-500 text-xs items-center gap-2">
+              <span>{al('payment')}</span>
+              <span class={`font-medium ${booking.payment_status === 'paid' ? 'text-emerald-600' : booking.payment_status === 'deposit_paid' ? 'text-amber-600' : booking.payment_status === 'unpaid' && booking.status === 'confirmed' && booking.payment_method === 'bank_transfer' ? 'text-amber-600' : 'text-gray-500'}`}>
+                {booking.payment_status === 'unpaid' && booking.status === 'confirmed' && booking.payment_method === 'bank_transfer' ? '⏳ awaiting payment' : booking.payment_status === 'deposit_paid' ? '⏳ deposit paid' : booking.payment_status}
+              </span>
+            </div>
+            <div class="flex justify-between text-gray-500 text-xs"><span>Method</span><span>{booking.payment_method ?? '—'}</span></div>
+            {(booking as any).payment_type && (booking as any).payment_type !== 'full' && (
+              <div class="flex justify-between text-gray-500 text-xs"><span>Plan</span><span class="font-medium text-amber-700">{(booking as any).payment_type}</span></div>
+            )}
+          </div>
+        </div>
+
+        <!-- Commission Invoice — super admin only -->
+        {isSuperAdmin && (
+          <div class="bg-white rounded-2xl border border-gray-100 p-6">
+            <div class="flex items-center justify-between mb-4">
+              <h2 class="font-semibold text-gray-900">Commission Invoice</h2>
+              <span class="text-xs font-medium text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full">Super admin</span>
+            </div>
+            <div class="space-y-2 text-sm mb-4">
+              <div class="flex justify-between text-gray-600">
+                <span>Booking total</span>
+                <span class="font-medium text-gray-900">€{booking.total_price}</span>
+              </div>
+              <div class="flex justify-between text-gray-600">
+                <span>Commission rate</span>
+                <span class="font-medium">{commissionPct}%</span>
+              </div>
+              <div class="flex justify-between text-gray-600 pt-2 border-t border-gray-100">
+                <span>Amount to invoice owner</span>
+                <span class="font-bold text-[#1a1a2e]">€{platformFee.toFixed(2)}</span>
+              </div>
+            </div>
+
+            {/* Invoice status */}
+            {(() => {
+              const invoiceStatus = (booking as any).commission_invoice_status ?? 'not_sent';
+              const invoiceUrl    = (booking as any).commission_invoice_url;
+              const sentAt        = (booking as any).commission_invoice_sent_at;
+              return (
+                <div>
+                  <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs text-gray-400">Invoice status</span>
+                    <span id="invoice-status-badge" class={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                      invoiceStatus === 'paid'     ? 'bg-emerald-100 text-emerald-700' :
+                      invoiceStatus === 'sent'     ? 'bg-blue-100 text-blue-700' :
+                      invoiceStatus === 'failed'   ? 'bg-red-100 text-red-600' :
+                      'bg-gray-100 text-gray-500'
+                    }`}>
+                      {invoiceStatus === 'paid'     ? '✓ Paid' :
+                       invoiceStatus === 'sent'     ? '📨 Sent — awaiting payment' :
+                       invoiceStatus === 'failed'   ? '✗ Payment failed' :
+                       'Not sent'}
+                    </span>
+                  </div>
+
+                  {sentAt && (
+                    <p class="text-xs text-gray-400 mb-3">
+                      Sent {new Date(sentAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                    </p>
+                  )}
+
+                  {invoiceUrl && (
+                    <a href={invoiceUrl} target="_blank" rel="noopener"
+                      class="block text-center text-xs text-blue-600 hover:underline mb-3">
+                      View invoice →
+                    </a>
+                  )}
+
+                  {invoiceStatus !== 'paid' && booking.status === 'confirmed' && (
+                    <div class="space-y-2">
+                      <button id="send-invoice-btn"
+                        data-booking-id={id as string}
+                        class="w-full bg-[#1a1a2e] hover:bg-[#2d2d4e] text-white font-semibold py-2.5 rounded-xl text-sm transition-colors">
+                        {invoiceStatus === 'sent' ? 'Resend Invoice' : 'Send Commission Invoice'}
+                      </button>
+                      <button id="payment-link-btn"
+                        data-booking-id={id as string}
+                        class="w-full border border-[#1a1a2e] text-[#1a1a2e] hover:bg-[#1a1a2e]/5 font-semibold py-2.5 rounded-xl text-sm transition-colors">
+                        🔗 Generate Payment Link
+                      </button>
+                    </div>
+                  )}
+                  <p id="invoice-msg" class="hidden text-xs mt-2 text-center"></p>
+                  {/* Payment link result — copyable */}
+                  <div id="payment-link-result" class="hidden mt-3 p-3 bg-emerald-50 border border-emerald-200 rounded-xl">
+                    <p class="text-xs font-semibold text-emerald-700 mb-1">✓ Payment link created</p>
+                    <p id="payment-link-amount" class="text-xs text-gray-500 mb-2"></p>
+                    <a id="payment-link-url" href="#" target="_blank" rel="noopener"
+                      class="block text-xs text-blue-600 break-all hover:underline mb-2"></a>
+                    <button id="copy-link-btn"
+                      class="w-full border border-emerald-300 text-emerald-700 hover:bg-emerald-100 font-semibold py-1.5 rounded-lg text-xs transition-colors">
+                      Copy link
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+        )}
+
+        <!-- Actions -->
+        <div class="bg-white rounded-2xl border border-gray-100 p-6 space-y-3">
+          <h2 class="font-semibold text-gray-900 mb-1">{al('actions')}</h2>
+          {booking.status === 'pending' && (
+            <button class="action-btn w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors cursor-pointer" data-id={id} data-action="confirm" data-action-failed={al('action_failed')}>
+              {al('confirm_booking')}
+            </button>
+          )}
+          {['pending','confirmed'].includes(booking.status) && (
+            <button class="action-btn w-full border border-red-300 text-red-600 hover:bg-red-50 font-semibold py-2.5 rounded-xl text-sm transition-colors cursor-pointer" data-id={id} data-action="cancel" data-cancel-prompt={al('cancel_prompt')} data-action-failed={al('action_failed')}>
+              {al('cancel_booking')}
+            </button>
+          )}
+          {booking.status === 'confirmed' && (
+            <button class="action-btn w-full bg-[#1a1a2e] hover:bg-[#2d2d4e] text-white font-semibold py-2.5 rounded-xl text-sm transition-colors cursor-pointer" data-id={id} data-action="complete" data-action-failed={al('action_failed')}>
+              {al('mark_completed')}
+            </button>
+          )}
+          {/* Deposit booking — unpaid: two options */}
+          {booking.status === 'confirmed' && ['bank_transfer','telegram_direct'].includes(booking.payment_method) && (booking as any).payment_type === 'deposit' && booking.payment_status === 'unpaid' && (
+            <>
+              <button
+                class="mark-paid-btn w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors cursor-pointer"
+                data-id={id}
+                data-new-status="deposit_paid"
+                data-confirm={`Mark deposit of €${(booking as any).deposit_amount ?? 0} as received?`}
+              >
+                💰 Mark deposit paid (€{(booking as any).deposit_amount ?? 0})
+              </button>
+              <button
+                class="mark-paid-btn w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors cursor-pointer"
+                data-id={id}
+                data-new-status="paid"
+                data-confirm={`Mark full amount of €${booking.total_price} as received?`}
+              >
+                ✓ Mark full amount paid (€{booking.total_price})
+              </button>
+            </>
+          )}
+          {/* Deposit booking — deposit already paid, mark remaining */}
+          {booking.status === 'confirmed' && ['bank_transfer','telegram_direct'].includes(booking.payment_method) && (booking as any).payment_type === 'deposit' && booking.payment_status === 'deposit_paid' && (
+            <button
+              class="mark-paid-btn w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors cursor-pointer"
+              data-id={id}
+              data-new-status="paid"
+              data-confirm={`Mark remaining €${(booking as any).remaining_amount ?? 0} as received?`}
+            >
+              ✓ Mark remaining paid (€{(booking as any).remaining_amount ?? 0})
+            </button>
+          )}
+          {/* Full payment booking — unpaid */}
+          {booking.status === 'confirmed' && ['bank_transfer','telegram_direct'].includes(booking.payment_method) && (booking as any).payment_type !== 'deposit' && booking.payment_status === 'unpaid' && (
+            <button
+              class="mark-paid-btn w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors cursor-pointer"
+              data-id={id}
+              data-new-status="paid"
+              data-confirm={`Mark full amount of €${booking.total_price} as received?`}
+            >
+              ✓ Mark as paid (€{booking.total_price})
+            </button>
+          )}
+          {/* Custom amount */}
+          {booking.status === 'confirmed' && ['bank_transfer','telegram_direct'].includes(booking.payment_method) && booking.payment_status !== 'paid' && (
+            <div id="custom-amt-wrap">
+              <button
+                id="custom-amt-toggle"
+                class="w-full min-h-[44px] border border-violet-300 text-violet-700 hover:bg-violet-50 font-semibold py-2.5 rounded-xl text-sm transition-colors"
+              >
+                € Mark custom amount paid
+              </button>
+              <div id="custom-amt-form" class="hidden mt-2 space-y-2">
+                <label class="block text-xs text-gray-500">Amount received (€)</label>
+                <input
+                  id="custom-amt-input"
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  placeholder="e.g. 250"
+                  class="w-full min-h-[44px] px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                />
+                <div class="flex gap-2">
+                  <button id="custom-amt-confirm" class="flex-1 min-h-[44px] bg-violet-600 hover:bg-violet-700 text-white font-semibold py-2.5 rounded-xl text-sm transition-colors">Confirm</button>
+                  <button id="custom-amt-cancel" class="flex-1 min-h-[44px] border border-gray-200 text-gray-600 hover:bg-gray-50 font-medium py-2.5 rounded-xl text-sm transition-colors">Cancel</button>
+                </div>
+                <p id="custom-amt-msg" class="hidden text-xs text-red-600"></p>
+              </div>
+            </div>
+          )}
+          <a href={`mailto:${booking.guest_email}`} class="block text-center border border-gray-200 text-gray-700 hover:bg-gray-50 font-medium py-2.5 rounded-xl text-sm transition-colors">
+            {al('email_guest')}
+          </a>
+        </div>
+      </div>
+    </div>
+  </div>
+</AdminLayout>
+
+<script>
+  // Action buttons
+  document.querySelectorAll('.action-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = (btn as HTMLElement).dataset.id;
+      const action = (btn as HTMLElement).dataset.action;
+      const statusMap: Record<string, string> = { confirm: 'confirmed', cancel: 'cancelled', complete: 'completed' };
+      const status = statusMap[action ?? ''];
+      if (!status) return;
+
+      let cancel_reason;
+      if (action === 'cancel') {
+        const promptMsg = document.querySelector('.action-btn[data-action="cancel"]')?.dataset?.cancelPrompt ?? 'Cancellation reason (optional):';
+        cancel_reason = prompt(promptMsg) ?? undefined;
+      }
+
+      const res = await fetch(`/api/bookings/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, ...(cancel_reason && { cancel_reason }) }),
+      });
+      if (res.ok) window.location.reload();
+      else alert((btn as HTMLElement).dataset.actionFailed ?? 'Action failed. Please try again.');
+    });
+  });
+
+  // Mark as paid (deposit or full)
+  document.querySelectorAll('.mark-paid-btn').forEach((el) => {
+    el.addEventListener('click', async () => {
+      const btn = el as HTMLButtonElement;
+      const id = btn.dataset.id;
+      const newStatus = btn.dataset.newStatus;
+      const confirmMsg = btn.dataset.confirm ?? 'Mark as paid? A confirmation email will be sent to the guest.';
+      if (!confirm(confirmMsg)) return;
+      const originalText = btn.textContent ?? '';
+      btn.disabled = true;
+      btn.textContent = '…';
+      const res = await fetch(`/api/bookings/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payment_status: newStatus }),
+      });
+      if (res.ok) window.location.reload();
+      else {
+        alert('Failed to update payment status');
+        btn.disabled = false;
+        btn.textContent = originalText;
+      }
+    });
+  });
+
+  // Custom amount paid
+  document.getElementById('custom-amt-toggle')?.addEventListener('click', () => {
+    document.getElementById('custom-amt-toggle')!.classList.add('hidden');
+    document.getElementById('custom-amt-form')!.classList.remove('hidden');
+    (document.getElementById('custom-amt-input') as HTMLInputElement).focus();
+  });
+  document.getElementById('custom-amt-cancel')?.addEventListener('click', () => {
+    document.getElementById('custom-amt-form')!.classList.add('hidden');
+    document.getElementById('custom-amt-toggle')!.classList.remove('hidden');
+    (document.getElementById('custom-amt-input') as HTMLInputElement).value = '';
+  });
+  document.getElementById('custom-amt-confirm')?.addEventListener('click', async () => {
+    const input = document.getElementById('custom-amt-input') as HTMLInputElement;
+    const amount = parseFloat(input.value);
+    const msg = document.getElementById('custom-amt-msg')!;
+    if (!amount || amount <= 0) {
+      msg.textContent = 'Please enter a valid amount.';
+      msg.classList.remove('hidden');
+      return;
+    }
+    const btn = document.getElementById('custom-amt-confirm') as HTMLButtonElement;
+    btn.disabled = true;
+    btn.textContent = '…';
+    msg.classList.add('hidden');
+    const bookingId = window.location.pathname.split('/').pop();
+    const res = await fetch(`/api/bookings/${bookingId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ payment_status: 'deposit_paid', deposit_amount: amount }),
+    });
+    if (res.ok) {
+      window.location.reload();
+    } else {
+      msg.textContent = 'Failed to update. Please try again.';
+      msg.classList.remove('hidden');
+      btn.disabled = false;
+      btn.textContent = 'Confirm';
+    }
+  });
+
+  // Send commission invoice
+  document.getElementById('send-invoice-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('send-invoice-btn') as HTMLButtonElement;
+    const msg = document.getElementById('invoice-msg')!;
+    const bookingId = btn.dataset.bookingId;
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+    msg.classList.add('hidden');
+
+    const res = await fetch(`/api/admin/bookings/${bookingId}/invoice`, { method: 'POST' });
+    const json = await res.json().catch(() => ({}));
+
+    if (res.ok) {
+      document.getElementById('invoice-status-badge')!.className = 'text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700';
+      document.getElementById('invoice-status-badge')!.textContent = '📨 Sent — awaiting payment';
+      btn.textContent = 'Resend Invoice';
+      btn.disabled = false;
+      msg.textContent = `✓ Invoice sent for €${json.amount?.toFixed(2)} → ${json.sentTo}`;
+      msg.className = 'text-xs mt-2 text-center text-emerald-600';
+      msg.classList.remove('hidden');
+    } else {
+      btn.disabled = false;
+      btn.textContent = 'Send Commission Invoice';
+      msg.textContent = json.error ?? 'Failed to send invoice';
+      msg.className = 'text-xs mt-2 text-center text-red-600';
+      msg.classList.remove('hidden');
+    }
+  });
+
+  // Generate payment link
+  document.getElementById('payment-link-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('payment-link-btn') as HTMLButtonElement;
+    const msg = document.getElementById('invoice-msg')!;
+    const bookingId = btn.dataset.bookingId;
+    btn.disabled = true;
+    btn.textContent = 'Generating…';
+    msg.classList.add('hidden');
+
+    const res  = await fetch(`/api/admin/bookings/${bookingId}/payment-link`, { method: 'POST' });
+    const json = await res.json().catch(() => ({}));
+
+    if (res.ok) {
+      const resultEl   = document.getElementById('payment-link-result')!;
+      const urlEl      = document.getElementById('payment-link-url') as HTMLAnchorElement;
+      const amountEl   = document.getElementById('payment-link-amount')!;
+      urlEl.href        = json.url;
+      urlEl.textContent = json.url;
+      amountEl.textContent = `€${json.amount?.toFixed(2)} · ${json.sentTo}`;
+      resultEl.classList.remove('hidden');
+      btn.textContent = '🔗 Regenerate Payment Link';
+      btn.disabled = false;
+    } else {
+      btn.disabled = false;
+      btn.textContent = '🔗 Generate Payment Link';
+      msg.textContent = json.error ?? 'Failed to generate link';
+      msg.className = 'text-xs mt-2 text-center text-red-600';
+      msg.classList.remove('hidden');
+    }
+  });
+
+  document.getElementById('copy-link-btn')?.addEventListener('click', () => {
+    const url = (document.getElementById('payment-link-url') as HTMLAnchorElement)?.href;
+    if (!url) return;
+    navigator.clipboard.writeText(url).then(() => {
+      const btn = document.getElementById('copy-link-btn')!;
+      btn.textContent = '✓ Copied!';
+      setTimeout(() => { btn.textContent = 'Copy link'; }, 2000);
+    });
+  });
+
+  // Save notes
+  document.getElementById('save-notes')?.addEventListener('click', async () => {
+    const btn = document.getElementById('save-notes') as HTMLElement;
+    const id = btn.dataset.id;
+    const labelSave = btn.dataset.label ?? 'Save notes';
+    const labelSaved = btn.dataset.saved ?? '✓ Saved';
+    const notes = (document.getElementById('notes-input') as HTMLTextAreaElement).value;
+    const res = await fetch(`/api/bookings/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ internal_notes: notes }),
+    });
+    if (res.ok) {
+      if (btn) { btn.textContent = labelSaved; setTimeout(() => { btn.textContent = labelSave; }, 2000); }
+    }
+  });
+</script>

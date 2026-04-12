@@ -1,0 +1,99 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+const profile = Astro.locals.profile!;
+if (!profile || !['admin', 'super_admin'].includes(profile.role)) return Astro.redirect('/admin');
+
+const service = getServiceClient();
+const { data: posts } = await service
+  .from('blog_posts')
+  .select('id,slug,title,is_published,published_at,tags,created_at')
+  .order('created_at', { ascending: false });
+
+const all = posts ?? [];
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+---
+
+<AdminLayout title="Blog">
+
+  <div class="flex items-center justify-between mb-6">
+    <p class="text-sm text-gray-500">{all.length} post{all.length !== 1 ? 's' : ''}</p>
+    <a href="/admin/blog/new"
+      class="bg-[#1a1a2e] text-white font-semibold px-4 py-2 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">
+      + New post
+    </a>
+  </div>
+
+  {all.length === 0 ? (
+    <div class="text-center py-20 text-gray-400">
+      <p class="text-4xl mb-3">✍️</p>
+      <p class="font-medium">No blog posts yet</p>
+      <p class="text-sm mt-1">Create your first travel guide to attract organic traffic.</p>
+    </div>
+  ) : (
+    <div class="space-y-3">
+      {all.map((post: any) => (
+        <div class="bg-white rounded-2xl border border-gray-100 p-5 flex items-center justify-between gap-4 flex-wrap">
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 mb-1 flex-wrap">
+              <a href={`/admin/blog/${post.id}`} class="font-semibold text-gray-900 hover:text-[#1a1a2e] transition-colors">
+                {post.title}
+              </a>
+              <span class={`px-2 py-0.5 rounded-full text-xs font-medium ${post.is_published ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>
+                {post.is_published ? 'Published' : 'Draft'}
+              </span>
+            </div>
+            <div class="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-400">
+              <span>/{post.slug}</span>
+              {post.published_at && <span>Published {fmtDate(post.published_at)}</span>}
+              {(post.tags ?? []).length > 0 && (
+                <span>{(post.tags as string[]).map((t: string) => `#${t}`).join(' ')}</span>
+              )}
+            </div>
+          </div>
+          <div class="flex items-center gap-3 shrink-0">
+            {post.is_published && (
+              <a href={`/blog/${post.slug}`} target="_blank"
+                class="text-xs text-[#c9a96e] font-medium hover:opacity-80 transition-opacity">
+                View ↗
+              </a>
+            )}
+            <a href={`/admin/blog/${post.id}`}
+              class="text-xs font-medium text-[#1a1a2e] border border-gray-200 px-3 py-1.5 rounded-lg hover:bg-gray-50 transition-colors">
+              Edit
+            </a>
+            <button class="delete-post-btn text-xs text-red-400 hover:text-red-600 transition-colors px-2 py-1.5"
+              data-id={post.id} data-title={post.title}>
+              Delete
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+</AdminLayout>
+
+<script>
+  document.querySelectorAll('.delete-post-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const title = (btn as HTMLElement).dataset.title ?? 'this post';
+      if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
+      const id = (btn as HTMLElement).dataset.id!;
+      const res = await fetch('/api/admin/blog/delete', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) {
+        (window as any).adminToast('🗑 Post deleted', 'info');
+        setTimeout(() => window.location.reload(), 1000);
+      } else {
+        (window as any).adminToast('❌ Failed to delete post', 'error');
+      }
+    });
+  });
+</script>

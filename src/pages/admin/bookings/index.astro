@@ -1,0 +1,498 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isSuperAdmin = Astro.locals.profile?.role === 'super_admin';
+const isOwner = (Astro.locals.profile?.role ?? '') === 'property_owner';
+const ownerListingIds = Astro.locals.ownerListingIds ?? [];
+
+const L: Record<string, Record<string, string>> = {
+  all:            { en: 'All', el: 'Όλες' },
+  pending:        { en: 'Pending', el: 'Εκκρεμείς' },
+  confirmed:      { en: 'Confirmed', el: 'Επιβεβαιωμένες' },
+  cancelled:      { en: 'Cancelled', el: 'Ακυρωμένες' },
+  completed:      { en: 'Completed', el: 'Ολοκληρωμένες' },
+  no_show:        { en: 'No show', el: 'Μη εμφάνιση' },
+  th_guest:       { en: 'Guest', el: 'Επισκέπτης' },
+  th_property:    { en: 'Property', el: 'Ακίνητο' },
+  th_dates:       { en: 'Dates', el: 'Ημερομηνίες' },
+  th_guests:      { en: 'Guests', el: 'Επισκέπτες' },
+  th_total:       { en: 'Total', el: 'Σύνολο' },
+  th_payout:      { en: 'Your payout', el: 'Πληρωμή σας' },
+  th_status:      { en: 'Status', el: 'Κατάσταση' },
+  th_payment:     { en: 'Payment', el: 'Πληρωμή' },
+  th_payout_st:   { en: 'Payout', el: 'Εκταμίευση' },
+  th_created:     { en: 'Created', el: 'Δημιουργήθηκε' },
+  view:           { en: 'View →', el: 'Προβολή →' },
+  no_bookings:    { en: 'No bookings found.', el: 'Δεν βρέθηκαν κρατήσεις.' },
+  total_bookings: { en: 'total bookings', el: 'συνολικές κρατήσεις' },
+  prev:           { en: '← Prev', el: '← Προηγ.' },
+  next:           { en: 'Next →', el: 'Επόμ. →' },
+  page_of:        { en: 'Page', el: 'Σελίδα' },
+  of:             { en: 'of', el: 'από' },
+};
+function al(k: string) { return L[k]?.[lang] ?? L[k]?.en ?? k; }
+
+const statusLabel: Record<string, string> = {
+  all: al('all'), pending: al('pending'), confirmed: al('confirmed'),
+  cancelled: al('cancelled'), completed: al('completed'),
+};
+
+const service = getServiceClient();
+const statusFilter = Astro.url.searchParams.get('status') ?? 'all';
+const page = parseInt(Astro.url.searchParams.get('page') ?? '1') || 1;
+const PAGE_SIZE = 20;
+
+let query = service.from('bookings')
+  .select('*, listings(title,slug)', { count: 'exact' })
+  .order('created_at', { ascending: false })
+  .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1)
+  // Exclude awaiting_payment bookings (Stripe checkout not yet completed)
+  .neq('status', 'awaiting_payment');
+
+if (statusFilter !== 'all') query = query.eq('status', statusFilter);
+
+// Scope property owners to only their listings
+if (isOwner) {
+  if (ownerListingIds.length > 0) {
+    query = query.in('listing_id', ownerListingIds);
+  } else {
+    query = query.eq('listing_id', '00000000-0000-0000-0000-000000000000');
+  }
+}
+
+const { data: bookings, count } = await query;
+const totalPages = Math.ceil((count ?? 0) / PAGE_SIZE);
+
+const statusBadge: Record<string, string> = {
+  pending:   'bg-amber-100 text-amber-800',
+  confirmed: 'bg-emerald-100 text-emerald-800',
+  cancelled: 'bg-red-100 text-red-800',
+  completed: 'bg-gray-100 text-gray-800',
+  no_show:   'bg-purple-100 text-purple-800',
+};
+
+const payoutBadge: Record<string, string> = {
+  na:          'bg-gray-100 text-gray-400',
+  pending:     'bg-amber-100 text-amber-700',
+  transferred: 'bg-emerald-100 text-emerald-700',
+  manual_paid: 'bg-blue-100 text-blue-700',
+};
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+}
+---
+
+<AdminLayout title="Bookings">
+  <!-- Live new-booking banner (shown by realtime listener in AdminLayout) -->
+  <div id="new-booking-banner" class="hidden mb-4 flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-2xl px-4 py-3 cursor-pointer hover:bg-amber-100 transition-colors" data-count="0" onclick="window.location.reload()">
+    <span class="text-lg">🏡</span>
+    <p class="text-sm font-semibold text-amber-900"><span id="new-booking-count">1 new booking</span> received — click to refresh</p>
+    <span class="ml-auto text-amber-500 text-xs font-medium">Refresh ↻</span>
+  </div>
+
+  <!-- Filter tabs -->
+  <div class="flex flex-wrap gap-2 mb-6">
+    {['all','pending','confirmed','cancelled','completed'].map((s) => (
+      <a
+        href={`/admin/bookings${s !== 'all' ? `?status=${s}` : ''}`}
+        class={`px-4 py-2.5 rounded-xl text-sm font-medium transition-colors min-h-[44px] flex items-center ${statusFilter === s ? 'bg-[#1a1a2e] text-white' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+      >
+        {statusLabel[s] ?? s}
+      </a>
+    ))}
+  </div>
+
+  <!-- Mobile cards (shown < lg) -->
+  <div class="lg:hidden space-y-3">
+    {(bookings ?? []).map((b: any) => (
+      <a href={`/admin/bookings/${b.id}`} class="block bg-white rounded-2xl border border-gray-100 p-4 active:bg-gray-50 transition-colors">
+        <!-- Top row: guest + status -->
+        <div class="flex items-start justify-between gap-2 mb-2">
+          <div class="min-w-0">
+            <p class="font-semibold text-gray-900 truncate">{b.guest_name}</p>
+            <p class="text-gray-400 text-xs truncate">{b.guest_email}</p>
+          </div>
+          <span class={`px-2.5 py-1 rounded-full text-xs font-medium whitespace-nowrap shrink-0 ${statusBadge[b.status] ?? 'bg-gray-100 text-gray-600'}`}>
+            {b.status}
+          </span>
+        </div>
+
+        <!-- Property -->
+        <p class="text-gray-600 text-sm mb-2 truncate">{b.listings?.title ?? '—'}</p>
+
+        <!-- Details grid -->
+        <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-sm mb-3">
+          <div>
+            <span class="text-gray-400 text-xs">{al('th_dates')}</span>
+            <p class="text-gray-700">{fmtDate(b.check_in)} → {fmtDate(b.check_out)} <span class="text-gray-400">({b.nights}n)</span></p>
+          </div>
+          <div>
+            <span class="text-gray-400 text-xs">{isOwner ? al('th_payout') : al('th_total')}</span>
+            <p class="font-semibold text-gray-900">{isOwner ? `€${b.owner_payout ?? 0}` : `€${b.total_price}`}</p>
+          </div>
+          <div>
+            <span class="text-gray-400 text-xs">{al('th_guests')}</span>
+            <p class="text-gray-700">{b.guests_adults + b.guests_children}</p>
+          </div>
+          <div>
+            <span class="text-gray-400 text-xs">{al('th_payment')}</span>
+            <span class={`inline-block px-2 py-0.5 rounded-full text-xs font-medium mt-0.5 ${b.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-800' : b.payment_status === 'deposit_paid' ? 'bg-blue-100 text-blue-800' : b.payment_status === 'unpaid' && b.status === 'confirmed' && b.payment_method === 'bank_transfer' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'}`}>
+              {b.payment_status === 'unpaid' && b.status === 'confirmed' && b.payment_method === 'bank_transfer' ? '⏳ awaiting' : b.payment_status === 'deposit_paid' ? '💰 deposit' : b.payment_status}
+            </span>
+          </div>
+          {isOwner && (
+            <div>
+              <span class="text-gray-400 text-xs">{al('th_payout_st')}</span>
+              <span class={`inline-block px-2 py-0.5 rounded-full text-xs font-medium mt-0.5 ${payoutBadge[b.payout_status ?? 'na'] ?? 'bg-gray-100 text-gray-400'}`}>
+                {b.payout_status ?? 'na'}
+              </span>
+            </div>
+          )}
+          <div>
+            <span class="text-gray-400 text-xs">{al('th_created')}</span>
+            <p class="text-gray-500 text-xs">{fmtDate(b.created_at)}</p>
+          </div>
+        </div>
+
+        <!-- Action buttons (stop propagation so link doesn't fire) -->
+        <div class="flex flex-wrap gap-2" onclick="event.preventDefault(); event.stopPropagation();">
+          {b.status === 'pending' && (
+            <>
+              <button
+                class="approve-btn flex-1 min-h-[44px] px-4 py-2.5 bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold rounded-xl transition-colors"
+                data-id={b.id}
+              >✓ Approve</button>
+              <button
+                class="reject-btn flex-1 min-h-[44px] px-4 py-2.5 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-xl transition-colors"
+                data-id={b.id}
+              >✗ Reject</button>
+            </>
+          )}
+          {b.status === 'confirmed' && b.payment_method === 'bank_transfer' && b.payment_status === 'unpaid' && b.payment_type === 'deposit' && (
+            <button
+              class="mark-paid-btn min-h-[44px] px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold rounded-xl transition-colors w-full"
+              data-id={b.id}
+              data-new-status="deposit_paid"
+            >💰 Deposit paid (€{b.deposit_amount ?? 0})</button>
+          )}
+          {b.status === 'confirmed' && b.payment_method === 'bank_transfer' && (b.payment_status === 'unpaid' || b.payment_status === 'deposit_paid') && (
+            <button
+              class="mark-paid-btn min-h-[44px] px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl transition-colors w-full"
+              data-id={b.id}
+              data-new-status="paid"
+            >{b.payment_status === 'deposit_paid' ? `✓ Remaining (€${b.remaining_amount ?? (b.total_price - (b.deposit_amount ?? 0))})` : b.payment_type === 'deposit' ? `✓ Full paid (€${b.total_price})` : `✓ Mark paid (€${b.total_price})`}</button>
+          )}
+          {b.status === 'confirmed' && b.payment_method === 'bank_transfer' && b.payment_status !== 'paid' && (
+            <div class="custom-amt-wrap w-full">
+              <button
+                class="custom-amt-toggle min-h-[44px] px-4 py-2.5 text-sm text-gray-500 hover:text-gray-700 underline transition-colors"
+                data-id={b.id}
+                data-total={b.total_price}
+              >€ custom amount</button>
+              <form class="custom-amt-form hidden items-center gap-2 w-full mt-1" data-id={b.id}>
+                <span class="text-sm text-gray-400">€</span>
+                <input
+                  type="number"
+                  min="1"
+                  step="0.01"
+                  placeholder="amount"
+                  class="custom-amt-input flex-1 min-h-[44px] px-3 py-2 border border-gray-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]"
+                />
+                <button type="submit" class="min-h-[44px] px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-semibold rounded-xl transition-colors">✓</button>
+                <button type="button" class="custom-amt-cancel min-h-[44px] px-3 py-2 text-sm text-gray-400 hover:text-gray-600">✕</button>
+              </form>
+            </div>
+          )}
+          {isSuperAdmin && (
+            <button
+              class="delete-btn min-h-[44px] px-4 py-2.5 text-sm text-red-500 hover:text-red-700 font-medium transition-colors"
+              data-id={b.id}
+              data-name={b.guest_name}
+            >🗑 Delete</button>
+          )}
+        </div>
+      </a>
+    ))}
+
+    {(bookings ?? []).length === 0 && (
+      <div class="text-center py-12 text-gray-400 bg-white rounded-2xl border border-gray-100">
+        <p class="text-4xl mb-2">📭</p>
+        <p>{al('no_bookings')}</p>
+      </div>
+    )}
+  </div>
+
+  <!-- Desktop table (shown >= lg) -->
+  <div class="hidden lg:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
+    <div class="overflow-x-auto">
+      <table class="w-full text-sm">
+        <thead>
+          <tr class="bg-gray-50 border-b border-gray-100">
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">{al('th_guest')}</th>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">{al('th_property')}</th>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">{al('th_dates')}</th>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">{al('th_guests')}</th>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">{isOwner ? al('th_payout') : al('th_total')}</th>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">{al('th_status')}</th>
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">{al('th_payment')}</th>
+            {isOwner && <th class="px-4 py-3 text-left font-semibold text-gray-600">{al('th_payout_st')}</th>}
+            <th class="px-4 py-3 text-left font-semibold text-gray-600">{al('th_created')}</th>
+            <th class="px-4 py-3"></th>
+            <th class="px-4 py-3"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-50">
+          {(bookings ?? []).map((b: any) => (
+            <tr class="hover:bg-gray-50 transition-colors">
+              <td class="px-4 py-3">
+                <p class="font-medium text-gray-900">{b.guest_name}</p>
+                <p class="text-gray-400 text-xs">{b.guest_email}</p>
+              </td>
+              <td class="px-4 py-3 text-gray-600">{b.listings?.title ?? '—'}</td>
+              <td class="px-4 py-3 text-gray-600 whitespace-nowrap">
+                {fmtDate(b.check_in)} → {fmtDate(b.check_out)}
+                <span class="text-gray-400 ml-1">({b.nights}n)</span>
+              </td>
+              <td class="px-4 py-3 text-gray-600">{b.guests_adults + b.guests_children}</td>
+              <td class="px-4 py-3 font-medium text-gray-900">
+                {isOwner ? `€${b.owner_payout ?? 0}` : `€${b.total_price}`}
+              </td>
+              <td class="px-4 py-3">
+                <span class={`px-2 py-0.5 rounded-full text-xs font-medium ${statusBadge[b.status] ?? 'bg-gray-100 text-gray-600'}`}>
+                  {b.status}
+                </span>
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex flex-col gap-1">
+                  <span class={`px-2 py-0.5 rounded-full text-xs font-medium w-fit ${b.payment_status === 'paid' ? 'bg-emerald-100 text-emerald-800' : b.payment_status === 'deposit_paid' ? 'bg-blue-100 text-blue-800' : b.payment_status === 'unpaid' && b.status === 'confirmed' && b.payment_method === 'bank_transfer' ? 'bg-amber-100 text-amber-800' : 'bg-gray-100 text-gray-600'}`}>
+                    {b.payment_status === 'unpaid' && b.status === 'confirmed' && b.payment_method === 'bank_transfer' ? '⏳ awaiting payment' : b.payment_status === 'deposit_paid' ? '💰 deposit paid' : b.payment_status}
+                  </span>
+                  {b.status === 'confirmed' && b.payment_method === 'bank_transfer' && b.payment_status === 'unpaid' && b.payment_type === 'deposit' && (
+                    <button
+                      class="mark-paid-btn px-2 py-0.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors w-fit whitespace-nowrap"
+                      data-id={b.id}
+                      data-new-status="deposit_paid"
+                    >💰 Deposit paid (€{b.deposit_amount ?? 0})</button>
+                  )}
+                  {b.status === 'confirmed' && b.payment_method === 'bank_transfer' && (b.payment_status === 'unpaid' || b.payment_status === 'deposit_paid') && (
+                    <button
+                      class="mark-paid-btn px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-colors w-fit whitespace-nowrap"
+                      data-id={b.id}
+                      data-new-status="paid"
+                    >{b.payment_status === 'deposit_paid' ? `✓ Remaining paid (€${b.remaining_amount ?? (b.total_price - (b.deposit_amount ?? 0))})` : b.payment_type === 'deposit' ? `✓ Full paid (€${b.total_price})` : `✓ Mark paid (€${b.total_price})`}</button>
+                  )}
+                  {b.status === 'confirmed' && b.payment_method === 'bank_transfer' && b.payment_status !== 'paid' && (
+                    <div class="custom-amt-wrap flex items-center gap-1 mt-0.5">
+                      <button
+                        class="custom-amt-toggle text-xs text-gray-400 hover:text-gray-600 underline transition-colors"
+                        data-id={b.id}
+                        data-total={b.total_price}
+                      >€ custom</button>
+                      <form class="custom-amt-form hidden items-center gap-1" data-id={b.id}>
+                        <span class="text-xs text-gray-400">€</span>
+                        <input
+                          type="number"
+                          min="1"
+                          step="0.01"
+                          placeholder="amount"
+                          class="custom-amt-input w-20 px-1.5 py-0.5 border border-gray-300 rounded text-xs focus:outline-none focus:ring-1 focus:ring-[#1a1a2e]"
+                        />
+                        <button type="submit" class="px-2 py-0.5 bg-violet-600 hover:bg-violet-700 text-white text-xs font-semibold rounded transition-colors">✓</button>
+                        <button type="button" class="custom-amt-cancel text-xs text-gray-400 hover:text-gray-600">✕</button>
+                      </form>
+                    </div>
+                  )}
+                </div>
+              </td>
+              {isOwner && (
+                <td class="px-4 py-3">
+                  <span class={`px-2 py-0.5 rounded-full text-xs font-medium ${payoutBadge[b.payout_status ?? 'na'] ?? 'bg-gray-100 text-gray-400'}`}>
+                    {b.payout_status ?? 'na'}
+                  </span>
+                </td>
+              )}
+              <td class="px-4 py-3 text-gray-400 text-xs">{fmtDate(b.created_at)}</td>
+              <td class="px-4 py-3">
+                <a href={`/admin/bookings/${b.id}`} class="text-[#1a1a2e] hover:text-[#c9a96e] font-medium text-xs transition-colors">
+                  {al('view')}
+                </a>
+              </td>
+              <td class="px-4 py-3">
+                {b.status === 'pending' && (
+                  <div class="flex gap-1">
+                    <button
+                      class="approve-btn px-2.5 py-1 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-lg transition-colors"
+                      data-id={b.id}
+                    >✓ Approve</button>
+                    <button
+                      class="reject-btn px-2.5 py-1 bg-red-500 hover:bg-red-600 text-white text-xs font-semibold rounded-lg transition-colors"
+                      data-id={b.id}
+                    >✗ Reject</button>
+                  </div>
+                )}
+                {isSuperAdmin && (
+                  <button
+                    class="delete-btn mt-1 text-xs text-red-400 hover:text-red-600 font-medium transition-colors"
+                    data-id={b.id}
+                    data-name={b.guest_name}
+                  >🗑 Delete</button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+
+    {(bookings ?? []).length === 0 && (
+      <div class="text-center py-12 text-gray-400">
+        <p class="text-4xl mb-2">📭</p>
+        <p>{al('no_bookings')}</p>
+      </div>
+    )}
+  </div>
+
+  <!-- Pagination -->
+  {totalPages > 1 && (
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-3 mt-4 text-sm text-gray-500">
+      <span>{count} {al('total_bookings')}</span>
+      <div class="flex gap-2">
+        {page > 1 && <a href={`?${statusFilter !== 'all' ? `status=${statusFilter}&` : ''}page=${page - 1}`} class="min-h-[44px] px-4 py-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors flex items-center">{al('prev')}</a>}
+        <span class="min-h-[44px] px-4 py-2.5 flex items-center">{al('page_of')} {page} {al('of')} {totalPages}</span>
+        {page < totalPages && <a href={`?${statusFilter !== 'all' ? `status=${statusFilter}&` : ''}page=${page + 1}`} class="min-h-[44px] px-4 py-2.5 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors flex items-center">{al('next')}</a>}
+      </div>
+    </div>
+  )}
+</AdminLayout>
+
+<script>
+  async function updateBooking(id: string, status: 'confirmed' | 'cancelled') {
+    const res = await fetch(`/api/bookings/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status }),
+    });
+    if (res.ok) {
+      location.reload();
+    } else {
+      const data = await res.json();
+      alert(data.error ?? 'Something went wrong');
+    }
+  }
+
+  document.querySelectorAll('.approve-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = (btn as HTMLElement).dataset.id!;
+      (btn as HTMLButtonElement).disabled = true;
+      (btn as HTMLButtonElement).textContent = '…';
+      await updateBooking(id, 'confirmed');
+    });
+  });
+
+  document.querySelectorAll('.reject-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Reject this booking?')) return;
+      const id = (btn as HTMLElement).dataset.id!;
+      (btn as HTMLButtonElement).disabled = true;
+      (btn as HTMLButtonElement).textContent = '…';
+      await updateBooking(id, 'cancelled');
+    });
+  });
+
+  document.querySelectorAll('.mark-paid-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const el = btn as HTMLButtonElement;
+      const id = el.dataset.id!;
+      const newStatus = el.dataset.newStatus!;
+      const label = el.textContent ?? '✓ Mark paid';
+      const confirmMsg = newStatus === 'deposit_paid'
+        ? 'Mark deposit as received? An email will be sent to the guest.'
+        : 'Mark full payment as received? A confirmation email will be sent to the guest.';
+      if (!confirm(confirmMsg)) return;
+      el.disabled = true;
+      el.textContent = '…';
+      const res = await fetch(`/api/bookings/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payment_status: newStatus }),
+      });
+      if (res.ok) {
+        location.reload();
+      } else {
+        alert('Failed to update payment status');
+        el.disabled = false;
+        el.textContent = label;
+      }
+    });
+  });
+
+  document.querySelectorAll('.custom-amt-toggle').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const id = (btn as HTMLElement).dataset.id!;
+      const form = document.querySelector<HTMLFormElement>(`.custom-amt-form[data-id="${id}"]`);
+      if (!form) return;
+      (btn as HTMLElement).classList.add('hidden');
+      form.classList.remove('hidden');
+      form.classList.add('flex');
+      form.querySelector<HTMLInputElement>('.custom-amt-input')?.focus();
+    });
+  });
+
+  document.querySelectorAll('.custom-amt-cancel').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      const form = (btn as HTMLElement).closest<HTMLFormElement>('.custom-amt-form')!;
+      const id = form.dataset.id!;
+      form.classList.add('hidden');
+      form.classList.remove('flex');
+      document.querySelector<HTMLElement>(`.custom-amt-toggle[data-id="${id}"]`)?.classList.remove('hidden');
+    });
+  });
+
+  document.querySelectorAll('.custom-amt-form').forEach((form) => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const f = form as HTMLFormElement;
+      const id = f.dataset.id!;
+      const input = f.querySelector<HTMLInputElement>('.custom-amt-input')!;
+      const amount = parseFloat(input.value);
+      if (!amount || amount <= 0) { input.focus(); return; }
+      const submitBtn = f.querySelector<HTMLButtonElement>('button[type="submit"]')!;
+      submitBtn.disabled = true;
+      submitBtn.textContent = '…';
+      const res = await fetch(`/api/bookings/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payment_status: 'deposit_paid', deposit_amount: amount }),
+      });
+      if (res.ok) {
+        location.reload();
+      } else {
+        alert('Failed to update payment');
+        submitBtn.disabled = false;
+        submitBtn.textContent = '✓';
+      }
+    });
+  });
+
+  document.querySelectorAll('.delete-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = (btn as HTMLElement).dataset.id!;
+      const name = (btn as HTMLElement).dataset.name!;
+      if (!confirm(`Permanently delete booking for ${name}? This cannot be undone.`)) return;
+      (btn as HTMLButtonElement).disabled = true;
+      (btn as HTMLButtonElement).textContent = '…';
+      const res = await fetch(`/api/bookings/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        location.reload();
+      } else {
+        const data = await res.json();
+        alert(data.error ?? 'Delete failed');
+        (btn as HTMLButtonElement).disabled = false;
+        (btn as HTMLButtonElement).textContent = '🗑 Delete';
+      }
+    });
+  });
+</script>

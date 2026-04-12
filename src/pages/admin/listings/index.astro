@@ -1,0 +1,265 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const role = Astro.locals.profile?.role ?? 'admin';
+const isOwner = role === 'property_owner';
+const isSuperAdmin = role === 'super_admin';
+const ownerListingIds = Astro.locals.ownerListingIds ?? [];
+
+const L: Record<string, Record<string, string>> = {
+  listing:    { en: 'listing', el: 'καταχώριση' },
+  listings:   { en: 'listings', el: 'καταχωρίσεις' },
+  add:        { en: '+ Add Listing', el: '+ Νέα Καταχώριση' },
+  active:     { en: 'Active', el: 'Ενεργή' },
+  inactive:   { en: 'Inactive', el: 'Ανενεργή' },
+  view:       { en: 'View ↗', el: 'Προβολή ↗' },
+  edit:       { en: 'Edit →', el: 'Επεξεργασία →' },
+  night:      { en: '/night', el: '/νύχτα' },
+  owner:      { en: 'Owner', el: 'Ιδιοκτήτης' },
+  commission: { en: 'Commission', el: 'Προμήθεια' },
+  unassigned: { en: 'Unassigned', el: 'Χωρίς ιδιοκτήτη' },
+  no_listings:{ en: 'No listings yet.', el: 'Δεν υπάρχουν καταχωρίσεις ακόμα.' },
+};
+function al(k: string) { return L[k]?.[lang] ?? L[k]?.en ?? k; }
+
+const service = getServiceClient();
+
+// Fetch platform commission rate as fallback
+const { data: commSettingRow } = await service
+  .from('platform_settings')
+  .select('value')
+  .eq('key', 'commission_rate')
+  .single();
+const platformCommissionRate: number = commSettingRow ? Number(commSettingRow.value) : 5;
+
+// Build scoped query
+let query = service
+  .from('listings')
+  .select('id,slug,title,city,base_price,max_guests,bedrooms,is_active,is_private,review_count,avg_rating,commission_rate,owner_id,approved_at,allow_telegram_direct,instant_booking,offer_bank_transfer,listing_images(url,is_cover),profiles(full_name,company_name)')
+  .order('created_at');
+
+// Property owners only see their own listings
+if (isOwner) {
+  if (ownerListingIds.length > 0) {
+    query = query.in('id', ownerListingIds);
+  } else {
+    // No listings assigned yet — return empty
+    query = query.eq('id', '00000000-0000-0000-0000-000000000000');
+  }
+}
+
+const { data: listings } = await query;
+
+// Pending approval: inactive listings that have never been approved (admins only)
+// approved_at being null means submitted but never yet approved — excludes admin-deactivated listings
+const pendingListings = !isOwner
+  ? (listings ?? []).filter((l: any) => !l.is_active && l.owner_id && !l.approved_at)
+  : [];
+// Show all listings except those pending first-time approval (shown in separate section)
+const activeListings = isOwner
+  ? (listings ?? [])
+  : (listings ?? []).filter((l: any) => l.is_active || l.approved_at);
+---
+
+<AdminLayout title="Listings">
+  <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6">
+    <p class="text-sm text-gray-500">{(listings ?? []).length} {(listings ?? []).length !== 1 ? al('listings') : al('listing')}</p>
+    <div class="flex gap-2 w-full sm:w-auto">
+      <a href="/admin/listings/import" class="flex-1 sm:flex-initial text-center border border-gray-200 text-gray-700 font-medium min-h-[44px] px-4 py-2.5 rounded-xl text-sm hover:bg-gray-50 transition-colors flex items-center justify-center">
+        Import
+      </a>
+      <a href="/admin/listings/new" class="flex-1 sm:flex-initial text-center bg-[#1a1a2e] text-white font-semibold min-h-[44px] px-4 py-2.5 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors flex items-center justify-center">
+        {al('add')}
+      </a>
+    </div>
+  </div>
+
+  <!-- Pending approval section (admins only) -->
+  {pendingListings.length > 0 && (
+    <div class="mb-8">
+      <h2 class="text-sm font-semibold text-amber-700 uppercase tracking-wide mb-3">
+        Pending Approval ({pendingListings.length})
+      </h2>
+      <div class="space-y-3">
+        {pendingListings.map((l: any) => {
+          const ownerName = l.profiles?.company_name ?? l.profiles?.full_name ?? 'Unknown owner';
+          return (
+            <div class="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+              <div class="min-w-0 mb-3">
+                <p class="font-semibold text-gray-900 truncate">{l.title}</p>
+                <p class="text-xs text-gray-500 mt-0.5">{l.city} · {l.bedrooms} BR · €{l.base_price}/night · submitted by <span class="font-medium">{ownerName}</span></p>
+              </div>
+              <div class="flex flex-wrap gap-2">
+                <a href={`/admin/listings/${l.id}`} class="min-h-[44px] px-4 py-2.5 text-sm text-gray-600 border border-gray-200 rounded-xl hover:bg-white transition-colors flex items-center">
+                  Review →
+                </a>
+                <button
+                  class="approve-btn min-h-[44px] px-4 py-2.5 text-sm font-semibold bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl transition-colors"
+                  data-id={l.id}
+                >
+                  Approve
+                </button>
+                <button
+                  class="reject-btn min-h-[44px] px-4 py-2.5 text-sm font-semibold bg-red-100 hover:bg-red-200 text-red-700 rounded-xl transition-colors"
+                  data-id={l.id}
+                >
+                  Reject
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  )}
+
+  {activeListings.length === 0 && pendingListings.length === 0 ? (
+    <div class="text-center py-20 text-gray-400">
+      <p class="text-4xl mb-3">🏡</p>
+      <p>{al('no_listings')}</p>
+    </div>
+  ) : activeListings.length > 0 && (
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {activeListings.map((listing: any) => {
+        const cover = listing.listing_images?.find((i: any) => i.is_cover) ?? listing.listing_images?.[0];
+        const ownerName = listing.profiles?.company_name ?? listing.profiles?.full_name;
+        return (
+          <div class={`group bg-white rounded-2xl border overflow-hidden hover:shadow-md transition-all relative cursor-pointer ${listing.is_private ? 'border-purple-200 bg-purple-50/30' : 'border-gray-100 hover:border-[#c9a96e]'}`}>
+            {/* Stretched link — covers the whole card, sits behind inner links */}
+            <a href={`/admin/listings/${listing.id}`} class="absolute inset-0 z-0" aria-label={`Edit ${listing.title}`}></a>
+            <a href={`/admin/listings/${listing.id}`} class="block aspect-video bg-gray-100 relative overflow-hidden" tabindex="-1" aria-hidden="true">
+              {cover ? (
+                <img src={cover.url} alt={listing.title} class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" loading="lazy" />
+              ) : (
+                <div class="w-full h-full flex items-center justify-center text-gray-300 text-4xl">🏡</div>
+              )}
+              <div class={`absolute top-2 right-2 px-2 py-0.5 rounded-full text-xs font-medium ${listing.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-100 text-gray-600'}`}>
+                {listing.is_active ? al('active') : al('inactive')}
+              </div>
+              {listing.is_active && !isOwner && (
+                <div class="absolute bottom-2 right-2 flex gap-1">
+                  {listing.instant_booking && <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-100 text-violet-700">Stripe</span>}
+                  {listing.offer_bank_transfer && <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700">Bank</span>}
+                  {listing.allow_telegram_direct && <span class="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700">TD</span>}
+                </div>
+              )}
+              {listing.is_private && (
+                <div class="absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-600 text-white">
+                  Private
+                </div>
+              )}
+              {!isOwner && !listing.is_private && (
+                <div class="absolute top-2 left-2 px-2 py-0.5 rounded-full text-xs font-medium bg-[#1a1a2e]/80 text-white">
+                  {listing.commission_rate ?? platformCommissionRate}%
+                </div>
+              )}
+            </a>
+            <div class="p-4">
+              <h3 class="font-semibold text-gray-900 text-sm mb-1 line-clamp-1">{listing.title}</h3>
+              <p class="text-gray-400 text-xs mb-1">{listing.city} · {listing.bedrooms} BR · {listing.max_guests} guests</p>
+              {isSuperAdmin && (
+                <p class="text-xs mb-2">
+                  {ownerName
+                    ? <span class="text-indigo-600 font-medium">{ownerName}</span>
+                    : <span class="text-gray-300 italic">{al('unassigned')}</span>
+                  }
+                </p>
+              )}
+              <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                <p class="font-bold text-gray-900 text-sm">€{listing.base_price}<span class="font-normal text-gray-400">{al('night')}</span></p>
+                <div class="flex flex-wrap gap-1 relative z-10 items-center">
+                  <a href={`/rentals/${listing.slug}`} target="_blank" class="min-h-[36px] px-2.5 py-1.5 text-xs text-gray-400 hover:text-gray-600 hover:bg-gray-50 rounded-lg transition-colors flex items-center">{al('view')}</a>
+                  <a href={`/admin/listings/${listing.id}/availability`} class="min-h-[36px] px-2.5 py-1.5 text-xs text-emerald-600 font-medium hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors flex items-center">Availability</a>
+                  <button
+                    class="visibility-btn min-h-[36px] px-2.5 py-1.5 text-xs font-medium rounded-lg transition-colors flex items-center"
+                    class:list={[listing.is_private ? 'text-purple-500 hover:text-purple-700 hover:bg-purple-50' : 'text-gray-400 hover:text-gray-600 hover:bg-gray-50']}
+                    data-id={listing.id}
+                    data-private={String(listing.is_private ?? false)}
+                    type="button"
+                    title={listing.is_private ? 'Make public' : 'Make private'}
+                  >
+                    {listing.is_private ? 'Make Public' : 'Make Private'}
+                  </button>
+                  <span class="min-h-[36px] px-2.5 py-1.5 text-xs text-[#c9a96e] font-medium flex items-center">{al('edit')}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  )}
+</AdminLayout>
+
+<script>
+  document.querySelectorAll('.visibility-btn').forEach((btn) => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const id = (btn as HTMLElement).dataset.id!;
+      const isPrivate = (btn as HTMLElement).dataset.private === 'true';
+      const next = !isPrivate;
+
+      (btn as HTMLButtonElement).disabled = true;
+      (btn as HTMLElement).textContent = '…';
+
+      const res = await fetch(`/api/listings/${id}/visibility`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_private: next }),
+      });
+
+      if (res.ok) {
+        (window as any).adminToast(next ? '🔒 Listing set to private' : '🌐 Listing set to public', 'info');
+        setTimeout(() => window.location.reload(), 1200);
+      } else {
+        (btn as HTMLElement).textContent = isPrivate ? 'Make Public' : 'Make Private';
+        (btn as HTMLButtonElement).disabled = false;
+        (window as any).adminToast('❌ Failed to update visibility', 'error');
+      }
+    });
+  });
+
+  // Approve pending listing
+  document.querySelectorAll('.approve-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      const id = (btn as HTMLElement).dataset.id!;
+      (btn as HTMLButtonElement).disabled = true;
+      (btn as HTMLElement).textContent = '…';
+      const res = await fetch(`/api/listings/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_active: true, approved_at: new Date().toISOString() }),
+      });
+      if (res.ok) {
+        (window as any).adminToast('✅ Listing approved and activated', 'success');
+        setTimeout(() => window.location.reload(), 1200);
+      } else {
+        (btn as HTMLElement).textContent = 'Approve';
+        (btn as HTMLButtonElement).disabled = false;
+        (window as any).adminToast('❌ Failed to approve listing', 'error');
+      }
+    });
+  });
+
+  // Reject pending listing (permanently deletes)
+  document.querySelectorAll('.reject-btn').forEach((btn) => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Reject and delete this listing? This cannot be undone.')) return;
+      const id = (btn as HTMLElement).dataset.id!;
+      (btn as HTMLButtonElement).disabled = true;
+      (btn as HTMLElement).textContent = '…';
+      const res = await fetch(`/api/listings/${id}`, { method: 'DELETE' });
+      if (res.ok || res.status === 204) {
+        (window as any).adminToast('🗑 Listing rejected and deleted', 'info');
+        setTimeout(() => window.location.reload(), 1200);
+      } else {
+        (btn as HTMLElement).textContent = 'Reject';
+        (btn as HTMLButtonElement).disabled = false;
+        (window as any).adminToast('❌ Failed to reject listing', 'error');
+      }
+    });
+  });
+</script>

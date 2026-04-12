@@ -1,0 +1,225 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const { slug } = Astro.params;
+const service = getServiceClient();
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://kefaloniabnb.com';
+const lang = ((Astro.locals as any).lang ?? 'en') as string;
+const isBg = lang === 'bg';
+const isEl = lang === 'el';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const { data: listing } = await service
+  .from('listings')
+  .select('id, slug, title, city, region, google_place_id, avg_rating, review_count')
+  .eq('slug', slug)
+  .eq('is_active', true)
+  .single();
+
+if (!listing) return Astro.redirect('/rentals');
+
+const googleReviewUrl = listing.google_place_id
+  ? `https://search.google.com/local/writereview?placeid=${listing.google_place_id}`
+  : null;
+
+const googleSearchUrl = `https://www.google.com/maps/search/${encodeURIComponent(listing.title + ' ' + (listing.city ?? '') + ' ' + (listing.region ?? '') + ' Greece')}`;
+
+const tThankStay = isEl ? 'Ευχαριστούμε που μείνατε!' : isBg ? 'Благодарим ви, че отседнахте!' : isSr ? 'Хвала вам што сте одсели!' : isTr ? 'Konaklamanız için teşekkürler!' : isRo ? 'Mulțumim pentru ședere!' : 'Thank you for staying!';
+const tReviewIntro = isEl ? 'Θα θέλαμε να μάθουμε για την εμπειρία σας. Η αξιολόγησή σας βοηθά άλλους ταξιδιώτες.' : isBg ? 'Ще се радваме да чуем за вашето преживяване. Вашата рецензия помага на други пътешественици.' : isSr ? 'Волели бисмо да чујемо о вашем искуству. Ваша рецензија помаже другим путницима.' : isTr ? 'Deneyiminiz hakkında bilgi almak isteriz. Değerlendirmeniz diğer gezginlere yardımcı olur.' : isRo ? 'Ne-ar plăcea să aflăm despre experiența dvs. Recenzia dvs. îi ajută pe alți călători și ne ajută să ne îmbunătățim.' : "We'd love to hear about your experience. Your review helps other travelers and helps us improve.";
+const tLeaveReview = isEl ? 'Αφήστε αξιολόγηση' : isBg ? 'Оставете рецензия' : isSr ? 'Оставите рецензију' : isTr ? 'Değerlendirme Bırakın' : isRo ? 'Lasă o recenzie' : 'Leave a Review';
+const tYourName = isEl ? 'Το όνομά σας' : isBg ? 'Вашето име' : isSr ? 'Ваше име' : isTr ? 'Adınız' : isRo ? 'Numele dvs.' : 'Your name';
+const tYourRating = isEl ? 'Η βαθμολογία σας' : isBg ? 'Вашата оценка' : isSr ? 'Ваша оцена' : isTr ? 'Değerlendirmeniz' : isRo ? 'Nota dvs.' : 'Your rating';
+const tSelectRating = isEl ? 'Επιλέξτε βαθμολογία.' : isBg ? 'Моля, изберете оценка.' : isSr ? 'Изаберите оцену.' : isTr ? 'Lütfen bir değerlendirme seçin.' : isRo ? 'Vă rugăm selectați o notă.' : 'Please select a rating.';
+const tYourReview = isEl ? 'Η αξιολόγησή σας' : isBg ? 'Вашата рецензия' : isSr ? 'Ваша рецензија' : isTr ? 'Değerlendirmeniz' : isRo ? 'Recenzia dvs.' : 'Your review';
+const tOptional = isEl ? '(προαιρετικό)' : isBg ? '(по избор)' : isSr ? '(опционално)' : isTr ? '(isteğe bağlı)' : isRo ? '(opțional)' : '(optional)';
+const tTellUs = isEl ? 'Πείτε μας για την εμπειρία σας…' : isBg ? 'Разкажете ни за вашето преживяване…' : isSr ? 'Реците нам о вашем искуству…' : isTr ? 'Deneyiminizi anlatın…' : isRo ? 'Spuneți-ne despre experiența dvs…' : 'Tell us about your experience…';
+const tSubmitReview = isEl ? 'Υποβολή αξιολόγησης' : isBg ? 'Изпратете рецензия' : isSr ? 'Пошаљите рецензију' : isTr ? 'Değerlendirmeyi Gönder' : isRo ? 'Trimite Recenzia' : 'Submit Review';
+const tSubmitting = isEl ? 'Υποβολή…' : isBg ? 'Изпращане…' : isSr ? 'Слање…' : isTr ? 'Gönderiliyor…' : isRo ? 'Se trimite…' : 'Submitting…';
+const tThankYou = isEl ? 'Ευχαριστούμε!' : isBg ? 'Благодарим ви!' : isSr ? 'Хвала вам!' : isTr ? 'Teşekkürler!' : isRo ? 'Mulțumim!' : 'Thank you!';
+const tReviewSubmitted = isEl ? 'Η αξιολόγησή σας υποβλήθηκε και θα εμφανιστεί μετά από έλεγχο.' : isBg ? 'Вашата рецензия е изпратена и ще се появи след бърза проверка.' : isSr ? 'Ваша рецензија је послата и појавиће се након провере.' : isTr ? 'Değerlendirmeniz gönderildi ve kısa bir inceleme sonrası yayınlanacak.' : isRo ? 'Recenzia dvs. a fost trimisă și va apărea după o verificare rapidă de moderare.' : 'Your review has been submitted and will appear after a quick moderation check.';
+const tAlsoGoogle = isEl ? 'Αξιολόγηση και στο Google' : isBg ? 'Оценете и в Google' : isSr ? 'Оцените и на Google-у' : isTr ? "Google'da da değerlendirin" : isRo ? 'Recenzie și pe Google' : 'Also review on Google';
+const tFindGoogle = isEl ? 'Βρείτε μας στο Google Maps' : isBg ? 'Намерете ни в Google Maps' : isSr ? 'Пронађите нас на Google Maps' : isTr ? "Google Maps'te bulun" : isRo ? 'Găsiți-ne pe Google Maps' : 'Find us on Google Maps';
+const tViewListing = isEl ? 'Δείτε λεπτομέρειες καταλύματος →' : isBg ? 'Вижте детайли за имота →' : isSr ? 'Погледајте детаље смештаја →' : isTr ? 'İlan detaylarını görüntüle →' : isRo ? 'Vezi detalii proprietate →' : 'View listing details →';
+const tBookDirect = isEl ? '— Κρατήστε απευθείας για τις καλύτερες τιμές' : isBg ? '— Резервирайте директно за най-добри цени' : isSr ? '— Резервишите директно за најбоље цене' : isTr ? '— En iyi fiyatlar için doğrudan rezervasyon yapın' : isRo ? '— Rezervați direct pentru cele mai bune tarife' : '— Book directly for the best rates';
+const tSomethingWrong = isEl ? 'Κάτι πήγε στραβά. Δοκιμάστε ξανά.' : isBg ? 'Нещо се обърка. Моля, опитайте отново.' : isSr ? 'Нешто је пошло наопако. Покушајте поново.' : isTr ? 'Bir şeyler ters gitti. Lütfen tekrar deneyin.' : isRo ? 'Ceva a mers greșit. Încercați din nou.' : 'Something went wrong. Please try again.';
+const tNetworkError = isEl ? 'Σφάλμα δικτύου. Δοκιμάστε ξανά.' : isBg ? 'Мрежова грешка. Моля, опитайте отново.' : isSr ? 'Грешка мреже. Покушајте поново.' : isTr ? 'Ağ hatası. Lütfen tekrar deneyin.' : isRo ? 'Eroare de rețea. Încercați din nou.' : 'Network error. Please try again.';
+const tReviews = isEl ? 'αξιολογήσεις' : isBg ? 'рецензии' : isSr ? 'рецензије' : isTr ? 'değerlendirme' : isRo ? 'recenzii' : 'reviews';
+---
+
+<BaseLayout
+  title={`Review ${listing.title}`}
+  description={`Leave a review for ${listing.title} in ${listing.city ?? 'Greece'} — share your experience on kefaloniabnb.com or Google.`}
+  noIndex={true}
+>
+  <div class="min-h-[70vh] flex items-center justify-center px-4 py-16">
+    <div class="max-w-md w-full text-center">
+
+      <div class="w-16 h-16 bg-[#1a1a2e] rounded-2xl flex items-center justify-center mx-auto mb-6">
+        <span class="text-white text-2xl font-bold">K</span>
+      </div>
+
+      <h1 class="text-2xl font-bold text-gray-900 mb-2">{tThankStay}</h1>
+      <p class="text-gray-500 mb-1">{listing.title}</p>
+      {listing.city && <p class="text-sm text-gray-400 mb-8">{listing.city}{listing.region ? `, ${listing.region}` : ''}, Greece</p>}
+
+      {listing.avg_rating > 0 && (
+        <div class="flex items-center justify-center gap-1 mb-8">
+          <span class="text-amber-400 text-lg">{'★'.repeat(Math.round(listing.avg_rating))}</span>
+          <span class="text-sm text-gray-500">{listing.avg_rating.toFixed(1)} ({listing.review_count} {tReviews})</span>
+        </div>
+      )}
+
+      <p class="text-gray-600 mb-8">
+        {tReviewIntro}
+      </p>
+
+      {/* ── Review form on KefaloniaBNB ── */}
+      <div id="review-section" class="bg-white rounded-2xl border border-gray-100 p-6 mb-6 text-left">
+        <h2 class="text-lg font-bold text-gray-900 mb-4 text-center">{tLeaveReview}</h2>
+        <form id="review-form" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{tYourName} <span class="text-red-500">*</span></label>
+            <input type="text" id="guest-name" required class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none" placeholder="John D." />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-3">{tYourRating} <span class="text-red-500">*</span></label>
+            <div class="flex gap-2 justify-center" id="stars">
+              {[1,2,3,4,5].map(n => (
+                <button type="button" data-star={n} class="star-btn text-4xl text-gray-300 hover:text-yellow-400 transition-colors focus:outline-none">★</button>
+              ))}
+            </div>
+            <p id="rating-error" class="text-xs text-red-500 mt-1 hidden text-center">{tSelectRating}</p>
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">{tYourReview} <span class="text-gray-400 font-normal">{tOptional}</span></label>
+            <textarea id="review-body" rows="3" placeholder={tTellUs} class="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-[#c9a96e] focus:border-transparent outline-none resize-none"></textarea>
+          </div>
+          <p id="submit-error" class="text-sm text-red-600 hidden"></p>
+          <button type="submit" id="submit-btn" class="w-full bg-[#c9a96e] text-white font-semibold py-3 rounded-xl hover:opacity-90 transition-opacity">
+            {tSubmitReview}
+          </button>
+        </form>
+      </div>
+
+      <div id="review-thanks" class="hidden bg-white rounded-2xl border border-gray-100 p-6 mb-6">
+        <p class="text-4xl mb-3">🙏</p>
+        <h2 class="text-lg font-bold text-gray-900 mb-2">{tThankYou}</h2>
+        <p class="text-sm text-gray-500">{tReviewSubmitted}</p>
+      </div>
+
+      <div class="space-y-3">
+        {/* Google Review */}
+        {googleReviewUrl ? (
+          <a
+            href={googleReviewUrl}
+            target="_blank"
+            rel="noopener"
+            class="flex items-center justify-center gap-3 w-full py-3.5 px-6 bg-white border-2 border-gray-200 rounded-2xl font-semibold text-gray-900 hover:border-blue-400 hover:shadow-md transition-all"
+          >
+            <svg class="w-5 h-5" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            {tAlsoGoogle}
+          </a>
+        ) : (
+          <a
+            href={googleSearchUrl}
+            target="_blank"
+            rel="noopener"
+            class="flex items-center justify-center gap-3 w-full py-3.5 px-6 bg-white border-2 border-gray-200 rounded-2xl font-semibold text-gray-900 hover:border-blue-400 hover:shadow-md transition-all"
+          >
+            <svg class="w-5 h-5" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+            </svg>
+            {tFindGoogle}
+          </a>
+        )}
+
+        <a
+          href={`/rentals/${listing.slug}`}
+          class="block w-full py-3 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          {tViewListing}
+        </a>
+      </div>
+
+      <div class="mt-12 pt-6 border-t border-gray-100">
+        <p class="text-xs text-gray-400">
+          <a href={siteUrl} class="font-semibold text-[#1a1a2e] hover:text-[#c9a96e] transition-colors">kefaloniabnb.com</a>
+          {tBookDirect}
+        </p>
+      </div>
+
+    </div>
+  </div>
+</BaseLayout>
+
+<script define:vars={{ listingId: listing.id, tSubmitReview, tSubmitting, tSomethingWrong, tNetworkError }}>
+  let selectedRating = 0;
+  const stars = document.querySelectorAll('.star-btn');
+  const ratingError = document.getElementById('rating-error');
+
+  function updateStars(n) {
+    stars.forEach(btn => {
+      const s = Number(btn.dataset.star);
+      btn.classList.toggle('text-yellow-400', s <= n);
+      btn.classList.toggle('text-gray-300', s > n);
+    });
+  }
+
+  stars.forEach(btn => {
+    btn.addEventListener('mouseenter', () => updateStars(Number(btn.dataset.star)));
+    btn.addEventListener('mouseleave', () => updateStars(selectedRating));
+    btn.addEventListener('click', () => {
+      selectedRating = Number(btn.dataset.star);
+      updateStars(selectedRating);
+      ratingError.classList.add('hidden');
+    });
+  });
+
+  document.getElementById('review-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    if (!selectedRating) { ratingError.classList.remove('hidden'); return; }
+
+    const guestName = document.getElementById('guest-name').value.trim();
+    const body = document.getElementById('review-body').value.trim();
+    const submitBtn = document.getElementById('submit-btn');
+    const submitError = document.getElementById('submit-error');
+
+    submitBtn.disabled = true;
+    submitBtn.textContent = tSubmitting;
+
+    try {
+      const res = await fetch('/api/reviews/public', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ listing_id: listingId, guest_name: guestName, rating: selectedRating, body }),
+      });
+
+      if (res.ok) {
+        document.getElementById('review-section').classList.add('hidden');
+        document.getElementById('review-thanks').classList.remove('hidden');
+      } else {
+        const data = await res.json().catch(() => ({}));
+        submitError.textContent = data.error || tSomethingWrong;
+        submitError.classList.remove('hidden');
+        submitBtn.disabled = false;
+        submitBtn.textContent = tSubmitReview;
+      }
+    } catch {
+      submitError.textContent = tNetworkError;
+      submitError.classList.remove('hidden');
+      submitBtn.disabled = false;
+      submitBtn.textContent = tSubmitReview;
+    }
+  });
+</script>

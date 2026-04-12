@@ -1,0 +1,264 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import ListingCard from '../../components/listing/ListingCard.astro';
+import type { ListingWithDetails } from '../../types/index.ts';
+import { getLocationBySlug, type Location } from '../../lib/locations.ts';
+import { getActiveFeaturedListingIds } from '../../lib/featured.ts';
+import { type Lang } from '../../i18n/translations.ts';
+import { getLocationDescription, translateTag, translateBestFor, getDemandLabel, getRegionLabel } from '../../i18n/locations-i18n.ts';
+const lang = (Astro.locals.lang ?? 'en') as Lang;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const { location: slug } = Astro.params;
+const loc: Location | undefined = getLocationBySlug(slug!);
+
+if (!loc) return Astro.redirect('/rentals');
+
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://kefaloniabnb.com';
+const supabase = Astro.locals.supabase;
+
+// Build query based on location filter config
+let query = supabase
+  .from('listings')
+  .select('*, listing_images(*), listing_amenities(amenities(*))')
+  .eq('is_active', true);
+
+const f = loc.filter;
+
+if (f.region) {
+  query = query.ilike('region', `%${f.region}%`);
+}
+if (f.city) {
+  query = query.ilike('city', `%${f.city}%`);
+} else if (f.cities && f.cities.length > 0) {
+  query = query.in('city', f.cities);
+}
+if (f.area) {
+  query = query.ilike('area', `%${f.area}%`);
+}
+
+// For island-level pages (slug = 'ithaca' or 'kefalonia'), just filter by region
+if (loc.type === 'island' || (loc.type === 'city' && !f.city)) {
+  query = supabase
+    .from('listings')
+    .select('*, listing_images(*), listing_amenities(amenities(*))')
+    .eq('is_active', true)
+    .ilike('region', `%${f.region ?? loc.region}%`);
+}
+
+const [rawRes, featuredIds] = await Promise.all([
+  query.order('avg_rating', { ascending: false }),
+  getActiveFeaturedListingIds(),
+]);
+
+let listings: ListingWithDetails[] = (rawRes.data ?? []).map((l: any) => ({
+  ...l,
+  listing_images: l.listing_images ?? [],
+  amenities: (l.listing_amenities ?? []).map((la: any) => la.amenities).filter(Boolean),
+}));
+
+const featuredSet = new Set(featuredIds);
+listings = [
+  ...listings.filter((l) => featuredSet.has(l.id)),
+  ...listings.filter((l) => !featuredSet.has(l.id)),
+];
+
+const regionLabel = getRegionLabel(loc.region, lang);
+const breadcrumbBack = loc.region === 'ithaca' ? '/locations/ithaca' : '/locations/kefalonia';
+
+const typeIcon: Record<string, string> = {
+  city: '🏙',
+  beach: '🏖',
+  village: '🏘',
+  island: '🏝',
+  hub: '⛴',
+  area: '🌊',
+  district: '🏰',
+};
+
+const demandBadge: Record<string, string> = {
+  high: 'bg-emerald-100 text-emerald-700',
+  medium: 'bg-blue-100 text-blue-700',
+  emerging: 'bg-amber-100 text-amber-700',
+};
+
+const schemas = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'Rentals', item: `${siteUrl}/rentals` },
+      { '@type': 'ListItem', position: 3, name: regionLabel, item: `${siteUrl}${breadcrumbBack}` },
+      { '@type': 'ListItem', position: 4, name: loc.name, item: `${siteUrl}/locations/${loc.slug}` },
+    ],
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'ItemList',
+    name: loc.seoTitle,
+    description: loc.seoDescription,
+    url: `${siteUrl}/locations/${loc.slug}`,
+    numberOfItems: listings.length,
+    itemListElement: listings.map((l, i) => ({
+      '@type': 'ListItem',
+      position: i + 1,
+      url: `${siteUrl}/rentals/${l.slug}`,
+      name: l.title,
+    })),
+  },
+  ...(loc.latitude && loc.longitude ? [{
+    '@context': 'https://schema.org',
+    '@type': 'TouristDestination',
+    name: loc.name,
+    description: loc.description,
+    geo: {
+      '@type': 'GeoCoordinates',
+      latitude: loc.latitude,
+      longitude: loc.longitude,
+    },
+    url: `${siteUrl}/locations/${loc.slug}`,
+  }] : []),
+];
+---
+
+<BaseLayout
+  title={loc.seoTitle}
+  description={loc.seoDescription}
+  schema={schemas}
+>
+
+  <!-- Hero -->
+  <section class="bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] text-white py-20 px-4">
+    <div class="max-w-4xl mx-auto">
+      <!-- Breadcrumb -->
+      <nav class="flex items-center gap-2 text-xs text-white/40 mb-6">
+        <a href="/" class="hover:text-white/70 transition-colors">{isEl ? 'Αρχική' : isBg ? 'Начало' : isSr ? 'Почетна' : isTr ? 'Ana Sayfa' : isRo ? 'Acasă' : 'Home'}</a>
+        <span>/</span>
+        <a href="/rentals" class="hover:text-white/70 transition-colors">{isEl ? 'Ενοικιάσεις' : isBg ? 'Наеми' : isSr ? 'Изнајмљивање' : isTr ? 'Kiralık' : isRo ? 'Închirieri' : 'Rentals'}</a>
+        {loc.slug !== 'kefalonia' && loc.slug !== 'ithaca' && (
+          <>
+            <span>/</span>
+            <a href={breadcrumbBack} class="hover:text-white/70 transition-colors">{regionLabel}</a>
+          </>
+        )}
+        <span>/</span>
+        <span class="text-white/70">{loc.name}</span>
+      </nav>
+
+      <div class="flex items-start gap-4">
+        <span class="text-5xl">{typeIcon[loc.type] ?? '📍'}</span>
+        <div>
+          <div class="flex items-center gap-3 mb-2">
+            <span class={`text-xs font-semibold px-2.5 py-1 rounded-full ${demandBadge[loc.demand]}`}>
+              {getDemandLabel(loc.demand, lang)}
+            </span>
+            <span class="text-xs text-white/40 uppercase tracking-widest">{regionLabel}</span>
+          </div>
+          <h1 class="text-3xl sm:text-5xl font-bold leading-tight mb-3">{loc.name}</h1>
+          <p class="text-white/70 text-lg max-w-2xl leading-relaxed">{getLocationDescription(loc.slug, lang) || loc.description}</p>
+        </div>
+      </div>
+
+      <!-- Tags -->
+      <div class="flex flex-wrap gap-2 mt-6 ml-16">
+        {loc.tags.map((tag) => (
+          <span class="text-xs bg-white/10 border border-white/10 text-white/60 rounded-full px-3 py-1">
+            {translateTag(tag, lang)}
+          </span>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Best for strip -->
+  <div class="bg-[#f8f6f2] border-b border-gray-100 py-3 px-4">
+    <div class="max-w-4xl mx-auto flex items-center gap-6 flex-wrap text-sm text-gray-600">
+      <span class="font-semibold text-gray-900 text-xs uppercase tracking-wide">{isEl ? 'Ιδανικό για:' : isBg ? 'Подходящо за:' : isSr ? 'Идеално за:' : isTr ? 'Bunun için ideal:' : isRo ? 'Ideal pentru:' : 'Best for:'}</span>
+      {loc.bestFor.map((tag) => (
+        <span class="flex items-center gap-1.5">
+          <span class="w-1.5 h-1.5 rounded-full bg-[#c9a96e]"></span>
+          {translateBestFor(tag, lang)}
+        </span>
+      ))}
+    </div>
+  </div>
+
+  <!-- Listings -->
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+
+    <div class="flex items-center justify-between mb-8">
+      <div>
+        <h2 class="text-2xl font-bold text-gray-900">
+          {listings.length > 0
+            ? (isEl ? `${listings.length} κατάλυμα${listings.length === 1 ? '' : 'τα'} στη/ν ${loc.name}` : isBg ? `${listings.length} имот${listings.length === 1 ? '' : 'а'} в ${loc.name}` : isSr ? `${listings.length} некретнин${listings.length === 1 ? 'а' : 'е'} у ${loc.name}` : isTr ? `${loc.name}'de ${listings.length} mülk` : isRo ? `${listings.length} proprietăț${listings.length === 1 ? 'e' : 'i'} în ${loc.name}` : `${listings.length} propert${listings.length === 1 ? 'y' : 'ies'} in ${loc.name}`)
+            : (isEl ? `Ακίνητα στη/ν ${loc.name}` : isBg ? `Имоти в ${loc.name}` : isSr ? `Некретнине у ${loc.name}` : isTr ? `${loc.name}'de Mülkler` : isRo ? `Proprietăți în ${loc.name}` : `Properties in ${loc.name}`)}
+        </h2>
+        <p class="text-sm text-gray-500 mt-1">{isEl ? 'Άμεση κράτηση · Χωρίς χρεώσεις · Εγγυημένες καλύτερες τιμές' : isBg ? 'Директна резервация · Нулеви такси · Гарантирани най-добри цени' : isSr ? 'Директна резервација · Нула накнада · Гарантоване најниже цене' : isTr ? 'Doğrudan rezervasyon · Sıfır ücret · En iyi fiyat garantisi' : isRo ? 'Rezervare directă · Zero comisioane · Cele mai bune tarife garantate' : 'Direct booking · Zero guest fees · Best rates guaranteed'}</p>
+      </div>
+      <div class="flex gap-2 flex-wrap">
+        <a href={`/locations/${loc.slug}/guide`}
+          class="text-sm text-[#c9a96e] hover:text-[#b8934a] border border-[#c9a96e]/40 hover:border-[#c9a96e] rounded-xl px-4 py-2 transition-colors font-medium">
+          {isEl ? '📖 Τοπικός Οδηγός' : isBg ? '📖 Местен наръчник' : isSr ? '📖 Локални водич' : isTr ? '📖 Yerel Rehber' : isRo ? '📖 Ghid Local' : '📖 Local Guide'}
+        </a>
+        <a href="/rentals" class="text-sm text-gray-500 hover:text-gray-900 border border-gray-200 hover:border-gray-400 rounded-xl px-4 py-2 transition-colors">
+          {isEl ? '← Όλοι οι Προορισμοί' : isBg ? '← Всички дестинации' : isSr ? '← Све дестинације' : isTr ? '← Tüm Destinasyonlar' : isRo ? '← Toate Destinațiile' : '← All Destinations'}
+        </a>
+      </div>
+    </div>
+
+    {listings.length > 0 ? (
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+        {listings.map((listing) => (
+          <ListingCard listing={listing} featured={featuredSet.has(listing.id)} />
+        ))}
+      </div>
+    ) : (
+      <div class="text-center py-20 bg-gray-50 rounded-3xl">
+        <p class="text-5xl mb-4">🏡</p>
+        <h3 class="text-xl font-semibold text-gray-900 mb-2">{isEl ? `Δεν υπάρχουν ακόμη ακίνητα στη/ν ${loc.name}` : isBg ? `Все още няма обяви в ${loc.name}` : isSr ? `Нема огласа у ${loc.name}` : isTr ? `${loc.name}'de henüz ilan yok` : isRo ? `Niciun anunț încă în ${loc.name}` : `No listings yet in ${loc.name}`}</h3>
+        <p class="text-gray-500 mb-6">{isEl ? 'Αναπτυσσόμαστε γρήγορα. Περιηγηθείτε σε όλα τα διαθέσιμα ακίνητα.' : isBg ? 'Развиваме се бързо. Разгледайте всички налични имоти.' : isSr ? 'Брзо растемо. Прегледајте све расположиве некретнине.' : isTr ? 'Hızla büyüyoruz. Genişlerken tüm mevcut mülklere göz atın.' : isRo ? 'Creștem rapid. Răsfoiți toate proprietățile disponibile în timp ce ne extindem aici.' : "We're growing fast. Browse all available properties while we expand here."}</p>
+        <a href="/rentals" class="inline-block bg-[#1a1a2e] text-white font-semibold px-6 py-3 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">
+          {isEl ? 'Περιήγηση σε Όλα τα Ακίνητα' : isBg ? 'Разгледайте всички имоти' : isSr ? 'Прегледај све некретнине' : isTr ? 'Tüm Mülkleri Gez' : isRo ? 'Răsfoiește Toate Proprietățile' : 'Browse All Properties'}
+        </a>
+      </div>
+    )}
+
+    <!-- Nearby locations -->
+    <div class="mt-16 pt-12 border-t border-gray-100">
+      <h3 class="text-lg font-bold text-gray-900 mb-6">{isEl ? 'Εξερευνήστε κοντινούς προορισμούς' : isBg ? 'Разгледайте близки дестинации' : isSr ? 'Истражите оближње дестинације' : isTr ? 'Yakın destinasyonları keşfedin' : isRo ? 'Explorează destinațiile din apropiere' : 'Explore nearby destinations'}</h3>
+      <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+        {(loc.region === 'kefalonia' ? (await import('../../lib/locations.ts')).KEFALONIA_LOCATIONS : (await import('../../lib/locations.ts')).ITHACA_LOCATIONS)
+          .filter((l: Location) => l.slug !== loc.slug)
+          .slice(0, 8)
+          .map((nearby: Location) => (
+            <a
+              href={`/rentals/${nearby.slug}`}
+              class="flex items-center gap-2 p-3 bg-white border border-gray-100 rounded-xl hover:border-[#c9a96e] hover:shadow-sm transition-all text-sm"
+            >
+              <span>{typeIcon[nearby.type] ?? '📍'}</span>
+              <span class="font-medium text-gray-800 truncate">{nearby.name}</span>
+            </a>
+          ))
+        }
+      </div>
+    </div>
+
+  </div>
+
+  <!-- CTA -->
+  <section class="bg-[#f8f6f2] border-t border-gray-100 py-16 px-4">
+    <div class="max-w-2xl mx-auto text-center">
+      <h3 class="text-2xl font-bold text-gray-900 mb-3">{isEl ? `Έχετε ακίνητο στη/ν ${loc.name};` : isBg ? `Имате имот в ${loc.name}?` : isSr ? `Имате некретнину у ${loc.name}?` : isTr ? `${loc.name}'de bir mülkünüz var mı?` : isRo ? `Dețineți o proprietate în ${loc.name}?` : `Own a property in ${loc.name}?`}</h3>
+      <p class="text-gray-500 mb-6">{isEl ? 'Καταχωρίστε το δωρεάν. Κρατήστε το 95% κάθε κράτησης. Άμεση επαφή με κάθε επισκέπτη.' : isBg ? 'Публикувайте го безплатно. Запазете 95% от всяка резервация. Директен контакт с всеки гост.' : isSr ? 'Огласите бесплатно. Задржите 95% сваке резервације. Директан контакт са сваким гостом.' : isTr ? 'Ücretsiz listeleyin. Her rezervasyonun %95\'ini kazanın. Her misafirle doğrudan iletişim.' : isRo ? 'Listează gratuit. Păstrează 95% din fiecare rezervare. Contact direct cu fiecare oaspete.' : 'List it free. Keep 95% of every booking. Direct contact with every guest.'}</p>
+      <a href="/contact" class="inline-block bg-[#1a1a2e] hover:bg-[#2d2d4e] text-white font-bold px-8 py-3 rounded-xl transition-colors text-sm">
+        {isEl ? 'Καταχωρίστε το Ακίνητό μου — Δωρεάν' : isBg ? 'Публикувайте имота ми — Безплатно' : isSr ? 'Огласи моју некретнину — Бесплатно' : isTr ? 'Mülkümü Listele — Ücretsiz' : isRo ? 'Listează Proprietatea Mea — Gratuit' : 'List My Property — Free'}
+      </a>
+    </div>
+  </section>
+
+</BaseLayout>

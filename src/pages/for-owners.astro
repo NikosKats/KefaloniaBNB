@@ -1,0 +1,363 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://kefaloniabnb.com';
+
+const faqSchema = {
+  '@context': 'https://schema.org',
+  '@type': 'FAQPage',
+  mainEntity: [
+    {
+      '@type': 'Question',
+      name: 'How much does it cost to list my property?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'Listing your property is completely free. We charge a small commission only when you receive a confirmed booking — no upfront fees.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'Do I need to manage my own calendar?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'We provide you with a dedicated owner portal where you can view bookings, block dates, and track payments — all in one place.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'How are guests vetted?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'All bookings require ID verification and a deposit. We review every inquiry before confirming, so only genuine travellers stay at your property.',
+      },
+    },
+    {
+      '@type': 'Question',
+      name: 'What about cleaning and maintenance?',
+      acceptedAnswer: {
+        '@type': 'Answer',
+        text: 'We have a vetted cleaning team available on demand. You can request a clean through your owner portal after every checkout — no need to coordinate yourself.',
+      },
+    },
+  ],
+};
+---
+
+<BaseLayout
+  title="List Your Property in Kefalonia — Earn More with KefaloniaBNB"
+  description="Partner with KefaloniaBNB to list your holiday property in Keramoti or Kefalonia, Greece. We handle bookings, payments, and guest support — you just earn."
+  schema={faqSchema}
+>
+
+  <!-- Hero -->
+  <section class="relative bg-[#1a1a2e] text-white overflow-hidden">
+    <div class="absolute inset-0 bg-gradient-to-br from-[#1a1a2e] via-[#1a1a2e] to-[#2d2d4e] opacity-90"></div>
+    <div class="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-24 lg:py-32">
+      <div class="grid lg:grid-cols-2 gap-12 items-center">
+        <div>
+          <div class="inline-flex items-center gap-2 bg-[#c9a96e]/20 text-[#c9a96e] px-4 py-1.5 rounded-full text-sm font-semibold mb-6">
+            <span>🏡</span> {isEl ? 'Για Ιδιοκτήτες Ακινήτων' : isBg ? 'За Собственици на Имоти' : isSr ? 'За Власнике Некретнина' : isTr ? 'Mülk Sahipleri İçin' : isRo ? 'Pentru Proprietarii de Imobile' : 'For Property Owners'}
+          </div>
+          <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-6">
+            {isEl ? 'Κερδίστε Περισσότερα από' : isBg ? 'Спечелете Повече от' : isSr ? 'Зарадите Више од' : isTr ? 'Daha Fazla Kazanın' : isRo ? 'Câștigați Mai Mult din' : 'Earn More from'}<br/>{isEl ? 'το Ακίνητό σας' : isBg ? 'Вашия Имот' : isSr ? 'Ваше Некретнине' : isTr ? 'Mülkünüzden' : isRo ? 'Proprietatea Dvs.' : 'Your Property'}<br/>
+            <span class="text-[#c9a96e]">{isEl ? 'στην Καβάλα' : isBg ? 'в Kefalonia' : isSr ? 'у Кавали' : isTr ? "Kefalonia'da" : isRo ? 'în Kefalonia' : 'in Kefalonia'}</span>
+          </h1>
+          <p class="text-gray-300 text-xl leading-relaxed mb-8 max-w-lg">
+            {isEl ? 'Οι επισκέπτες πληρώνουν ασφαλώς μέσω της πλατφόρμας μας — εσείς λαμβάνετε το μερίδιό σας μετά από κάθε επιβεβαιωμένη παραμονή. Απλώς 5% προμήθεια — χωρίς κρυφές χρεώσεις, χωρίς έξοδα OTA.' : isBg ? 'Гостите плащат сигурно чрез нашата платформа — вие получавате дела си след всяко потвърдено настаняване. Само 5% комисионна — без скрити такси, без разходи за OTA.' : isSr ? 'Гости плаћају безбедно преко наше платформе — ви добијате свој удео после сваког потврђеног боравка. Само 5% провизија — без скривених накнада, без трошкова OTA.' : isTr ? 'Misafirler platformumuz üzerinden güvenle ödeme yapar — her onaylı konaklamadan sonra payınızı alırsınız. Yalnızca %5 komisyon — gizli ücret yok, OTA maliyeti yok.' : isRo ? 'Oaspeții plătesc în siguranță prin platforma noastră — primiți partea dvs. după fiecare sejur confirmat. Doar 5% comision — fără taxe ascunse, fără costuri OTA.' : 'Guests pay securely through our platform — you receive your share after each confirmed stay. Just 5% commission — no hidden fees, no OTA costs.'}
+          </p>
+          <div class="flex flex-col sm:flex-row gap-4">
+            <a href="/list-your-property"
+              class="inline-flex items-center justify-center gap-2 bg-[#c9a96e] text-white font-bold px-8 py-4 rounded-2xl text-lg hover:bg-[#b8935d] transition-colors">
+              {isEl ? 'Ξεκινήστε Δωρεάν →' : isBg ? 'Започнете безплатно →' : isSr ? 'Почните бесплатно →' : isTr ? 'Ücretsiz Başlayın →' : isRo ? 'Începeți Gratuit →' : 'Get Started Free →'}
+            </a>
+            <a href="/contact"
+              class="inline-flex items-center justify-center gap-2 bg-white/10 text-white font-semibold px-8 py-4 rounded-2xl text-lg hover:bg-white/20 transition-colors">
+              {isEl ? 'Μιλήστε μαζί μας' : isBg ? 'Говорете с нас' : isSr ? 'Разговарајте са нама' : isTr ? 'Bizimle Konuşun' : isRo ? 'Vorbiți cu Noi' : 'Talk to Us'}
+            </a>
+          </div>
+        </div>
+        <div class="hidden lg:block">
+          <div class="bg-white/5 backdrop-blur-sm border border-white/10 rounded-3xl p-8 space-y-6">
+            <div class="flex items-start gap-4">
+              <div class="w-12 h-12 rounded-2xl bg-[#c9a96e]/20 flex items-center justify-center shrink-0 text-2xl">💶</div>
+              <div>
+                <p class="font-semibold text-lg">{isEl ? 'Υψηλότερα ποσοστά πληρότητας' : isBg ? 'По-висока заетост' : isSr ? 'Већа попуњеност' : isTr ? 'Daha yüksek doluluk oranları' : isRo ? 'Rate de ocupare mai mari' : 'Higher occupancy rates'}</p>
+                <p class="text-gray-400 text-sm mt-1">{isEl ? 'Η πλατφόρμα απευθείας κρατήσεων μας προσελκύει επισκέπτες που παρακάμπτουν τα τέλη πλατφόρμας — σημαίνει καλύτερη αξία και για εσάς και για αυτούς.' : isBg ? 'Нашата платформа за директни резервации привлича гости, които избягват таксите на платформите — по-добра стойност и за вас, и за тях.' : isSr ? 'Наша платформа за директне резервације привлачи госте који избегавају накнаде платформи — боља вредност и за вас и за њих.' : isTr ? 'Doğrudan rezervasyon platformumuz, platform ücretlerini atlayan misafirleri çeker — hem sizin hem onların lehine daha iyi değer.' : isRo ? 'Platforma noastră de rezervare directă atrage oaspeți care evită taxele de platformă — valoare mai bună atât pentru dvs., cât și pentru ei.' : 'Our direct-booking platform attracts guests who bypass platform fees — meaning better value for both you and them.'}</p>
+              </div>
+            </div>
+            <div class="flex items-start gap-4">
+              <div class="w-12 h-12 rounded-2xl bg-[#c9a96e]/20 flex items-center justify-center shrink-0 text-2xl">📱</div>
+              <div>
+                <p class="font-semibold text-lg">{isEl ? 'Πύλη ιδιοκτήτη συμπεριλαμβάνεται' : isBg ? 'Портал за собственика е включен' : isSr ? 'Портал за власнике је укључен' : isTr ? 'Mülk sahibi portalı dahil' : isRo ? 'Portal proprietar inclus' : 'Owner portal included'}</p>
+                <p class="text-gray-400 text-sm mt-1">{isEl ? 'Παρακολουθήστε κρατήσεις, δείτε έσοδα, διαχειριστείτε διαθεσιμότητα και επικοινωνήστε με επισκέπτες από έναν απλό πίνακα ελέγχου.' : isBg ? 'Проследявайте резервации, виждайте приходи, управлявайте наличността и комуникирайте с гости от едно лесно табло.' : isSr ? 'Пратите резервације, прегледајте приходе, управљајте доступношћу и дописујте се са гостима саједне контролне табле.' : isTr ? 'Rezervasyonları takip edin, gelirleri görüntüleyin, müsaitliği yönetin ve misafirlerle tek bir basit kontrol panelinden mesajlaşın.' : isRo ? 'Urmăriți rezervările, vizualizați câștigurile, gestionați disponibilitatea și comunicați cu oaspeții dintr-un singur panou simplu.' : 'Track bookings, view earnings, manage availability, and message guests from one simple dashboard.'}</p>
+              </div>
+            </div>
+            <div class="flex items-start gap-4">
+              <div class="w-12 h-12 rounded-2xl bg-[#c9a96e]/20 flex items-center justify-center shrink-0 text-2xl">🧹</div>
+              <div>
+                <p class="font-semibold text-lg">{isEl ? 'Καθαρισμός κατ\' απαίτηση' : isBg ? 'Почистване при поискване' : isSr ? 'Чишћење на захтев' : isTr ? 'Talep üzerine temizlik' : isRo ? 'Curățenie la cerere' : 'Cleaning on demand'}</p>
+                <p class="text-gray-400 text-sm mt-1">{isEl ? 'Η επαληθευμένη ομάδα καθαρισμού μας είναι ένα tap μακριά. Συντονίστε καθαρισμούς changeover χωρίς να σηκώσετε το τηλέφωνο.' : isBg ? 'Нашият проверен екип за почистване е на едно докосване. Организирайте почиствания при смяна на гости, без да вдигате телефона.' : isSr ? 'Наш проверени тим за чишћење је на један додир. Координирајте чишћења при промени гостију без подизања телефона.' : isTr ? 'Denetlenmiş temizlik ekibimiz bir dokunuş uzağınızda. Telefonu kaldırmadan geçiş temizliklerini koordine edin.' : isRo ? 'Echipa noastră verificată de curățenie este la o atingere distanță. Coordonați curățeniile de schimb fără să ridicați telefonul.' : 'Our vetted cleaning team is one tap away. Coordinate changeover cleans without picking up the phone.'}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Stats bar -->
+  <section class="bg-[#c9a96e] text-white">
+    <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-8 text-center">
+        {[
+          { value: '0%', label: isEl ? 'Τέλος καταχώρισης' : isBg ? 'Такса за регистрация' : isSr ? 'Накнада за листање' : isTr ? 'Listeleme ücreti' : isRo ? 'Taxă de listare' : 'Listing fee' },
+          { value: '24h', label: isEl ? 'Μέσος χρόνος απάντησης' : isBg ? 'Средно време за отговор' : isSr ? 'Просечно време одговора' : isTr ? 'Ort. yanıt süresi' : isRo ? 'Timp mediu de răspuns' : 'Avg. response time' },
+          { value: '100%', label: isEl ? 'Ασφαλείς πληρωμές' : isBg ? 'Сигурни плащания' : isSr ? 'Безбедне уплате' : isTr ? 'Güvenli ödemeler' : isRo ? 'Plăți securizate' : 'Secure payments' },
+          { value: '5%', label: isEl ? 'Μόνο προμήθεια' : isBg ? 'Само комисионна' : isSr ? 'Само провизија' : isTr ? 'Yalnızca komisyon' : isRo ? 'Doar comision' : 'Commission only' },
+        ].map((s) => (
+          <div>
+            <p class="text-3xl font-bold">{s.value}</p>
+            <p class="text-sm font-medium opacity-80 mt-1">{s.label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <div class="text-center mb-14">
+      <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-widest mb-3">{isEl ? 'Απλή διαδικασία' : isBg ? 'Опростен процес' : isSr ? 'Једноставан процес' : isTr ? 'Basit süreç' : isRo ? 'Proces simplu' : 'Simple process'}</p>
+      <h2 class="text-3xl sm:text-4xl font-bold text-gray-900">{isEl ? 'Πώς λειτουργεί' : isBg ? 'Как работи' : isSr ? 'Kako то функционише' : isTr ? 'Nasıl çalışır' : isRo ? 'Cum funcționează' : 'How it works'}</h2>
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
+      {[
+        {
+          step: '1',
+          icon: '📋',
+          title: isEl ? 'Υποβάλετε την καταχώρισή σας' : isBg ? 'Подайте своята обява' : isSr ? 'Пошаљите свој оглас' : isTr ? 'İlanınızı gönderin' : isRo ? 'Trimiteți anunțul' : 'Submit your listing',
+          desc: isEl ? 'Συμπληρώστε τα στοιχεία του ακινήτου σας, ανεβάστε φωτογραφίες και ορίστε τη νυχτερινή τιμή σας — διαρκεί περίπου 10 λεπτά.' : isBg ? 'Попълнете данните за имота си, качете снимки и задайте нощната си цена — отнема около 10 минути.' : isSr ? 'Попуните податке о некретнини, поставите фотографије и одредите ноћну цену — траје oko 10 минута.' : isTr ? 'Mülk bilgilerinizi doldurun, fotoğraf yükleyin ve gecelik fiyatınızı belirleyin — yaklaşık 10 dakika sürer.' : isRo ? 'Completați detaliile proprietății, încărcați fotografii și stabiliți tariful pe noapte — durează aproximativ 10 minute.' : 'Fill in your property details, upload photos, and set your nightly rate — takes about 10 minutes.',
+        },
+        {
+          step: '2',
+          icon: '✅',
+          title: isEl ? 'Αξιολογούμε & δημοσιεύουμε' : isBg ? 'Преглеждаме и публикуваме' : isSr ? 'Прегледамо и објављујемо' : isTr ? 'İnceleyip yayınlıyoruz' : isRo ? 'Verificăm și publicăm' : 'We review & publish',
+          desc: isEl ? 'Η ομάδα μας αξιολογεί την καταχώρισή σας και την ενεργοποιεί στην πλατφόρμα μας και τα κανάλια SEO εντός 24 ωρών.' : isBg ? 'Нашият екип преглежда обявата ви и я активира в нашата платформа и SEO канали в рамките на 24 часа.' : isSr ? 'Наш тим прегледа ваш оглас и активира га на нашој платформи и SEO каналима у року од 24 сата.' : isTr ? 'Ekibimiz ilanınızı inceler ve 24 saat içinde platformumuzda ve SEO kanallarımızda yayınlar.' : isRo ? 'Echipa noastră verifică anunțul dvs. și îl activează pe platforma noastră și canalele SEO în 24 de ore.' : 'Our team reviews your listing and activates it across our platform and SEO channels within 24 hours.',
+        },
+        {
+          step: '3',
+          icon: '📅',
+          title: isEl ? 'Επισκέπτες κάνουν κράτηση απευθείας' : isBg ? 'Гостите резервират директно' : isSr ? 'Гости директно резервишу' : isTr ? 'Misafirler doğrudan rezervasyon yapar' : isRo ? 'Oaspeții rezervă direct' : 'Guests book directly',
+          desc: isEl ? 'Οι ταξιδιώτες ανακαλύπτουν και κάνουν κράτηση στο ακίνητό σας χωρίς να πληρώνουν τέλη OTA — κρατάτε περισσότερα.' : isBg ? 'Пътниците намират и резервират имота ви без да плащат такси на OTA платформи — вие запазвате повече.' : isSr ? 'Путници откривају и резервишу вашу некретнину без плаћања накнада OTA платформи — ви задржавате више.' : isTr ? 'Gezginler mülkünüzü keşfeder ve OTA platform ücreti ödemeden rezervasyon yapar — siz daha fazlasını alırsınız.' : isRo ? 'Călătorii descoperă și rezervă proprietatea dvs. fără a plăti taxe de platformă OTA — dvs. păstrați mai mult.' : 'Travellers discover and book your property without paying OTA platform fees — you keep more.',
+        },
+        {
+          step: '4',
+          icon: '💶',
+          title: isEl ? 'Πληρώνεστε' : isBg ? 'Получавате плащането' : isSr ? 'Добијате плаћање' : isTr ? 'Ödemenizi alırsınız' : isRo ? 'Primiți plata' : 'You get paid',
+          desc: isEl ? 'Οι πληρωμές επεξεργάζονται με ασφάλεια. Τα έσοδα μεταφέρονται στον λογαριασμό σας μετά από κάθε επιβεβαιωμένη διαμονή.' : isBg ? 'Плащанията се обработват сигурно. Приходите се превеждат по сметката ви след всяко потвърдено настаняване.' : isSr ? 'Плаћања се обрађују безбедно. Приходи се преносе на ваш рачун после сваког потврђеног боравка.' : isTr ? 'Ödemeler güvenli şekilde işlenir. Kazançlar her onaylı konaklamadan sonra hesabınıza aktarılır.' : isRo ? 'Plățile sunt procesate în siguranță. Câștigurile sunt transferate în contul dvs. după fiecare sejur confirmat.' : 'Payments are processed securely. Earnings are transferred to your account after each confirmed stay.',
+        },
+      ].map((item) => (
+        <div class="relative">
+          <div class="bg-white border border-gray-100 rounded-2xl p-6 h-full hover:shadow-md transition-shadow">
+            <div class="w-10 h-10 bg-[#1a1a2e] text-white rounded-xl flex items-center justify-center text-sm font-bold mb-4">
+              {item.step}
+            </div>
+            <div class="text-3xl mb-3">{item.icon}</div>
+            <h3 class="font-bold text-gray-900 text-lg mb-2">{item.title}</h3>
+            <p class="text-gray-500 text-sm leading-relaxed">{item.desc}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <!-- Benefits -->
+  <section class="bg-gray-50 border-y border-gray-100 py-20 px-4">
+    <div class="max-w-6xl mx-auto">
+      <div class="text-center mb-14">
+        <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-widest mb-3">{isEl ? 'Γιατί να μας επιλέξετε' : isBg ? 'Защо да ни изберете' : isSr ? 'Зашто нас изабрати' : isTr ? 'Neden bizi seçmelisiniz' : isRo ? 'De ce să ne alegeți' : 'Why choose us'}</p>
+        <h2 class="text-3xl sm:text-4xl font-bold text-gray-900">{isEl ? 'Όλα συμπεριλαμβάνονται' : isBg ? 'Всичко е включено' : isSr ? 'Све је укључено' : isTr ? 'Her şey dahil' : isRo ? 'Totul inclus' : 'Everything included'}</h2>
+      </div>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        {[
+          {
+            icon: '🌐',
+            title: isEl ? 'Καταχωρίσεις βελτιστοποιημένες για SEO' : isBg ? 'Обяви, оптимизирани за SEO' : isSr ? 'Огласи оптимизовани за SEO' : isTr ? 'SEO optimize edilmiş ilanlar' : isRo ? 'Anunțuri optimizate SEO' : 'SEO-optimised listings',
+            desc: isEl ? 'Το ακίνητό σας εμφανίζεται στα αποτελέσματα αναζήτησης Google, οδηγούς περιοχών και σελίδες τοποθεσιών — δωρεάν οργανική ορατότητα.' : isBg ? 'Имотът ви се появява в резултатите от търсенето в Google, наръчниците за района и страниците с локации — безплатна органична видимост.' : isSr ? 'Ваша некретнина се појављује у Google резултатима претраге, водичима за подручје и страницама локација — бесплатна органска видљивост.' : isTr ? 'Mülkünüz Google arama sonuçlarında, bölge rehberlerinde ve konum sayfalarında görünür — ücretsiz organik görünürlük.' : isRo ? 'Proprietatea dvs. apare în rezultatele de căutare Google, ghidurile zonei și paginile de locații — vizibilitate organică gratuită.' : 'Your property appears in Google search results, area guides, and location pages — free organic visibility.',
+          },
+          {
+            icon: '💬',
+            title: isEl ? 'Επικοινωνία με επισκέπτες' : isBg ? 'Комуникация с гостите' : isSr ? 'Комуникација са гостима' : isTr ? 'Misafir iletişimi' : isRo ? 'Comunicare cu oaspeții' : 'Guest communication',
+            desc: isEl ? 'Χειριζόμαστε ερωτήματα, οδηγίες check-in και υποστήριξη ώστε να μην χάνετε ποτέ κράτηση.' : isBg ? 'Обработваме запитвания, инструкции за настаняване и поддръжка, за да не пропускате никога резервация.' : isSr ? 'Обрађујемо упите, упутства за пријаву и подршку тако да никада не пропустите резервацију.' : isTr ? 'Sorguları, check-in talimatlarını ve desteği biz hallederiz, böylece hiçbir rezervasyonu kaçırmazsınız.' : isRo ? 'Ne ocupăm de solicitări, instrucțiuni de check-in și asistență, astfel încât să nu pierdeți nicio rezervare.' : 'We handle enquiries, check-in instructions, and support so you never miss a booking.',
+          },
+          {
+            icon: '🔐',
+            title: isEl ? 'Ασφαλής διαχείριση εγγύησης' : isBg ? 'Сигурно управление на депозита' : isSr ? 'Безбедно управљање депозитом' : isTr ? 'Güvenli depozito yönetimi' : isRo ? 'Gestionare securizată a depozitului' : 'Secure deposit handling',
+            desc: isEl ? 'Οι εγγυήσεις ζημιών κρατούνται και αποδεσμεύονται αυτόματα. Το ακίνητό σας προστατεύεται πάντα.' : isBg ? 'Депозитите за щети се задържат и освобождават автоматично. Имотът ви е винаги защитен.' : isSr ? 'Депозити за штету се задржавају и аутоматски ослобађају. Ваша некретнина је увек заштићена.' : isTr ? 'Hasar depozitoları otomatik olarak tutulur ve serbest bırakılır. Mülkünüz her zaman korumalıdır.' : isRo ? 'Depozitele pentru daune sunt reținute și eliberate automat. Proprietatea dvs. este întotdeauna protejată.' : 'Damage deposits are held and released automatically. Your property is always protected.',
+          },
+          {
+            icon: '📊',
+            title: isEl ? 'Πίνακας ελέγχου ιδιοκτήτη' : isBg ? 'Табло на собственика' : isSr ? 'Контролна табла власника' : isTr ? 'Mülk sahibi kontrol paneli' : isRo ? 'Panou de control proprietar' : 'Owner dashboard',
+            desc: isEl ? 'Προβολή σε πραγματικό χρόνο επερχόμενων κρατήσεων, εσόδων και κριτικών. Δεν χρειάζονται λογιστικά φύλλα.' : isBg ? 'Преглед в реално време на предстоящи резервации, приходи и отзиви. Без електронни таблици.' : isSr ? 'Приказ у реалном времену предстојећих резервација, прихода и рецензија. Нису потребне табеле.' : isTr ? 'Yaklaşan rezervasyonların, kazançların ve yorumların gerçek zamanlı görünümü. Elektronik tablo gerekmez.' : isRo ? 'Vizualizare în timp real a rezervărilor viitoare, câștigurilor și recenziilor. Fără foi de calcul.' : 'Real-time view of upcoming bookings, earnings, and reviews. No spreadsheets needed.',
+          },
+          {
+            icon: '🧹',
+            title: isEl ? 'Αγορά καθαρισμού' : isBg ? 'Платформа за почистване' : isSr ? 'Платформа за чишћење' : isTr ? 'Temizlik pazarı' : isRo ? 'Piață de curățenie' : 'Cleaning marketplace',
+            desc: isEl ? 'Αποκτήστε πρόσβαση στους επαληθευμένους επαγγελματίες καθαρισμού μας και προγραμματίστε changeovers με ένα κλικ.' : isBg ? 'Получете достъп до нашите проверени специалисти по почистване и планирайте смени с едно кликване.' : isSr ? 'Приступите нашим провереним стручњацима за чишћење и закажите измене са једним кликом.' : isTr ? 'Doğrulanmış temizlik profesyonellerimize erişin ve değişimleri tek tıkla planlayın.' : isRo ? 'Accesați profesioniștii noștri verificați în curățenie și programați schimburile cu un singur clic.' : 'Access our verified cleaning professionals and schedule changeovers with one click.',
+          },
+          {
+            icon: '📣',
+            title: isEl ? 'Μάρκετινγκ & προωθητικές ενέργειες' : isBg ? 'Маркетинг и промоции' : isSr ? 'Маркетинг и промоције' : isTr ? 'Pazarlama ve promosyonlar' : isRo ? 'Marketing și promoții' : 'Marketing & promotions',
+            desc: isEl ? 'Προβεβλημένες τοποθετήσεις, εποχιακές καμπάνιες και προώθηση μέσω κοινωνικών δικτύων χωρίς επιπλέον κόστος.' : isBg ? 'Featured позиции, сезонни кампании и промоция в социалните мрежи без допълнителни разходи.' : isSr ? 'Истакнута места, сезонске кампање и промоција на друштвеним мрежама без додатних трошкова.' : isTr ? 'Öne çıkan yerleştirmeler, sezonluk kampanyalar ve ek maliyet olmadan sosyal medya tanıtımı.' : isRo ? 'Plasări recomandate, campanii sezoniere și promovare pe rețelele sociale fără costuri suplimentare.' : 'Featured placements, seasonal campaigns, and social media promotion at no extra cost.',
+          },
+        ].map((b) => (
+          <div class="bg-white rounded-2xl border border-gray-100 p-6 hover:shadow-md transition-shadow">
+            <div class="text-3xl mb-3">{b.icon}</div>
+            <h3 class="font-bold text-gray-900 mb-2">{b.title}</h3>
+            <p class="text-gray-500 text-sm leading-relaxed">{b.desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Subscription Plans -->
+  <section class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <div class="text-center mb-12">
+      <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-widest mb-3">{isEl ? 'Τιμολόγηση' : isBg ? 'Ценообразуване' : isSr ? 'Одређивање цена' : isTr ? 'Fiyatlandırma' : isRo ? 'Prețuri' : 'Pricing'}</p>
+      <h2 class="text-3xl sm:text-4xl font-bold text-gray-900">
+        {isEl ? 'Δύο πλάνα. Και τα δύο δωρεάν για καταχώριση.' : isBg ? 'Два плана. И двата безплатни за регистрация.' : isSr ? 'Два плана. Оба бесплатна за оглашавање.' : isTr ? 'İki plan. Her ikisi de listeleme için ücretsiz.' : isRo ? 'Două planuri. Ambele gratuite pentru listare.' : 'Two plans. Both free to list.'}
+      </h2>
+      <p class="text-gray-500 mt-3 max-w-xl mx-auto">
+        {isEl ? 'Ξεκινήστε δωρεάν και αναβαθμίστε αν θέλετε να μιλάτε απευθείας με επισκέπτες.' : isBg ? 'Започнете безплатно и надстройте, ако искате да говорите директно с гости.' : isSr ? 'Почните бесплатно и надоградите ако желите да разговарате директно са гостима.' : isTr ? 'Ücretsiz başlayın ve misafirlerle doğrudan konuşmak istiyorsanız yükseltin.' : isRo ? 'Începeți gratuit și faceți upgrade dacă doriți să vorbiți direct cu oaspeții.' : 'Start free and upgrade if you want to speak directly with guests.'}
+      </p>
+    </div>
+    <div class="grid sm:grid-cols-2 gap-8 max-w-3xl mx-auto">
+      <!-- Free plan -->
+      <div class="bg-white border border-gray-200 rounded-3xl p-8 flex flex-col">
+        <div class="mb-6">
+          <p class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-2">{isEl ? 'Βασικό' : isBg ? 'Безплатен' : isSr ? 'Бесплатно' : isTr ? 'Ücretsiz' : isRo ? 'Gratuit' : 'Free'}</p>
+          <p class="text-4xl font-bold text-gray-900">€0 <span class="text-lg font-normal text-gray-400">/ {isEl ? 'έτος' : isBg ? 'година' : isSr ? 'годишно' : isTr ? 'yıl' : isRo ? 'an' : 'year'}</span></p>
+        </div>
+        <ul class="space-y-3 mb-8 flex-1">
+          {[
+            isEl ? '5% προμήθεια ανά κράτηση' : isBg ? '5% комисионна на резервация' : isSr ? '5% провизија по резервацији' : isTr ? 'Rezervasyon başına %5 komisyon' : isRo ? '5% comision per rezervare' : '5% commission per booking',
+            isEl ? 'Πλήρης καταχώριση & SEO' : isBg ? 'Пълна обява и SEO' : isSr ? 'Потпун оглас и SEO' : isTr ? 'Tam listeleme ve SEO' : isRo ? 'Anunț complet și SEO' : 'Full listing & SEO',
+            isEl ? 'Πύλη ιδιοκτήτη' : isBg ? 'Портал за собственика' : isSr ? 'Портал за власнике' : isTr ? 'Mülk sahibi portalı' : isRo ? 'Portal proprietar' : 'Owner portal',
+            isEl ? 'Κρατήσεις μέσω inquiry' : isBg ? 'Резервации чрез запитване' : isSr ? 'Резервације путем упита' : isTr ? 'Sorgulama yoluyla rezervasyon' : isRo ? 'Rezervări prin solicitare' : 'Bookings via inquiry',
+          ].map((f) => (
+            <li class="flex items-start gap-2 text-sm text-gray-700">
+              <span class="text-emerald-500 mt-0.5">✓</span> {f}
+            </li>
+          ))}
+        </ul>
+        <a href="/list-your-property"
+          class="block text-center bg-gray-100 text-gray-900 font-semibold px-6 py-3 rounded-xl hover:bg-gray-200 transition-colors text-sm">
+          {isEl ? 'Ξεκινήστε δωρεάν →' : isBg ? 'Започнете безплатно →' : isSr ? 'Почните бесплатно →' : isTr ? 'Ücretsiz başlayın →' : isRo ? 'Începeți gratuit →' : 'Get started free →'}
+        </a>
+      </div>
+      <!-- Direct Contact plan -->
+      <div class="bg-[#1a1a2e] text-white rounded-3xl p-8 flex flex-col relative overflow-hidden">
+        <div class="absolute top-4 right-4">
+          <span class="bg-[#c9a96e] text-white text-xs font-bold px-3 py-1 rounded-full">{isEl ? 'Δημοφιλές' : isBg ? 'Популярен' : isSr ? 'Популарно' : isTr ? 'Popüler' : isRo ? 'Popular' : 'Popular'}</span>
+        </div>
+        <div class="mb-6">
+          <p class="text-sm font-semibold text-[#c9a96e] uppercase tracking-wide mb-2">{isEl ? 'Άμεση Επαφή' : isBg ? 'Директен Контакт' : isSr ? 'Директни Контакт' : isTr ? 'Doğrudan İletişim' : isRo ? 'Contact Direct' : 'Direct Contact'}</p>
+          <p class="text-4xl font-bold">€299 <span class="text-lg font-normal text-white/50">/ {isEl ? 'έτος' : isBg ? 'година' : isSr ? 'годишно' : isTr ? 'yıl' : isRo ? 'an' : 'year'}</span></p>
+        </div>
+        <ul class="space-y-3 mb-8 flex-1">
+          {[
+            isEl ? '3% προμήθεια ανά κράτηση' : isBg ? '3% комисионна на резервация' : isSr ? '3% провизија по резервацији' : isTr ? 'Rezervasyon başına %3 komisyon' : isRo ? '3% comision per rezervare' : '3% commission per booking',
+            isEl ? 'Κουμπί WhatsApp / Viber στην καταχώριση' : isBg ? 'Бутон WhatsApp / Viber в обявата' : isSr ? 'WhatsApp / Viber дугме у огласу' : isTr ? 'İlanda WhatsApp / Viber butonu' : isRo ? 'Buton WhatsApp / Viber pe anunț' : 'WhatsApp / Viber button on listing',
+            isEl ? 'Άμεση επικοινωνία επισκέπτη–ιδιοκτήτη' : isBg ? 'Директна комуникация гост–собственик' : isSr ? 'Директна комуникација гост–власник' : isTr ? 'Doğrudan misafir-sahip iletişimi' : isRo ? 'Comunicare directă oaspete–proprietar' : 'Direct guest–owner communication',
+            isEl ? 'Όλα τα οφέλη του Βασικού πλάνου' : isBg ? 'Всички предимства на безплатния план' : isSr ? 'Све погодности Бесплатног плана' : isTr ? 'Ücretsiz planın tüm faydaları' : isRo ? 'Toate beneficiile planului Gratuit' : 'All Free plan benefits',
+            isEl ? 'Αυτόματη ανανέωση — ακυρώστε ανά πάσα στιγμή' : isBg ? 'Автоматично подновяване — отменете по всяко време' : isSr ? 'Аутоматска обнова — откажите у свако доба' : isTr ? 'Otomatik yenileme — istediğiniz zaman iptal edin' : isRo ? 'Reînnoire automată — anulați oricând' : 'Auto-renews — cancel any time',
+          ].map((f) => (
+            <li class="flex items-start gap-2 text-sm text-white/90">
+              <span class="text-[#c9a96e] mt-0.5">✓</span> {f}
+            </li>
+          ))}
+        </ul>
+        <a href="/list-your-property"
+          class="block text-center bg-[#c9a96e] text-white font-bold px-6 py-3 rounded-xl hover:bg-[#b8935d] transition-colors text-sm">
+          {isEl ? 'Εγγραφή & Συνδρομή →' : isBg ? 'Регистрирайте се и абонирайте →' : isSr ? 'Региструјте се и претплатите →' : isTr ? 'Kayıt ol ve abone ol →' : isRo ? 'Înregistrați-vă și abonați-vă →' : 'Sign up & subscribe →'}
+        </a>
+      </div>
+    </div>
+    <p class="text-center text-xs text-gray-400 mt-6">
+      {isEl ? 'Η συνδρομή ενεργοποιείται άμεσα. Αν η συνδρομή λήξει, το κουμπί άμεσης επαφής απενεργοποιείται αυτόματα.' : isBg ? 'Абонаментът се активира незабавно. Ако абонаментът изтече, бутонът за директен контакт се деактивира автоматично.' : isSr ? 'Претплата се активира одмах. Ако претплата истекне, дугме за директни контакт се аутоматски деактивира.' : isTr ? 'Abonelik anında etkinleşir. Abonelik sona ererse doğrudan iletişim butonu otomatik olarak devre dışı kalır.' : isRo ? 'Abonamentul se activează instant. Dacă expiră, butonul de contact direct este dezactivat automat.' : 'Subscription activates instantly. If it expires, the direct contact button is automatically disabled.'}
+    </p>
+  </section>
+
+  <!-- FAQ -->
+  <section class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <div class="text-center mb-12">
+      <p class="text-[#c9a96e] font-semibold text-sm uppercase tracking-widest mb-3">{isEl ? 'Συχνές Ερωτήσεις' : isBg ? 'Често задавани въпроси' : isSr ? 'Честа питања' : isTr ? 'SSS' : isRo ? 'Întrebări frecvente' : 'FAQ'}</p>
+      <h2 class="text-3xl font-bold text-gray-900">{isEl ? 'Κοινές ερωτήσεις' : isBg ? 'Общи въпроси' : isSr ? 'Уобичајена питања' : isTr ? 'Sık sorulan sorular' : isRo ? 'Întrebări frecvente' : 'Common questions'}</h2>
+    </div>
+    <div class="space-y-4" id="faq">
+      {[
+        {
+          q: isEl ? 'Πόσο κοστίζει η καταχώριση του ακινήτου μου;' : isBg ? 'Колко струва регистрирането на имота ми?' : isSr ? 'Колико кошта оглашавање моје некретнине?' : isTr ? 'Mülkümü listelemek ne kadara mal olur?' : isRo ? 'Cât costă să listez proprietatea mea?' : 'How much does it cost to list my property?',
+          a: isEl ? 'Η καταχώριση είναι εντελώς δωρεάν. Παίρνουμε 5% προμήθεια μόνο σε επιβεβαιωμένες κρατήσεις — χωρίς προκαταβολικά τέλη, χωρίς μηνιαίες συνδρομές. Με τη συνδρομή Άμεσης Επαφής (€299/έτος) η προμήθεια μειώνεται στο 3%.' : isBg ? 'Регистрацията е напълно безплатна. Вземаме 5% комисионна само от потвърдени резервации — без авансови такси, без месечни абонаменти. С абонамента за Директен Контакт (€299/год.) комисионната спада до 3%.' : isSr ? 'Оглашавање је потпуно бесплатно. Узимамо 5% провизије само на потврђене резервације — без накнада унапред, без месечних претплата. Са претплатом за Директни Контакт (€299/год.) провизија пада на 3%.' : isTr ? 'Listeleme tamamen ücretsizdir. Yalnızca onaylı rezervasyonlardan %5 komisyon alırız — peşin ücret yok, aylık abonelik yok. Doğrudan İletişim aboneliğiyle (€299/yıl) komisyon %3\'e düşer.' : isRo ? 'Listarea este complet gratuită. Percepem un comision de 5% doar la rezervările confirmate — fără taxe în avans, fără abonamente lunare. Cu abonamentul Contact Direct (€299/an), comisionul scade la 3%.' : 'Listing is completely free. We take a 5% commission only on confirmed bookings — no upfront fees, no monthly subscriptions. With the Direct Contact subscription (€299/year), commission drops to 3%.',
+        },
+        {
+          q: isEl ? 'Χρειάζεται να διαχειριστώ το δικό μου ημερολόγιο;' : isBg ? 'Трябва ли сам да управлявам календара си?' : isSr ? 'Да ли треба да управљам сопственим календаром?' : isTr ? 'Kendi takvimdimi yönetmem gerekiyor mu?' : isRo ? 'Trebuie să îmi gestionez propriul calendar?' : 'Do I need to manage my own calendar?',
+          a: isEl ? 'Η πύλη ιδιοκτήτη σας εμφανίζει όλες τις κρατήσεις σε πραγματικό χρόνο. Μπορείτε να μπλοκάρετε ημερομηνίες, να ρυθμίζετε τη διαθεσιμότητα και να βλέπετε επερχόμενες διαμονές με μια ματιά.' : isBg ? 'Порталът ви за собственика показва всички резервации в реално време. Можете да блокирате дати, да регулирате наличността и да виждате предстоящи престои с един поглед.' : isSr ? 'Ваш портал за власнике приказује све резервације у реалном времену. Можете да блокирате датуме, подешавате доступност и прегледате предстојеће боравке одједном.' : isTr ? 'Mülk sahibi portalınız tüm rezervasyonları gerçek zamanlı gösterir. Tarihleri engelleyebilir, müsaitliği ayarlayabilir ve yaklaşan konaklamaları tek bakışta görebilirsiniz.' : isRo ? 'Portalul dvs. de proprietar arată toate rezervările în timp real. Puteți bloca date, ajusta disponibilitatea și vedea sejururile viitoare dintr-o privire.' : 'Your owner portal shows all bookings in real time. You can block dates, adjust availability, and see upcoming stays at a glance.',
+        },
+        {
+          q: isEl ? 'Πώς αξιολογούνται οι επισκέπτες;' : isBg ? 'Как се проверяват гостите?' : isSr ? 'Како се проверавају гости?' : isTr ? 'Misafirler nasıl denetleniyor?' : isRo ? 'Cum sunt verificați oaspeții?' : 'How are guests vetted?',
+          a: isEl ? 'Όλες οι κρατήσεις απαιτούν ταυτότητα και εγγύηση. Αξιολογούμε κάθε ερώτημα πριν επιβεβαιώσουμε, ώστε μόνο γνήσιοι ταξιδιώτες να μένουν στο ακίνητό σας.' : isBg ? 'Всички резервации изискват лична карта и депозит. Преглеждаме всяко запитване преди потвърждение, така че само истински пътници отсядат в имота ви.' : isSr ? 'Све резервације захтевају лични документ и депозит. Прегледамо сваки упит пре потврде, тако да само прави путници бораве у вашој некретнини.' : isTr ? 'Tüm rezervasyonlar kimlik doğrulama ve depozito gerektirir. Onaylamadan önce her sorguyu inceliyoruz, böylece yalnızca gerçek gezginler mülkünüzde kalıyor.' : isRo ? 'Toate rezervările necesită act de identitate și depozit. Verificăm fiecare solicitare înainte de confirmare, astfel încât doar călătorii autentici să stea la proprietatea dvs.' : 'All bookings require ID and a deposit. We review each inquiry before confirming, so only genuine travellers stay at your property.',
+        },
+        {
+          q: isEl ? 'Τι γίνεται με τον καθαρισμό και τη συντήρηση;' : isBg ? 'Как стои въпросът с почистването и поддръжката?' : isSr ? 'Шта је са чишћењем и одржавањем?' : isTr ? 'Temizlik ve bakım konusunda ne yapıyorsunuz?' : isRo ? 'Ce se întâmplă cu curățenia și întreținerea?' : 'What about cleaning and maintenance?',
+          a: isEl ? 'Η επαληθευμένη ομάδα καθαρισμού μας είναι διαθέσιμη κατ\' απαίτηση μέσω της πύλης ιδιοκτήτη σας. Προγραμματίστε έναν καθαρισμό changeover μετά από κάθε checkout — δεν χρειάζονται τηλεφωνήματα.' : isBg ? 'Нашият проверен екип за почистване е на разположение при поискване чрез портала ви за собственика. Планирайте почистване при смяна след всяко напускане — без телефонни обаждания.' : isSr ? 'Наш проверени тим за чишћење је доступан на захтев преко портала за власнике. Закажите чишћење при промени гостију после сваке одјаве — нису потребни телефонски позиви.' : isTr ? 'Denetlenmiş temizlik ekibimiz mülk sahibi portalınız üzerinden talep üzerine ulaşılabilir. Her çıkıştan sonra geçiş temizliği planlayın — telefon görüşmesine gerek yok.' : isRo ? 'Echipa noastră verificată de curățenie este disponibilă la cerere prin portalul dvs. de proprietar. Programați o curățenie de schimb după fiecare checkout — fără apeluri telefonice.' : 'Our vetted cleaning team is available on demand through your owner portal. Schedule a changeover clean after every checkout — no phone calls needed.',
+        },
+        {
+          q: isEl ? 'Μπορώ να χρησιμοποιώ ακόμα Airbnb ή Booking.com;' : isBg ? 'Мога ли да продължа да използвам Airbnb или Booking.com?' : isSr ? 'Могу ли и даље да користим Airbnb или Booking.com?' : isTr ? 'Hâlâ Airbnb veya Booking.com kullanabilir miyim?' : isRo ? 'Pot folosi în continuare Airbnb sau Booking.com?' : 'Can I still use Airbnb or Booking.com?',
+          a: isEl ? 'Απολύτως. Η καταχώριση μαζί μας δεν είναι αποκλειστική. Πολλοί ιδιοκτήτες μας χρησιμοποιούν παράλληλα με OTAs και αξιοποιούν το πλεονέκτημα απευθείας κράτησης για εξοικονόμηση τελών πλατφόρμας.' : isBg ? 'Разбира се. Регистрацията при нас не е изключителна. Много собственици ни използват заедно с OTA и се възползват от предимството на директните резервации за спестяване на такси.' : isSr ? 'Апсолутно. Оглашавање код нас није ексклузивно. Многи власници нас користе поред OTA платформи и искоришћавају предност директних резервација за уштеду на накнадама.' : isTr ? 'Kesinlikle. Bizimle listeleme özel değildir. Pek çok mülk sahibi bizi OTA\'larla birlikte kullanır ve platform ücretlerinden tasarruf etmek için doğrudan rezervasyon avantajımızdan yararlanır.' : isRo ? 'Absolut. Listarea cu noi nu este exclusivă. Mulți proprietari ne folosesc alături de OTA-uri și profită de avantajul nostru de rezervare directă pentru a economisi taxele de platformă.' : 'Absolutely. Listing with us is non-exclusive. Many owners use us alongside OTAs and use our direct-booking advantage to save on platform fees.',
+        },
+        {
+          q: isEl ? 'Τι είναι η συνδρομή Άμεσης Επαφής;' : isBg ? 'Какво е абонаментът за Директен Контакт?' : isSr ? 'Шта је претплата за Директни Контакт?' : isTr ? 'Doğrudan İletişim aboneliği nedir?' : isRo ? 'Ce este abonamentul Contact Direct?' : 'What is the Direct Contact subscription?',
+          a: isEl ? 'Για €299/έτος, ενεργοποιείτε ένα κουμπί WhatsApp/Viber στην καταχώρισή σας ώστε οι επισκέπτες να μπορούν να σας στείλουν μήνυμα απευθείας. Επίσης, η προμήθεια μειώνεται από 5% σε 3% σε όλες τις κρατήσεις. Η συνδρομή ανανεώνεται αυτόματα κάθε χρόνο και μπορείτε να την ακυρώσετε ανά πάσα στιγμή.' : isBg ? 'За €299/год. активирате бутон WhatsApp/Viber в обявата си, за да могат гостите да ви пишат директно. Освен това комисионната намалява от 5% на 3% за всички резервации. Абонаментът се подновява автоматично всяка година и може да се отмени по всяко време.' : isSr ? 'За €299/год. активирате дугме WhatsApp/Viber у огласу тако да гости могу директно да вам пишу. Такође, провизија пада са 5% на 3% за све резервације. Претплата се аутоматски обнавља сваке године и може се отказати у свако доба.' : isTr ? '€299/yıl karşılığında ilanınızda bir WhatsApp/Viber butonu etkinleştirir ve misafirlerin size doğrudan mesaj atmasını sağlarsınız. Ayrıca komisyon tüm rezervasyonlarda %5\'ten %3\'e düşer. Abonelik her yıl otomatik yenilenir ve istediğiniz zaman iptal edilebilir.' : isRo ? 'Pentru €299/an, activați un buton WhatsApp/Viber pe anunțul dvs., astfel încât oaspeții să vă poată trimite mesaje direct. Comisionul dvs. scade de la 5% la 3% la toate rezervările. Abonamentul se reînnoiește automat anual și poate fi anulat oricând.' : 'For €299/year, you activate a WhatsApp/Viber button on your listing so guests can message you directly. Your commission also drops from 5% to 3% on all bookings. The subscription auto-renews annually and can be cancelled any time.',
+        },
+      ].map((item) => (
+        <details class="bg-white border border-gray-100 rounded-2xl overflow-hidden group">
+          <summary class="flex items-center justify-between px-6 py-5 cursor-pointer font-semibold text-gray-900 hover:bg-gray-50 transition-colors list-none">
+            {item.q}
+            <span class="text-gray-400 text-xl group-open:rotate-45 transition-transform duration-200">+</span>
+          </summary>
+          <div class="px-6 pb-5 text-gray-600 text-sm leading-relaxed">{item.a}</div>
+        </details>
+      ))}
+    </div>
+  </section>
+
+  <!-- Final CTA -->
+  <section class="bg-[#1a1a2e] text-white py-20 px-4">
+    <div class="max-w-2xl mx-auto text-center">
+      <h2 class="text-3xl sm:text-4xl font-bold mb-4">{isEl ? 'Αρχίστε να κερδίζετε από το ακίνητό σας σήμερα' : isBg ? 'Започнете да печелите от имота си днес' : isSr ? 'Почните да зарађујете на својој некретнини данас' : isTr ? 'Bugün mülkünüzden kazanmaya başlayın' : isRo ? 'Începeți să câștigați din proprietatea dvs. astăzi' : 'Start earning from your property today'}</h2>
+      <p class="text-gray-300 text-lg mb-8">
+        {isEl ? 'Ενταχθείτε στους ιδιοκτήτες ακινήτων στην Καβάλα και το Κεραμωτί που μας εμπιστεύονται να γεμίσουμε τα ημερολόγιά τους.' : isBg ? 'Присъединете се към другите собственици на имоти в Кавала и Керамоти, които ни доверяват запълването на техните календари.' : isSr ? 'Придружите се власницима некретнина у Кавали и Керамотију који нам верују да попунимо њихове календаре.' : isTr ? "Kefalonia ve Keramoti'deki diğer mülk sahiplerine katılın; takvimlerini doldurmayı bize güveniyorlar." : isRo ? 'Alăturați-vă altor proprietari din Kefalonia și Keramoti care ne încredințează umplerea calendarelor lor.' : 'Join other property owners in Kefalonia and Keramoti who trust us to fill their calendars.'}
+      </p>
+      <div class="flex flex-col sm:flex-row gap-4 justify-center">
+        <a href="/list-your-property"
+          class="inline-flex items-center justify-center gap-2 bg-[#c9a96e] text-white font-bold px-8 py-4 rounded-2xl text-lg hover:bg-[#b8935d] transition-colors">
+          {isEl ? 'Καταχωρίστε το Ακίνητό μου →' : isBg ? 'Регистрирайте имота ми →' : isSr ? 'Листај моју некретнину →' : isTr ? 'Mülkümü Listele →' : isRo ? 'Listează Proprietatea Mea →' : 'List My Property →'}
+        </a>
+        <a href="/contact"
+          class="inline-flex items-center justify-center gap-2 bg-white/10 text-white font-semibold px-8 py-4 rounded-2xl text-lg hover:bg-white/20 transition-colors">
+          {isEl ? 'Κάντε μια Ερώτηση' : isBg ? 'Задайте въпрос' : isSr ? 'Поставите питање' : isTr ? 'Soru Sorun' : isRo ? 'Puneți o Întrebare' : 'Ask a Question'}
+        </a>
+      </div>
+    </div>
+  </section>
+
+</BaseLayout>

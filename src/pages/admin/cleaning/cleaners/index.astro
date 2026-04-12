@@ -1,0 +1,330 @@
+---
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../../lib/supabase';
+
+const role = Astro.locals.profile?.role ?? '';
+if (!['admin', 'super_admin'].includes(role)) {
+  return Astro.redirect('/admin');
+}
+const isSuperAdmin = role === 'super_admin';
+
+const service = getServiceClient();
+
+const { data: rawCleaners } = await service
+  .from('cleaner_profiles')
+  .select('*, services:cleaner_services(id, property_type, base_price), areas:cleaner_service_areas(region,city)')
+  .order('created_at', { ascending: false });
+
+// Fetch public profiles separately (FK is to auth.users, not public.profiles)
+const userIds = (rawCleaners ?? []).map((c: any) => c.user_id).filter(Boolean);
+const { data: userProfiles } = userIds.length > 0
+  ? await service.from('profiles').select('id, full_name, email, created_at').in('id', userIds)
+  : { data: [] };
+const profileMap = Object.fromEntries((userProfiles ?? []).map((p: any) => [p.id, p]));
+const cleaners = (rawCleaners ?? []).map((c: any) => ({ ...c, profiles: profileMap[c.user_id] ?? null }));
+
+const { data: jobStats } = await service
+  .from('cleaning_jobs')
+  .select('cleaner_id, status, agreed_price, cleaner_payout');
+
+const statsByCleanerId: Record<string, { total: number; approved: number; earnings: number }> = {};
+for (const job of jobStats ?? []) {
+  if (!statsByCleanerId[job.cleaner_id]) {
+    statsByCleanerId[job.cleaner_id] = { total: 0, approved: 0, earnings: 0 };
+  }
+  statsByCleanerId[job.cleaner_id].total++;
+  if (job.status === 'approved') {
+    statsByCleanerId[job.cleaner_id].approved++;
+    statsByCleanerId[job.cleaner_id].earnings += job.cleaner_payout ?? 0;
+  }
+}
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+---
+
+<AdminLayout title="Cleaners">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+    <p class="text-sm text-gray-500">{cleaners?.length ?? 0} registered cleaner{(cleaners?.length ?? 0) !== 1 ? 's' : ''}</p>
+    <div class="flex items-center gap-3">
+      <a href="/cleaner/dashboard" class="min-h-[44px] inline-flex items-center border border-gray-200 text-gray-700 text-sm font-medium px-4 py-2.5 rounded-xl hover:bg-gray-50 transition-colors">
+        View Portal →
+      </a>
+      {isSuperAdmin && (
+        <button id="invite-btn" class="min-h-[44px] bg-[#1a1a2e] text-white font-semibold px-4 py-2.5 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">
+          + Invite cleaner
+        </button>
+      )}
+    </div>
+  </div>
+
+  <!-- Invite modal -->
+  {isSuperAdmin && (
+    <div id="invite-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div class="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl">
+        <h3 class="font-semibold text-gray-900 mb-1">Invite cleaner</h3>
+        <p class="text-sm text-gray-500 mb-4">They'll receive an email with a link to set their password and complete their profile.</p>
+        <div class="space-y-3">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Full name *</label>
+            <input id="inv-name" type="text" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/30" placeholder="Maria Papadopoulou" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Email *</label>
+            <input id="inv-email" type="email" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/30" placeholder="maria@example.com" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Phone (optional)</label>
+            <input id="inv-phone" type="tel" class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#c9a96e]/30" placeholder="+30 6xx xxx xxxx" />
+          </div>
+          <p class="text-xs text-gray-400">The cleaner will receive an email to set their password and access the cleaner portal.</p>
+        </div>
+        <div id="invite-error" class="hidden mt-3 text-sm text-red-600"></div>
+        <div class="flex gap-3 mt-5">
+          <button id="invite-cancel" class="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+          <button id="invite-submit" class="flex-1 bg-[#c9a96e] text-white font-semibold px-4 py-2 rounded-xl text-sm hover:opacity-90 transition-opacity">Send invite</button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- Remove confirmation modal -->
+  {isSuperAdmin && (
+    <div id="remove-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
+      <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
+        <h3 class="font-semibold text-gray-900 mb-2">Remove cleaner</h3>
+        <p id="remove-modal-desc" class="text-sm text-gray-500 mb-4"></p>
+        <div class="bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-5 text-sm text-amber-800">
+          ⚠️ This permanently deletes their account. Any assigned jobs may need reassignment.
+        </div>
+        <div class="flex gap-3">
+          <button id="remove-cancel" class="flex-1 px-4 py-2 border border-gray-200 rounded-xl text-sm text-gray-600 hover:bg-gray-50 transition-colors">Cancel</button>
+          <button id="remove-confirm" class="flex-1 bg-red-600 hover:bg-red-700 text-white font-semibold px-4 py-2 rounded-xl text-sm transition-colors">Remove</button>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <!-- Mobile card view -->
+  <div class="lg:hidden space-y-3">
+    {(cleaners ?? []).map((c: any) => {
+      const stats = statsByCleanerId[c.id] ?? { total: 0, approved: 0, earnings: 0 };
+      const areaNames = (c.areas ?? []).map((a: any) => a.area_name).join(', ');
+      const userId = c.profiles?.id;
+      return (
+        <div class="bg-white rounded-xl border border-gray-100 p-4">
+          <div class="flex items-start justify-between mb-3">
+            <div class="min-w-0 flex-1">
+              <p class="font-medium text-gray-900">{c.profiles?.full_name ?? '—'}</p>
+              <p class="text-xs text-gray-400">{c.profiles?.email}</p>
+              {c.profiles?.created_at && <p class="text-xs text-gray-300 mt-0.5">Joined {fmtDate(c.profiles.created_at)}</p>}
+            </div>
+            <div class="flex flex-col items-end gap-1 shrink-0 ml-2">
+              <span class={`px-2 py-1 rounded-full text-xs font-medium ${c.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                {c.is_active ? 'Active' : 'Inactive'}
+              </span>
+              <span class={`px-2 py-1 rounded-full text-xs font-medium ${c.stripe_onboarded ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-700'}`}>
+                {c.stripe_onboarded ? 'Connected' : 'Pending'}
+              </span>
+            </div>
+          </div>
+          {areaNames && <p class="text-xs text-gray-500 mb-2">{areaNames}</p>}
+          <div class="grid grid-cols-3 gap-2 text-sm mb-3">
+            <div>
+              <p class="text-xs text-gray-400">Jobs</p>
+              <p class="font-medium text-gray-900">{stats.approved} <span class="text-gray-400 text-xs">/ {stats.total}</span></p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-400">Earned</p>
+              <p class="font-medium text-gray-900">€{stats.earnings.toFixed(0)}</p>
+            </div>
+            <div>
+              <p class="text-xs text-gray-400">Rating</p>
+              <p class="font-medium text-gray-700">{c.rating ? `★ ${Number(c.rating).toFixed(1)}` : '—'}</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-3">
+            <a href={`/admin/cleaning/cleaners/${c.id}`} class="min-h-[44px] px-4 py-2.5 inline-flex items-center text-xs text-[#c9a96e] font-medium hover:opacity-80">View →</a>
+            {isSuperAdmin && userId && (
+              <button
+                class="delete-cleaner-btn min-h-[44px] px-4 py-2.5 text-xs text-red-400 hover:text-red-600 transition-colors"
+                data-id={userId}
+                data-name={c.profiles?.full_name ?? c.profiles?.email ?? 'this cleaner'}
+              >Remove</button>
+            )}
+          </div>
+        </div>
+      );
+    })}
+    {(cleaners ?? []).length === 0 && (
+      <div class="bg-white rounded-xl border border-gray-100 p-10 text-center text-gray-400 text-sm">
+        No cleaners registered yet.
+        {isSuperAdmin && <span class="block mt-2"><button id="invite-btn-empty" class="min-h-[44px] text-[#c9a96e] hover:opacity-80 font-medium">Invite your first cleaner →</button></span>}
+      </div>
+    )}
+  </div>
+
+  <!-- Desktop table view -->
+  <div class="hidden lg:block bg-white rounded-2xl border border-gray-100 overflow-hidden">
+    <table class="w-full text-sm">
+      <thead>
+        <tr class="border-b border-gray-100 bg-gray-50">
+          <th class="text-left p-4 text-xs font-medium text-gray-500">Cleaner</th>
+          <th class="text-left p-4 text-xs font-medium text-gray-500">Areas</th>
+          <th class="text-left p-4 text-xs font-medium text-gray-500">Jobs</th>
+          <th class="text-left p-4 text-xs font-medium text-gray-500">Earned</th>
+          <th class="text-left p-4 text-xs font-medium text-gray-500">Rating</th>
+          <th class="text-left p-4 text-xs font-medium text-gray-500">Status</th>
+          <th class="text-left p-4 text-xs font-medium text-gray-500">Stripe</th>
+          <th class="p-4"></th>
+        </tr>
+      </thead>
+      <tbody>
+        {(cleaners ?? []).map((c: any) => {
+          const stats = statsByCleanerId[c.id] ?? { total: 0, approved: 0, earnings: 0 };
+          const areaNames = (c.areas ?? []).map((a: any) => a.area_name).join(', ');
+          const userId = c.profiles?.id;
+          return (
+            <tr class="border-b border-gray-50 hover:bg-gray-50">
+              <td class="p-4">
+                <p class="font-medium text-gray-900">{c.profiles?.full_name ?? '—'}</p>
+                <p class="text-xs text-gray-400">{c.profiles?.email}</p>
+                {c.profiles?.created_at && <p class="text-xs text-gray-300 mt-0.5">Joined {fmtDate(c.profiles.created_at)}</p>}
+              </td>
+              <td class="p-4 text-gray-500 text-xs max-w-[140px] truncate">{areaNames || '—'}</td>
+              <td class="p-4">
+                <p class="font-medium text-gray-900">{stats.approved}</p>
+                <p class="text-xs text-gray-400">{stats.total} total</p>
+              </td>
+              <td class="p-4 font-medium text-gray-900">€{stats.earnings.toFixed(0)}</td>
+              <td class="p-4 text-gray-700">{c.rating ? `★ ${Number(c.rating).toFixed(1)}` : '—'}</td>
+              <td class="p-4">
+                <span class={`px-2 py-0.5 rounded-full text-xs font-medium ${c.is_active ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
+                  {c.is_active ? 'Active' : 'Inactive'}
+                </span>
+              </td>
+              <td class="p-4">
+                <span class={`px-2 py-0.5 rounded-full text-xs font-medium ${c.stripe_onboarded ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-700'}`}>
+                  {c.stripe_onboarded ? 'Connected' : 'Pending'}
+                </span>
+              </td>
+              <td class="p-4">
+                <div class="flex items-center gap-3">
+                  <a href={`/admin/cleaning/cleaners/${c.id}`} class="text-xs text-[#c9a96e] font-medium hover:opacity-80">View →</a>
+                  {isSuperAdmin && userId && (
+                    <button
+                      class="delete-cleaner-btn text-xs text-red-400 hover:text-red-600 transition-colors"
+                      data-id={userId}
+                      data-name={c.profiles?.full_name ?? c.profiles?.email ?? 'this cleaner'}
+                    >Remove</button>
+                  )}
+                </div>
+              </td>
+            </tr>
+          );
+        })}
+        {(cleaners ?? []).length === 0 && (
+          <tr>
+            <td colspan="8" class="p-10 text-center text-gray-400 text-sm">
+              No cleaners registered yet.
+              {isSuperAdmin && <span class="block mt-2"><button id="invite-btn-empty" class="text-[#c9a96e] hover:opacity-80 font-medium">Invite your first cleaner →</button></span>}
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+</AdminLayout>
+
+{isSuperAdmin && (
+  <script>
+    // --- Invite modal ---
+    const modal     = document.getElementById('invite-modal')!;
+    const invBtn    = document.getElementById('invite-btn');
+    const invBtnEmpty = document.getElementById('invite-btn-empty');
+    const cancelBtn = document.getElementById('invite-cancel')!;
+    const submitBtn = document.getElementById('invite-submit') as HTMLButtonElement;
+    const errBox    = document.getElementById('invite-error')!;
+
+    function openModal() { modal.classList.remove('hidden'); }
+    invBtn?.addEventListener('click', openModal);
+    invBtnEmpty?.addEventListener('click', openModal);
+    cancelBtn.addEventListener('click', () => modal.classList.add('hidden'));
+    modal.addEventListener('click', (e) => { if (e.target === modal) modal.classList.add('hidden'); });
+
+    submitBtn.addEventListener('click', async () => {
+      const full_name = (document.getElementById('inv-name') as HTMLInputElement).value.trim();
+      const email     = (document.getElementById('inv-email') as HTMLInputElement).value.trim();
+      const phone     = (document.getElementById('inv-phone') as HTMLInputElement).value.trim();
+
+      if (!email || !full_name) {
+        errBox.textContent = 'Name and email are required.';
+        errBox.classList.remove('hidden');
+        return;
+      }
+
+      submitBtn.textContent = 'Sending…';
+      submitBtn.disabled = true;
+      errBox.classList.add('hidden');
+
+      const res = await fetch('/api/admin/cleaners/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, full_name, phone: phone || undefined }),
+      });
+      const json = await res.json();
+
+      if (res.ok) {
+        modal.classList.add('hidden');
+        window.location.reload();
+      } else {
+        errBox.textContent = json.error ?? 'Invite failed. Please try again.';
+        errBox.classList.remove('hidden');
+        submitBtn.textContent = 'Send invite';
+        submitBtn.disabled = false;
+      }
+    });
+
+    // --- Remove modal ---
+    const removeModal   = document.getElementById('remove-modal')!;
+    const removeDesc    = document.getElementById('remove-modal-desc')!;
+    const removeCancel  = document.getElementById('remove-cancel')!;
+    const removeConfirm = document.getElementById('remove-confirm') as HTMLButtonElement;
+    let pendingId: string | null = null;
+
+    document.querySelectorAll('.delete-cleaner-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const el = btn as HTMLElement;
+        pendingId = el.dataset.id!;
+        removeDesc.textContent = `You are about to permanently remove ${el.dataset.name}.`;
+        removeModal.classList.remove('hidden');
+      });
+    });
+
+    removeCancel.addEventListener('click', () => { removeModal.classList.add('hidden'); pendingId = null; });
+    removeModal.addEventListener('click', (e) => { if (e.target === removeModal) { removeModal.classList.add('hidden'); pendingId = null; } });
+
+    removeConfirm.addEventListener('click', async () => {
+      if (!pendingId) return;
+      removeConfirm.disabled = true;
+      removeConfirm.textContent = 'Removing…';
+
+      const res = await fetch('/api/admin/cleaners/invite', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: pendingId }),
+      });
+
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        removeModal.classList.add('hidden');
+        pendingId = null;
+        removeConfirm.disabled = false;
+        removeConfirm.textContent = 'Remove';
+        alert('Failed to remove cleaner. Please try again.');
+      }
+    });
+  </script>
+)}

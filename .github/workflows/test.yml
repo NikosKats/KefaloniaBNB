@@ -1,0 +1,207 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Full Test Suite — unit + integration + all E2E scenarios
+#
+# Runs on:
+#   - Push to main / staging
+#   - Manual dispatch (workflow_dispatch)
+#   - Can be triggered from nightly.yml
+#
+# Required secrets:
+#   TEST_SUPABASE_URL         — dedicated test Supabase project URL
+#   TEST_SUPABASE_SERVICE_KEY — service role key (bypasses RLS for seeding)
+#   TEST_BASE_URL             — running app URL (e.g. https://staging.kefaloniabnb.com)
+#   SUPABASE_URL              — main app Supabase URL (for app to connect)
+#   SUPABASE_ANON_KEY         — main app anon key
+#   SUPABASE_SERVICE_KEY      — main app service key
+#   STRIPE_SECRET_KEY_TEST    — Stripe test mode secret key
+#   STRIPE_WEBHOOK_SECRET_TEST— Stripe test mode webhook secret
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: Full Test Suite
+
+on:
+  push:
+    branches: [main, staging]
+  workflow_dispatch:
+    inputs:
+      skip_e2e:
+        description: 'Skip E2E tests (run unit + integration only)'
+        required: false
+        default: 'false'
+        type: boolean
+
+concurrency:
+  group: full-test-${{ github.ref }}
+  cancel-in-progress: false   # never cancel a full test run mid-flight
+
+env:
+  NODE_VERSION: '22'
+  CI: 'true'
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 1 — Unit tests (pure, no network)
+  # ────────────────────────────────────────────────────────────────────────────
+  unit:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run unit tests
+        run: npx vitest run tests/unit tests/api
+        env:
+          PUBLIC_SITE_URL: 'https://test.kefaloniabnb.com'
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-coverage-${{ github.run_number }}
+          path: coverage/
+          retention-days: 14
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 2 — Integration tests (real Supabase test project)
+  # Auto-skipped if TEST_SUPABASE_URL secret is not set.
+  # ────────────────────────────────────────────────────────────────────────────
+  integration:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: unit
+
+    env:
+      TEST_SUPABASE_URL:         ${{ secrets.TEST_SUPABASE_URL }}
+      TEST_SUPABASE_SERVICE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_KEY }}
+      SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY:         ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_KEY:      ${{ secrets.SUPABASE_SERVICE_KEY }}
+      STRIPE_SECRET_KEY:         ${{ secrets.STRIPE_SECRET_KEY_TEST }}
+      STRIPE_WEBHOOK_SECRET:     ${{ secrets.STRIPE_WEBHOOK_SECRET_TEST }}
+      PUBLIC_SITE_URL:           'https://test.kefaloniabnb.com'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Run integration tests
+        run: npx vitest run tests/integration
+        # Tests auto-skip when TEST_SUPABASE_URL is not set — no hard failure
+
+      - name: Upload integration test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: integration-results-${{ github.run_number }}
+          path: test-results/
+          retention-days: 7
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 3 — Full E2E suite (all browsers, all scenarios)
+  # Only runs on main/staging, not on PRs (use pr.yml smoke subset for that).
+  # ────────────────────────────────────────────────────────────────────────────
+  e2e-full:
+    name: E2E Full Suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: integration
+    if: ${{ github.event.inputs.skip_e2e != 'true' }}
+
+    env:
+      TEST_BASE_URL:             ${{ secrets.TEST_BASE_URL }}
+      TEST_SUPABASE_URL:         ${{ secrets.TEST_SUPABASE_URL }}
+      TEST_SUPABASE_SERVICE_KEY: ${{ secrets.TEST_SUPABASE_SERVICE_KEY }}
+      SUPABASE_URL:              ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY:         ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_KEY:      ${{ secrets.SUPABASE_SERVICE_KEY }}
+      STRIPE_SECRET_KEY:         ${{ secrets.STRIPE_SECRET_KEY_TEST }}
+      STRIPE_WEBHOOK_SECRET:     ${{ secrets.STRIPE_WEBHOOK_SECRET_TEST }}
+      PUBLIC_SITE_URL:           ${{ secrets.TEST_BASE_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps
+
+      - name: Run full E2E suite
+        run: npx playwright test
+        env:
+          CI: 'true'
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report-full-${{ github.run_number }}
+          path: playwright-report/
+          retention-days: 14
+
+      - name: Upload traces on failure
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-traces-full-${{ github.run_number }}
+          path: test-results/
+          retention-days: 14
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # GATE — summary job for branch protection
+  # ────────────────────────────────────────────────────────────────────────────
+  test-gate:
+    name: Test Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs: [unit, integration, e2e-full]
+    if: always()
+
+    steps:
+      - name: Evaluate results
+        run: |
+          UNIT="${{ needs.unit.result }}"
+          INTEGRATION="${{ needs.integration.result }}"
+          E2E="${{ needs.e2e-full.result }}"
+
+          echo "unit: $UNIT | integration: $INTEGRATION | e2e: $E2E"
+
+          if [[ "$UNIT" != "success" ]]; then
+            echo "FAIL: unit tests did not pass (result: $UNIT)"
+            exit 1
+          fi
+
+          # Integration is allowed to be skipped (no TEST_SUPABASE_URL in env)
+          if [[ "$INTEGRATION" != "success" && "$INTEGRATION" != "skipped" ]]; then
+            echo "FAIL: integration tests failed (result: $INTEGRATION)"
+            exit 1
+          fi
+
+          # E2E allowed to be skipped via workflow_dispatch input
+          if [[ "$E2E" != "success" && "$E2E" != "skipped" ]]; then
+            echo "FAIL: E2E tests failed (result: $E2E)"
+            exit 1
+          fi
+
+          echo "All test gates passed."

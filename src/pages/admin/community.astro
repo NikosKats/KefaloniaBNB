@@ -1,0 +1,194 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const service = getServiceClient();
+
+// Reported content
+const { data: reports } = await service
+  .from('community_reports')
+  .select('*, community_posts(id, author_name, body, is_hidden), community_comments(id, author_name, body, is_hidden)')
+  .eq('status', 'pending')
+  .order('created_at', { ascending: false })
+  .limit(50);
+
+// Recent posts (for bulk moderation)
+const { data: recentPosts } = await service
+  .from('community_posts')
+  .select('*')
+  .order('created_at', { ascending: false })
+  .limit(30);
+
+const stats = {
+  pendingReports: (reports ?? []).length,
+  hiddenPosts: (recentPosts ?? []).filter((p: any) => p.is_hidden).length,
+  totalPosts: (recentPosts ?? []).length,
+};
+
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+
+<AdminLayout title="Community Moderation">
+  <div class="space-y-6">
+    <h1 class="text-2xl font-bold text-white">Community Moderation</h1>
+
+    {/* Stats */}
+    <div class="grid grid-cols-3 gap-4">
+      <div class="bg-white/5 rounded-xl border border-white/10 p-4 text-center">
+        <p class="text-2xl font-bold text-orange-400">{stats.pendingReports}</p>
+        <p class="text-xs text-gray-400">Pending Reports</p>
+      </div>
+      <div class="bg-white/5 rounded-xl border border-white/10 p-4 text-center">
+        <p class="text-2xl font-bold text-red-400">{stats.hiddenPosts}</p>
+        <p class="text-xs text-gray-400">Hidden Posts</p>
+      </div>
+      <div class="bg-white/5 rounded-xl border border-white/10 p-4 text-center">
+        <p class="text-2xl font-bold text-white">{stats.totalPosts}</p>
+        <p class="text-xs text-gray-400">Recent Posts</p>
+      </div>
+    </div>
+
+    {/* Pending reports */}
+    <div>
+      <h2 class="text-lg font-semibold text-white mb-3">Pending Reports</h2>
+      {(!reports || reports.length === 0) ? (
+        <p class="text-gray-500 text-sm">No pending reports.</p>
+      ) : (
+        <div class="space-y-3">
+          {(reports ?? []).map((r: any) => {
+            const target = r.community_posts ?? r.community_comments;
+            const targetType = r.post_id ? 'post' : 'comment';
+            return (
+            <div class="bg-white/5 rounded-xl border border-white/10 p-4 report-row" data-id={r.id}>
+              <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-2 mb-1">
+                    <span class="text-xs bg-orange-500/20 text-orange-400 px-2 py-0.5 rounded font-medium">{targetType}</span>
+                    <span class="text-xs text-gray-500">{new Date(r.created_at).toLocaleString()}</span>
+                  </div>
+                  <p class="text-xs text-gray-400 mb-1">Reason: <span class="text-gray-300">{r.reason}</span></p>
+                  {target && (
+                    <div class="bg-white/5 rounded-lg p-3 mt-2">
+                      <p class="text-xs text-gray-400 mb-0.5">By: {target.author_name}</p>
+                      <p class="text-sm text-gray-300 line-clamp-3">{target.body}</p>
+                      {target.is_hidden && <span class="text-xs text-red-400 mt-1 inline-block">Already hidden</span>}
+                    </div>
+                  )}
+                </div>
+                <div class="flex flex-col gap-1.5 flex-shrink-0">
+                  {target && !target.is_hidden && (
+                    <button class="hide-content-btn bg-red-600/20 text-red-400 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-red-600/30"
+                      data-report-id={r.id}
+                      data-target-type={targetType}
+                      data-target-id={r.post_id ?? r.comment_id}>
+                      Hide {targetType}
+                    </button>
+                  )}
+                  <button class="dismiss-report-btn bg-white/10 text-gray-400 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-white/20"
+                    data-id={r.id}>
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+
+    {/* Recent posts */}
+    <div>
+      <h2 class="text-lg font-semibold text-white mb-3">Recent Posts</h2>
+      <div class="space-y-2">
+        {(recentPosts ?? []).map((p: any) => (
+          <div class="bg-white/5 rounded-xl border border-white/10 p-3 flex items-center justify-between gap-3 post-mod-row" data-id={p.id}>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2">
+                <span class="text-sm font-medium text-white truncate">{p.author_name}</span>
+                {p.is_hidden && <span class="text-xs bg-red-900/30 text-red-400 px-1.5 py-0.5 rounded">Hidden</span>}
+                {p.report_count > 0 && <span class="text-xs bg-orange-900/30 text-orange-400 px-1.5 py-0.5 rounded">{p.report_count} reports</span>}
+                <span class="text-xs text-gray-500">{p.category}</span>
+                <span class="text-xs text-gray-500">{new Date(p.created_at).toLocaleDateString()}</span>
+              </div>
+              <p class="text-xs text-gray-400 truncate mt-0.5">{p.body}</p>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <a href={`/community/board/${p.id}`} target="_blank" class="text-xs text-blue-400 hover:underline">View</a>
+              <button class={`toggle-hide-btn text-xs ${p.is_hidden ? 'text-green-400 hover:text-green-300' : 'text-red-400 hover:text-red-300'}`}
+                data-id={p.id} data-hidden={p.is_hidden}>
+                {p.is_hidden ? 'Unhide' : 'Hide'}
+              </button>
+              <button class="delete-post-mod-btn text-xs text-red-400 hover:text-red-300" data-id={p.id}>Delete</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+</AdminLayout>
+
+<script>
+  // Hide content from report
+  document.querySelectorAll('.hide-content-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const reportId = (btn as HTMLElement).dataset.reportId!;
+      const targetType = (btn as HTMLElement).dataset.targetType!;
+      const targetId = (btn as HTMLElement).dataset.targetId!;
+
+      // Hide the content
+      const table = targetType === 'post' ? 'community_posts' : 'community_comments';
+      await fetch(`/api/community/posts/${targetId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_hidden: true }),
+      });
+
+      // Mark report as reviewed
+      await fetch(`/api/admin/community/reports/${reportId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'reviewed' }),
+      });
+
+      (btn as HTMLElement).closest('.report-row')?.remove();
+    });
+  });
+
+  // Dismiss report
+  document.querySelectorAll('.dismiss-report-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = (btn as HTMLElement).dataset.id!;
+      await fetch(`/api/admin/community/reports/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'dismissed' }),
+      });
+      (btn as HTMLElement).closest('.report-row')?.remove();
+    });
+  });
+
+  // Toggle hide post
+  document.querySelectorAll('.toggle-hide-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = (btn as HTMLElement).dataset.id!;
+      const isHidden = (btn as HTMLElement).dataset.hidden === 'true';
+      const res = await fetch(`/api/community/posts/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ is_hidden: !isHidden }),
+      });
+      if (res.ok) location.reload();
+    });
+  });
+
+  // Delete post
+  document.querySelectorAll('.delete-post-mod-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Permanently delete this post?')) return;
+      const id = (btn as HTMLElement).dataset.id!;
+      const res = await fetch(`/api/community/posts/${id}`, { method: 'DELETE' });
+      if (res.ok) (btn as HTMLElement).closest('.post-mod-row')?.remove();
+    });
+  });
+</script>

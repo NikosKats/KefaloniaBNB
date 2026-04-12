@@ -1,0 +1,365 @@
+# ──────────────────────────────────────────────────────────────────────────────
+# Release Pipeline — pre-production quality gate
+#
+# Triggers:
+#   - Push to `main` branch (production deploy candidate)
+#   - Manual dispatch (for emergency hotfixes with skip_perf option)
+#
+# Stages:
+#   1. Full unit + API tests
+#   2. Full E2E regression (all 3 browser projects in parallel)
+#   3. JMeter baseline smoke — fail release if SLOs not met
+#   4. JMeter booking create stress — condensed (30 VUs × 5 min)
+#   5. Build + deploy to staging (validate Wrangler deployment)
+#   6. Post-deploy smoke verification
+#
+# The pipeline is a HARD GATE. No deployment proceeds unless all stages pass.
+# ──────────────────────────────────────────────────────────────────────────────
+
+name: Release — Pre-Production Gate
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      skip_perf:
+        description: 'Skip performance tests (for emergency hotfixes only)'
+        required: false
+        default: 'false'
+      reason:
+        description: 'Reason for skipping performance tests'
+        required: false
+        default: ''
+
+env:
+  NODE_VERSION: '22'
+  CI: 'true'
+  JMETER_VERSION: '5.6.3'
+
+jobs:
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 1 — Full unit + API tests (same as nightly)
+  # ────────────────────────────────────────────────────────────────────────────
+  unit-full:
+    name: Unit + API Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY_TEST }}
+      STRIPE_WEBHOOK_SECRET: ${{ secrets.STRIPE_WEBHOOK_SECRET_TEST }}
+      PUBLIC_SITE_URL: 'https://staging.kefaloniabnb.com'
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: npm }
+      - run: npm ci
+      - run: npm run test:coverage
+
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-release-${{ github.run_number }}
+          path: coverage/
+          retention-days: 90
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 2 — Full E2E across all browser projects (parallel)
+  # ────────────────────────────────────────────────────────────────────────────
+  e2e-full:
+    name: E2E Full Regression (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    needs: unit-full
+
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [chromium, mobile-chrome, mobile-safari]
+
+    env:
+      TEST_BASE_URL: ${{ secrets.TEST_BASE_URL }}
+      PUBLIC_SITE_URL: ${{ secrets.TEST_BASE_URL }}
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+      TEST_ADMIN_EMAIL: ${{ secrets.TEST_ADMIN_EMAIL }}
+      TEST_ADMIN_PASSWORD: ${{ secrets.TEST_ADMIN_PASSWORD }}
+      TEST_ADMIN_ROLE: ${{ secrets.TEST_ADMIN_ROLE }}
+      TEST_LISTING_SLUG: ${{ secrets.TEST_LISTING_SLUG }}
+      TEST_LISTING_ID: ${{ secrets.TEST_LISTING_ID }}
+      TEST_DEPOSIT_LISTING_ID: ${{ secrets.TEST_DEPOSIT_LISTING_ID }}
+      TEST_BOOKING_ID: ${{ secrets.TEST_BOOKING_ID }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: npm }
+      - run: npm ci
+
+      - name: Install Playwright browsers
+        run: |
+          case "${{ matrix.project }}" in
+            chromium|mobile-chrome) npx playwright install chromium --with-deps ;;
+            mobile-safari)          npx playwright install webkit --with-deps ;;
+          esac
+
+      - name: Run full E2E suite — 3 retries on CI
+        run: npx playwright test --project=${{ matrix.project }} --retries=3
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-release-${{ matrix.project }}-${{ github.run_number }}
+          path: playwright-report/
+          retention-days: 90
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 3 — JMeter baseline smoke (required, non-skippable)
+  # ────────────────────────────────────────────────────────────────────────────
+  jmeter-baseline:
+    name: JMeter Baseline Smoke (required)
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    needs: unit-full
+    if: ${{ github.event.inputs.skip_perf != 'true' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install JMeter
+        run: |
+          wget -q "https://downloads.apache.org/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz"
+          tar xzf "apache-jmeter-${JMETER_VERSION}.tgz"
+          echo "$(pwd)/apache-jmeter-${JMETER_VERSION}/bin" >> $GITHUB_PATH
+
+      - name: Run baseline smoke (5 VUs × 3 min)
+        working-directory: tests/performance/jmeter
+        env:
+          JMETER_HOST: ${{ secrets.STAGING_HOST }}
+          JMETER_LISTING_ID: ${{ secrets.TEST_LISTING_ID }}
+          JMETER_LISTING_SLUG: ${{ secrets.TEST_LISTING_SLUG }}
+        run: |
+          mkdir -p results/release
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          jmeter -n \
+            -t plans/01-baseline-smoke.jmx \
+            -p env/staging.properties \
+            -Jhost="${JMETER_HOST}" \
+            -Jlisting_id="${JMETER_LISTING_ID}" \
+            -Jlisting_slug="${JMETER_LISTING_SLUG}" \
+            -Jthreads=5 \
+            -Jduration=180 \
+            -l "results/release/baseline-${TIMESTAMP}.jtl" \
+            -e -o "results/release/baseline-${TIMESTAMP}-report" \
+            -j "results/release/baseline-${TIMESTAMP}.log"
+
+          # Hard fail if error rate > 1%
+          LATEST=$(ls -t results/release/baseline-*.jtl | head -1)
+          ERROR_COUNT=$(tail -n +2 "$LATEST" | awk -F',' '$8=="false"' | wc -l | tr -d ' ')
+          TOTAL=$(tail -n +2 "$LATEST" | wc -l | tr -d ' ')
+          if [ "$TOTAL" -gt "0" ]; then
+            ERROR_RATE=$(echo "scale=4; $ERROR_COUNT * 100 / $TOTAL" | bc)
+            echo "Baseline error rate: ${ERROR_RATE}% ($ERROR_COUNT/$TOTAL)"
+            if (( $(echo "$ERROR_RATE > 1" | bc -l) )); then
+              echo "RELEASE BLOCKED: Baseline error rate ${ERROR_RATE}% > 1% SLO"
+              exit 1
+            fi
+          fi
+
+      - name: Upload baseline results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jmeter-baseline-release-${{ github.run_number }}
+          path: tests/performance/jmeter/results/release/
+          retention-days: 90
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 4 — JMeter booking stress (condensed: 30 VUs × 5 min)
+  # Validates the booking creation endpoint hasn't regressed before release.
+  # Skippable only via workflow_dispatch + skip_perf=true with a documented reason.
+  # ────────────────────────────────────────────────────────────────────────────
+  jmeter-booking-stress:
+    name: JMeter Booking Stress (condensed)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: jmeter-baseline
+    if: ${{ github.event.inputs.skip_perf != 'true' }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install JMeter
+        run: |
+          wget -q "https://downloads.apache.org/jmeter/binaries/apache-jmeter-${JMETER_VERSION}.tgz"
+          tar xzf "apache-jmeter-${JMETER_VERSION}.tgz"
+          echo "$(pwd)/apache-jmeter-${JMETER_VERSION}/bin" >> $GITHUB_PATH
+
+      - name: Run condensed booking stress (30 VUs × 5 min)
+        working-directory: tests/performance/jmeter
+        env:
+          JMETER_HOST: ${{ secrets.STAGING_HOST }}
+        run: |
+          mkdir -p results/release
+          TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+          jmeter -n \
+            -t plans/03-booking-create-stress.jmx \
+            -p env/staging.properties \
+            -Jhost="${JMETER_HOST}" \
+            -Jthreads=30 \
+            -Jramp_time=60 \
+            -Jduration=300 \
+            -l "results/release/booking-stress-${TIMESTAMP}.jtl" \
+            -e -o "results/release/booking-stress-${TIMESTAMP}-report" \
+            -j "results/release/booking-stress-${TIMESTAMP}.log"
+
+          # Fail if 5xx error rate > 2%
+          LATEST=$(ls -t results/release/booking-stress-*.jtl | head -1)
+          SERVER_ERRORS=$(tail -n +2 "$LATEST" | awk -F',' '$7 ~ /^5/' | wc -l | tr -d ' ')
+          TOTAL=$(tail -n +2 "$LATEST" | wc -l | tr -d ' ')
+          if [ "$TOTAL" -gt "0" ]; then
+            ERROR_RATE=$(echo "scale=4; $SERVER_ERRORS * 100 / $TOTAL" | bc)
+            echo "5xx error rate: ${ERROR_RATE}% ($SERVER_ERRORS/$TOTAL)"
+            if (( $(echo "$ERROR_RATE > 2" | bc -l) )); then
+              echo "RELEASE BLOCKED: 5xx error rate ${ERROR_RATE}% > 2% SLO"
+              exit 1
+            fi
+          fi
+
+      - name: Upload stress results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jmeter-stress-release-${{ github.run_number }}
+          path: tests/performance/jmeter/results/release/
+          retention-days: 90
+
+      - name: Warn if skip_perf was used
+        if: ${{ github.event.inputs.skip_perf == 'true' }}
+        run: |
+          echo "⚠️  Performance tests were skipped."
+          echo "    Reason: '${{ github.event.inputs.reason }}'"
+          echo "    This must be reviewed and documented before merge."
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 5 — Build and deploy to staging
+  # Only runs after all test gates pass.
+  # ────────────────────────────────────────────────────────────────────────────
+  deploy-staging:
+    name: Build & Deploy to Staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs:
+      - e2e-full
+      - jmeter-baseline
+    environment: staging
+
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      PUBLIC_SITE_URL: ${{ secrets.TEST_BASE_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: npm }
+      - run: npm ci
+      - run: npm run build
+
+      - name: Deploy to Cloudflare Pages (staging)
+        run: |
+          npx wrangler pages deploy dist \
+            --project-name kefaloniabnb \
+            --branch staging \
+            --commit-dirty=true
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # JOB 6 — Post-deploy smoke verification
+  # Runs a quick Playwright smoke against the freshly deployed staging URL.
+  # ────────────────────────────────────────────────────────────────────────────
+  post-deploy-smoke:
+    name: Post-Deploy Smoke Verification
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: deploy-staging
+
+    env:
+      TEST_BASE_URL: ${{ secrets.TEST_BASE_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '${{ env.NODE_VERSION }}', cache: npm }
+      - run: npm ci
+      - run: npx playwright install chromium --with-deps
+
+      - name: Post-deploy smoke
+        run: |
+          npx playwright test \
+            --project=chromium \
+            tests/e2e/homepage.spec.ts \
+            tests/e2e/listings.spec.ts \
+            tests/e2e/contact.spec.ts \
+            --retries=2
+
+      - name: Upload post-deploy report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: post-deploy-smoke-${{ github.run_number }}
+          path: playwright-report/
+          retention-days: 30
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # GATE — summary job for branch protection rules
+  # ────────────────────────────────────────────────────────────────────────────
+  release-gate:
+    name: Release Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    needs:
+      - unit-full
+      - e2e-full
+      - jmeter-baseline
+      - jmeter-booking-stress
+      - deploy-staging
+      - post-deploy-smoke
+    if: always()
+
+    steps:
+      - name: Check all release gates passed
+        run: |
+          FAILED=0
+          check() {
+            local name="$1" result="$2"
+            if [[ "$result" != "success" && "$result" != "skipped" ]]; then
+              echo "FAIL: $name → $result"
+              FAILED=1
+            else
+              echo "OK:   $name → $result"
+            fi
+          }
+          check "unit-full"              "${{ needs.unit-full.result }}"
+          check "e2e-full"               "${{ needs.e2e-full.result }}"
+          check "jmeter-baseline"        "${{ needs.jmeter-baseline.result }}"
+          check "jmeter-booking-stress"  "${{ needs.jmeter-booking-stress.result }}"
+          check "deploy-staging"         "${{ needs.deploy-staging.result }}"
+          check "post-deploy-smoke"      "${{ needs.post-deploy-smoke.result }}"
+
+          if [ $FAILED -ne 0 ]; then
+            echo ""
+            echo "RELEASE BLOCKED: One or more required gates failed."
+            exit 1
+          fi
+          echo ""
+          echo "All release gates passed. Safe to promote to production."

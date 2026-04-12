@@ -1,0 +1,320 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const role = Astro.locals.profile?.role ?? 'admin';
+const isOwner = role === 'property_owner';
+const ownerListingIds = Astro.locals.ownerListingIds ?? [];
+
+const L: Record<string, Record<string, string>> = {
+  tg_not_connected:   { en: 'Telegram bot not connected', el: 'Το bot Telegram δεν είναι συνδεδεμένο' },
+  tg_no_alerts:       { en: "Booking alerts won't be delivered to Telegram.", el: 'Οι ειδοποιήσεις κρατήσεων δεν θα σταλούν στο Telegram.' },
+  tg_add_vars:        { en: 'Add', el: 'Προσθέστε' },
+  tg_env_vars:        { en: 'to your environment variables.', el: 'στις μεταβλητές περιβάλλοντος.' },
+  setup_guide:        { en: 'Setup guide →', el: 'Οδηγός ρύθμισης →' },
+  tg_connected:       { en: 'connected — booking alerts active', el: 'συνδεδεμένο — ειδοποιήσεις κρατήσεων ενεργές' },
+  pending_bookings:   { en: 'Pending bookings', el: 'Εκκρεμείς κρατήσεις' },
+  confirmed_bookings: { en: 'Confirmed bookings', el: 'Επιβεβαιωμένες κρατήσεις' },
+  new_inquiries:      { en: 'New inquiries', el: 'Νέες ερωτήσεις' },
+  revenue_month:      { en: 'Revenue this month', el: 'Έσοδα αυτόν τον μήνα' },
+  my_revenue:         { en: 'My earnings this month', el: 'Έσοδά μου αυτόν τον μήνα' },
+  platform_fees:      { en: 'Platform fees this month', el: 'Προμήθειες πλατφόρμας' },
+  fees_collected:     { en: 'Fees collected this month', el: 'Εισπραχθείσες προμήθειες' },
+  outstanding_comm:   { en: 'Outstanding commissions', el: 'Εκκρεμείς προμήθειες' },
+  upcoming_checkins:  { en: 'Upcoming check-ins (7 days)', el: 'Επερχόμενα check-in (7 ημέρες)' },
+  view_all:           { en: 'View all →', el: 'Δείτε όλα →' },
+  no_checkins:        { en: 'No check-ins in the next 7 days.', el: 'Δεν υπάρχουν check-in τις επόμενες 7 ημέρες.' },
+  quick_actions:      { en: 'Quick actions', el: 'Γρήγορες ενέργειες' },
+  review_pending:     { en: 'Review pending bookings', el: 'Εκκρεμείς κρατήσεις' },
+  add_listing:        { en: 'Add new listing', el: 'Νέα καταχώριση' },
+  all_bookings:       { en: 'All bookings', el: 'Όλες οι κρατήσεις' },
+  manage_reviews:     { en: 'Manage reviews', el: 'Διαχείριση κριτικών' },
+  my_listings:        { en: 'My listings', el: 'Τα ακίνητά μου' },
+  view_payouts:       { en: 'View payouts', el: 'Πληρωμές' },
+};
+function al(k: string) { return L[k]?.[lang] ?? L[k]?.en ?? k; }
+
+const service = getServiceClient();
+
+const today = new Date().toISOString().split('T')[0];
+const in7Days = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0];
+
+// ── Telegram status (only for non-owners) ──────────────────────────────────
+let telegramStatus: { connected: boolean; username?: string } = { connected: false };
+if (!isOwner) {
+  const token = import.meta.env.TELEGRAM_BOT_TOKEN;
+  if (token) {
+    try {
+      const res = await fetch(`https://api.telegram.org/bot${token}/getMe`);
+      const json = await res.json() as { ok: boolean; result?: { username: string } };
+      telegramStatus = { connected: json.ok, username: json.result?.username };
+    } catch { /* ignore */ }
+  }
+}
+
+// ── Stats queries (scoped to owner's listings if property_owner) ───────────
+let pendingRes, confirmedRes, upcomingRes, revenueRes, inquiriesRes;
+let feesCollectedRes, platformFeeRes, outstandingRes;
+
+let ownerFeesRes: any = { data: [] };
+if (isOwner && ownerListingIds.length > 0) {
+  [pendingRes, confirmedRes, upcomingRes, revenueRes, ownerFeesRes] = await Promise.all([
+    service.from('bookings').select('id', { count: 'exact', head: true })
+      .eq('status', 'pending').in('listing_id', ownerListingIds),
+    service.from('bookings').select('id', { count: 'exact', head: true })
+      .eq('status', 'confirmed').in('listing_id', ownerListingIds),
+    service.from('bookings').select('id,guest_name,check_in,check_out,listings(title)')
+      .eq('status', 'confirmed').gte('check_in', today).lte('check_in', in7Days)
+      .in('listing_id', ownerListingIds).order('check_in').limit(5),
+    service.from('bookings').select('total_price,platform_fee,owner_payout')
+      .in('status', ['confirmed','completed']).gte('created_at', monthStart)
+      .in('listing_id', ownerListingIds),
+    service.from('bookings').select('platform_fee')
+      .in('status', ['confirmed','completed']).gte('created_at', monthStart)
+      .in('listing_id', ownerListingIds),
+  ]);
+  inquiriesRes = { count: 0 };
+} else if (isOwner) {
+  pendingRes = { count: 0 }; confirmedRes = { count: 0 }; upcomingRes = { data: [] };
+  revenueRes = { data: [] }; inquiriesRes = { count: 0 };
+} else {
+  // Admin: fees collected = platform_fee on bookings paid via Stripe/bank (deposit_paid or paid)
+  //                       + platform_fee on TD bookings where owner paid the commission invoice
+  // Outstanding = platform_fee on confirmed bookings not yet collected
+  [pendingRes, confirmedRes, upcomingRes, inquiriesRes, platformFeeRes, feesCollectedRes, outstandingRes] = await Promise.all([
+    service.from('bookings').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    service.from('bookings').select('id', { count: 'exact', head: true }).eq('status', 'confirmed'),
+    service.from('bookings').select('id,guest_name,check_in,check_out,listings(title)')
+      .eq('status', 'confirmed').gte('check_in', today).lte('check_in', in7Days).order('check_in').limit(5),
+    service.from('inquiries').select('id', { count: 'exact', head: true }).eq('status', 'new'),
+    // All platform fees earned on confirmed bookings this month
+    service.from('bookings').select('platform_fee')
+      .in('status', ['confirmed','completed']).gte('created_at', monthStart),
+    // Fees actually collected: guest paid deposit/full via Stripe, OR owner paid commission invoice
+    service.from('bookings').select('platform_fee')
+      .in('status', ['confirmed','completed']).gte('created_at', monthStart)
+      .or('payment_status.in.(deposit_paid,paid),commission_invoice_status.eq.paid'),
+    // Outstanding: confirmed bookings where platform has NOT collected the fee yet
+    service.from('bookings').select('platform_fee')
+      .eq('status', 'confirmed')
+      .not('payment_status', 'in', '(deposit_paid,paid)')
+      .neq('commission_invoice_status', 'paid'),
+  ]);
+}
+
+let pendingListingsForReview: any[] = [];
+if (role === 'super_admin') {
+  // Only show listings that have NEVER been approved (approved_at is null).
+  // Listings that were approved then deactivated (is_active=false but approved_at set)
+  // are intentionally inactive, not pending review.
+  const { data } = await service
+    .from('listings')
+    .select('id,title,created_at,profiles:owner_id(full_name,email)')
+    .eq('is_active', false)
+    .is('approved_at', null)
+    .not('owner_id', 'is', null)
+    .order('created_at', { ascending: false })
+    .limit(10);
+  pendingListingsForReview = data ?? [];
+}
+
+
+// Owner stats
+const ownerGross  = (revenueRes?.data ?? []).reduce((s: number, b: any) => s + Number(b.total_price), 0);
+const ownerFees   = (revenueRes?.data ?? []).reduce((s: number, b: any) => s + Number(b.platform_fee ?? 0), 0);
+const ownerNet    = (revenueRes?.data ?? []).reduce((s: number, b: any) => s + Number(b.owner_payout ?? b.total_price), 0);
+// Admin: all platform fees earned this month
+const monthlyFees = (platformFeeRes?.data ?? []).reduce((s: number, b: any) => s + Number(b.platform_fee), 0);
+// Admin: fees actually collected (deposit paid or commission invoice paid)
+const feesCollected = (feesCollectedRes?.data ?? []).reduce((s: number, b: any) => s + Number(b.platform_fee), 0);
+// Admin: outstanding commissions not yet collected
+const outstandingComm = (outstandingRes?.data ?? []).reduce((s: number, b: any) => s + Number(b.platform_fee), 0);
+const upcoming = upcomingRes?.data ?? [];
+
+function fmtDate(d: string) {
+  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+---
+
+<AdminLayout title="Dashboard">
+
+  <!-- Telegram status banner (non-owners only) -->
+  {!isOwner && !telegramStatus.connected && (
+    <div class="mb-6 flex items-start gap-3 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-sm">
+      <span class="text-lg mt-0.5">📵</span>
+      <div>
+        <p class="font-semibold">{al('tg_not_connected')}</p>
+        <p class="text-amber-700 mt-0.5">
+          {al('tg_no_alerts')} {al('tg_add_vars')} <code class="bg-amber-100 px-1 rounded">TELEGRAM_BOT_TOKEN</code> and <code class="bg-amber-100 px-1 rounded">TELEGRAM_CHAT_ID</code> {al('tg_env_vars')}
+          <a href="https://core.telegram.org/bots#botfather" target="_blank" class="underline ml-1">{al('setup_guide')}</a>
+        </p>
+      </div>
+    </div>
+  )}
+  {!isOwner && telegramStatus.connected && (
+    <div class="mb-6 flex items-center gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-4 py-3 text-sm">
+      <span class="text-lg">✅</span>
+      <p>Telegram bot <strong>@{telegramStatus.username}</strong> {al('tg_connected')}</p>
+    </div>
+  )}
+
+  <!-- Pending listings review (super_admin only) -->
+  {role === 'super_admin' && pendingListingsForReview.length > 0 && (
+    <div class="mb-6 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-sm text-amber-800">
+      <div class="flex items-center gap-2 mb-2">
+        <span class="text-lg">🏡</span>
+        <p class="font-semibold">{pendingListingsForReview.length} listing{pendingListingsForReview.length !== 1 ? 's' : ''} pending review</p>
+      </div>
+      <div class="space-y-1">
+        {pendingListingsForReview.map((l: any) => (
+          <div class="flex items-center justify-between gap-4">
+            <span class="text-amber-700 truncate">{l.title} <span class="text-amber-500 text-xs">— {(l.profiles as any)?.full_name ?? (l.profiles as any)?.email ?? 'Owner'}</span></span>
+            <a href={`/admin/listings/${l.id}`} class="shrink-0 underline font-medium hover:text-amber-900">Review →</a>
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
+
+  <!-- Stats -->
+  <div class={`grid grid-cols-2 ${isOwner ? 'lg:grid-cols-3' : 'lg:grid-cols-4'} gap-4 mb-8`}>
+    {isOwner ? (
+      <>
+        <a href="/admin/bookings?status=pending" class="bg-white rounded-2xl p-5 border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all block">
+          <div class="inline-flex items-center justify-center w-10 h-10 bg-amber-50 rounded-xl text-lg mb-3">⏳</div>
+          <p class="text-2xl font-bold text-amber-600">{pendingRes?.count ?? 0}</p>
+          <p class="text-gray-500 text-xs mt-0.5">{al('pending_bookings')}</p>
+        </a>
+        <a href="/admin/bookings?status=confirmed" class="bg-white rounded-2xl p-5 border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all block">
+          <div class="inline-flex items-center justify-center w-10 h-10 bg-emerald-50 rounded-xl text-lg mb-3">✅</div>
+          <p class="text-2xl font-bold text-emerald-600">{confirmedRes?.count ?? 0}</p>
+          <p class="text-gray-500 text-xs mt-0.5">{al('confirmed_bookings')}</p>
+        </a>
+        <div class="bg-white rounded-2xl p-5 border border-gray-100">
+          <div class="inline-flex items-center justify-center w-10 h-10 bg-[#1a1a2e]/5 rounded-xl text-lg mb-3">💶</div>
+          <p class="text-2xl font-bold text-gray-900">€{ownerGross.toLocaleString()}</p>
+          <p class="text-gray-500 text-xs mt-0.5">Gross revenue this month</p>
+        </div>
+        {ownerFees > 0 ? (
+          <div class="bg-white rounded-2xl p-5 border border-gray-100">
+            <div class="inline-flex items-center justify-center w-10 h-10 bg-purple-50 rounded-xl text-lg mb-3">💎</div>
+            <p class="text-2xl font-bold text-purple-600">€{ownerFees.toLocaleString()}</p>
+            <p class="text-gray-500 text-xs mt-0.5">Platform fees</p>
+          </div>
+        ) : (
+          <div class="bg-white rounded-2xl p-5 border border-gray-100">
+            <div class="inline-flex items-center justify-center w-10 h-10 bg-emerald-50 rounded-xl text-lg mb-3">🎉</div>
+            <p class="text-2xl font-bold text-emerald-600">€0</p>
+            <p class="text-gray-500 text-xs mt-0.5">Platform fees</p>
+          </div>
+        )}
+        <div class="bg-white rounded-2xl p-5 border border-gray-100">
+          <div class="inline-flex items-center justify-center w-10 h-10 bg-emerald-50 rounded-xl text-lg mb-3">✅</div>
+          <p class="text-2xl font-bold text-emerald-600">€{ownerNet.toLocaleString()}</p>
+          <p class="text-gray-500 text-xs mt-0.5">Net earnings this month</p>
+        </div>
+        <div class="bg-white rounded-2xl p-5 border border-gray-100">
+          <div class="inline-flex items-center justify-center w-10 h-10 bg-blue-50 rounded-xl text-lg mb-3">📅</div>
+          <p class="text-2xl font-bold text-blue-600">{upcoming.length}</p>
+          <p class="text-gray-500 text-xs mt-0.5">{al('upcoming_checkins')}</p>
+        </div>
+      </>
+    ) : (
+      <>
+        {[
+          { label: al('pending_bookings'), value: pendingRes?.count ?? 0, color: 'text-amber-600', bg: 'bg-amber-50', icon: '⏳', href: '/admin/bookings?status=pending' },
+          { label: al('confirmed_bookings'), value: confirmedRes?.count ?? 0, color: 'text-emerald-600', bg: 'bg-emerald-50', icon: '✅', href: '/admin/bookings?status=confirmed' },
+          { label: al('new_inquiries'), value: inquiriesRes?.count ?? 0, color: 'text-blue-600', bg: 'bg-blue-50', icon: '📬', href: '/admin/inquiries' },
+          { label: al('fees_collected'), value: `€${feesCollected.toLocaleString()}`, color: 'text-emerald-600', bg: 'bg-emerald-50', icon: '💶', href: '/admin/bookings' },
+        ].map((s) => (
+          <a href={s.href} class="bg-white rounded-2xl p-5 border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all block">
+            <div class={`inline-flex items-center justify-center w-10 h-10 ${s.bg} rounded-xl text-lg mb-3`}>{s.icon}</div>
+            <p class={`text-2xl font-bold ${s.color}`}>{s.value}</p>
+            <p class="text-gray-500 text-xs mt-0.5">{s.label}</p>
+          </a>
+        ))}
+        <!-- Extra row for super_admin: platform fees + pending payouts -->
+        {role === 'super_admin' && (
+          <>
+            <div class="bg-white rounded-2xl p-5 border border-gray-100">
+              <div class="inline-flex items-center justify-center w-10 h-10 bg-purple-50 rounded-xl text-lg mb-3">💎</div>
+              <p class="text-2xl font-bold text-purple-600">€{monthlyFees.toLocaleString()}</p>
+              <p class="text-gray-500 text-xs mt-0.5">{al('platform_fees')}</p>
+            </div>
+            <a href="/admin/bookings?commission=outstanding" class="bg-white rounded-2xl p-5 border border-gray-100 hover:border-gray-200 hover:shadow-sm transition-all block">
+              <div class="inline-flex items-center justify-center w-10 h-10 bg-orange-50 rounded-xl text-lg mb-3">🧾</div>
+              <p class="text-2xl font-bold text-orange-600">€{outstandingComm.toLocaleString()}</p>
+              <p class="text-gray-500 text-xs mt-0.5">{al('outstanding_comm')}</p>
+            </a>
+          </>
+        )}
+      </>
+    )}
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+    <!-- Upcoming check-ins -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="font-semibold text-gray-900">{al('upcoming_checkins')}</h2>
+        <a href="/admin/bookings" class="text-xs text-[#1a1a2e] hover:text-[#c9a96e] transition-colors">{al('view_all')}</a>
+      </div>
+      {upcoming.length === 0 ? (
+        <p class="text-gray-400 text-sm">{al('no_checkins')}</p>
+      ) : (
+        <div class="space-y-3">
+          {upcoming.map((b: any) => (
+            <a href={`/admin/bookings/${b.id}`} class="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+              <div>
+                <p class="font-medium text-gray-900 text-sm">{b.guest_name}</p>
+                <p class="text-xs text-gray-400">{b.listings?.title}</p>
+              </div>
+              <div class="text-right">
+                <p class="text-sm font-medium text-gray-900">{fmtDate(b.check_in)}</p>
+                <p class="text-xs text-gray-400">→ {fmtDate(b.check_out)}</p>
+              </div>
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+
+    <!-- Quick actions -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <h2 class="font-semibold text-gray-900 mb-4">{al('quick_actions')}</h2>
+      <div class="grid grid-cols-2 gap-3">
+        {isOwner ? (
+          <>
+            {[
+              { href: '/admin/bookings?status=pending', label: al('review_pending'), icon: '⏳' },
+              { href: '/admin/listings', label: al('my_listings'), icon: '🏡' },
+              { href: '/admin/bookings', label: al('all_bookings'), icon: '📅' },
+              { href: '/admin/profile', label: 'My profile', icon: '👤' },
+            ].map((a) => (
+              <a href={a.href} class="flex flex-col gap-2 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors">
+                <span class="text-xl">{a.icon}</span>
+                <span class="text-sm font-medium text-gray-900">{a.label}</span>
+              </a>
+            ))}
+          </>
+        ) : (
+          <>
+            {[
+              { href: '/admin/bookings?status=pending', label: al('review_pending'), icon: '⏳' },
+              { href: '/admin/listings/new', label: al('add_listing'), icon: '➕' },
+              { href: '/admin/bookings', label: al('all_bookings'), icon: '📅' },
+              { href: '/admin/reviews', label: al('manage_reviews'), icon: '⭐' },
+            ].map((a) => (
+              <a href={a.href} class="flex flex-col gap-2 p-4 bg-gray-50 hover:bg-gray-100 rounded-xl transition-colors">
+                <span class="text-xl">{a.icon}</span>
+                <span class="text-sm font-medium text-gray-900">{a.label}</span>
+              </a>
+            ))}
+          </>
+        )}
+      </div>
+    </div>
+  </div>
+</AdminLayout>

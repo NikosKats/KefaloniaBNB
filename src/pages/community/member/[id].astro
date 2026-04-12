@@ -1,0 +1,201 @@
+---
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+const { id } = Astro.params;
+
+const service = getServiceClient();
+const { data: profile } = await service
+  .from('profiles')
+  .select('id, full_name, avatar_url, bio, location, hometown, cover_photo, facebook_url, instagram_url, created_at')
+  .eq('id', id)
+  .single();
+
+if (!profile) return Astro.redirect('/community/board');
+
+const { data: posts } = await service
+  .from('community_posts')
+  .select('*')
+  .eq('author_id', id)
+  .eq('is_hidden', false)
+  .order('created_at', { ascending: false })
+  .limit(20);
+
+const memberSince = new Date(profile.created_at).toLocaleDateString();
+const isOwnProfile = Astro.locals.session?.user?.id === id;
+---
+
+<BaseLayout
+  title={`${profile.full_name ?? 'Member'} — Keramoti Community`}
+  description={profile.bio?.slice(0, 160) ?? 'Community member'}
+>
+  <section class="bg-[#1a1a2e] py-8">
+    <div class="max-w-2xl mx-auto px-4">
+      <a href="/community/board" class="text-gray-400 hover:text-white text-sm">← {isEl ? 'Κοινότητα' : isBg ? 'Общност' : isSr ? 'Zajednica' : isTr ? 'Topluluk' : isRo ? 'Comunitate' : 'Community'}</a>
+    </div>
+  </section>
+
+  <section class="max-w-2xl mx-auto px-4 -mt-8 pb-10">
+    <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden shadow-sm">
+      <div class="h-32 bg-gradient-to-br from-[#1a1a2e] to-[#3d3d5e]">
+        {profile.cover_photo && <img src={profile.cover_photo} alt="" class="w-full h-full object-cover" />}
+      </div>
+      <div class="px-5 pb-5 -mt-10">
+        <div class="flex items-end gap-4">
+          <div class="w-20 h-20 rounded-full border-4 border-white bg-[#1a1a2e] flex items-center justify-center text-white text-2xl font-bold overflow-hidden flex-shrink-0">
+            {profile.avatar_url ? (
+              <img src={profile.avatar_url} alt={profile.full_name} class="w-full h-full object-cover" />
+            ) : (
+              profile.full_name?.[0]?.toUpperCase() ?? '?'
+            )}
+          </div>
+          <div class="pb-1">
+            <h1 class="text-xl font-bold text-gray-900">{profile.full_name}</h1>
+            <p class="text-xs text-gray-400">{isEl ? 'Μέλος από' : isBg ? 'Член от' : isSr ? 'Član od' : isTr ? 'Üye olma tarihi' : isRo ? 'Membru din' : 'Member since'} {memberSince}</p>
+          </div>
+        </div>
+        <div class="flex flex-wrap gap-2 mt-4">
+          {profile.location && <span class="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">📍 {profile.location}</span>}
+          {profile.hometown && <span class="text-xs bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">🏠 {isEl ? 'Από' : isBg ? 'От' : isSr ? 'Iz' : isTr ? 'Memleket' : isRo ? 'Din' : 'From'} {profile.hometown}</span>}
+        </div>
+        {profile.bio && <p class="text-sm text-gray-600 mt-3">{profile.bio}</p>}
+        {(profile.facebook_url || profile.instagram_url) && (
+          <div class="flex gap-3 mt-3">
+            {profile.facebook_url && (
+              <a href={profile.facebook_url} target="_blank" rel="noopener" class="text-xs text-gray-500 hover:text-blue-600">Facebook</a>
+            )}
+            {profile.instagram_url && (
+              <a href={profile.instagram_url} target="_blank" rel="noopener" class="text-xs text-gray-500 hover:text-pink-600">Instagram</a>
+            )}
+          </div>
+        )}
+        <div class="flex flex-wrap gap-2 mt-4">
+          {isOwnProfile ? (
+            <a href="/community/profile" class="bg-gray-100 text-gray-700 px-4 py-2 rounded-xl text-sm font-medium hover:bg-gray-200">
+              {isEl ? 'Επεξεργασία' : isBg ? 'Редактирайте профила' : isSr ? 'Uredi profil' : isTr ? 'Profili Düzenle' : isRo ? 'Editare Profil' : 'Edit Profile'}
+            </a>
+          ) : Astro.locals.session && (
+            <>
+              <button
+                id="friend-btn"
+                data-member-id={id}
+                class="bg-[#1a1a2e] text-white px-4 py-2 rounded-xl text-sm font-medium hover:bg-[#2d2d4e] transition-colors"
+              >
+                {isEl ? 'Προσθήκη φίλου' : isBg ? 'Добавете приятел' : isSr ? 'Dodaj prijatelja' : isTr ? 'Arkadaş Ekle' : isRo ? 'Adaugă Prieten' : 'Add Friend'}
+              </button>
+              <a
+                href={`/account/messages?new=${id}`}
+                class="border border-gray-200 text-gray-700 px-4 py-2 rounded-xl text-sm font-medium hover:bg-gray-50 transition-colors"
+              >
+                {isEl ? 'Μήνυμα' : isBg ? 'Съобщение' : isSr ? 'Poruka' : isTr ? 'Mesaj' : isRo ? 'Mesaj' : 'Message'}
+              </a>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+
+    {/* Posts */}
+    <h2 class="text-lg font-semibold text-gray-900 mt-6 mb-4">
+      {isEl ? 'Δημοσιεύσεις' : isBg ? 'Публикации' : isSr ? 'Objave' : isTr ? 'Gönderiler' : isRo ? 'Postări' : 'Posts'} ({(posts ?? []).length})
+    </h2>
+    {(posts ?? []).length === 0 ? (
+      <p class="text-sm text-gray-400 text-center py-6">{isEl ? 'Δεν υπάρχουν δημοσιεύσεις' : isBg ? 'Все още няма публикации' : isSr ? 'Još nema objava' : isTr ? 'Henüz gönderi yok' : isRo ? 'Nicio postare încă' : 'No posts yet'}</p>
+    ) : (
+      <div class="space-y-3">
+        {(posts ?? []).map((post: any) => (
+          <a href={`/community/board/${post.id}`} class="block bg-white rounded-xl border border-gray-100 p-4 hover:shadow-md transition-shadow">
+            <span class="text-xs text-gray-400">{new Date(post.created_at).toLocaleDateString()} · {post.category}</span>
+            {post.title && <h3 class="font-semibold text-gray-900 mt-1">{post.title}</h3>}
+            <p class="text-sm text-gray-600 mt-1 line-clamp-2">{post.body}</p>
+            {post.photo_urls?.length > 0 && (
+              <div class="flex gap-1 mt-2">
+                {post.photo_urls.slice(0, 3).map((url: string) => (
+                  <img src={url} alt="" class="w-12 h-12 rounded object-cover" loading="lazy" />
+                ))}
+              </div>
+            )}
+          </a>
+        ))}
+      </div>
+    )}
+  </section>
+</BaseLayout>
+
+<script is:inline>
+  var friendBtn = document.getElementById('friend-btn');
+  if (friendBtn) {
+    var memberId = friendBtn.dataset.memberId;
+    var _fl = document.documentElement.lang;
+    var _t = function(en, el, bg, sr, tr, ro) {
+      return _fl === 'el' ? el : _fl === 'bg' ? bg : _fl === 'sr' ? sr : _fl === 'tr' ? tr : _fl === 'ro' ? ro : en;
+    };
+    var _friends = _t('Friends', 'Φίλοι', 'Приятели', 'Prijatelji', 'Arkadaşlar', 'Prieteni');
+    var _reqSent = _t('Request Sent', 'Αίτημα Στάλθηκε', 'Заявката е изпратена', 'Zahtev poslat', 'İstek Gönderildi', 'Cerere Trimisă');
+    var _acceptReq = _t('Accept Request', 'Αποδοχή Αιτήματος', 'Приемете заявката', 'Prihvati zahtev', 'İsteği Kabul Et', 'Acceptă Cererea');
+
+    // Check current friendship status
+    fetch('/api/community/friends/status?user_id=' + memberId)
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        if (data.status === 'accepted') {
+          friendBtn.textContent = _friends;
+          friendBtn.className = 'bg-gray-100 text-gray-600 px-4 py-2 rounded-xl text-sm font-medium cursor-default';
+          friendBtn.disabled = true;
+        } else if (data.status === 'pending') {
+          friendBtn.textContent = data.direction === 'sent' ? _reqSent : _acceptReq;
+          if (data.direction === 'sent') {
+            friendBtn.className = 'bg-gray-100 text-gray-600 px-4 py-2 rounded-xl text-sm font-medium cursor-default';
+            friendBtn.disabled = true;
+          } else {
+            friendBtn.dataset.friendId = data.friend_id;
+            friendBtn.dataset.action = 'accept';
+          }
+        } else if (data.status === 'blocked') {
+          friendBtn.style.display = 'none';
+        }
+      });
+
+    friendBtn.addEventListener('click', async function() {
+      if (friendBtn.disabled) return;
+      friendBtn.disabled = true;
+      var prevText = friendBtn.textContent;
+      friendBtn.textContent = '...';
+
+      try {
+        if (friendBtn.dataset.action === 'accept') {
+          await fetch('/api/community/friends/' + friendBtn.dataset.friendId, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ status: 'accepted' }),
+          });
+          friendBtn.textContent = _friends;
+          friendBtn.className = 'bg-gray-100 text-gray-600 px-4 py-2 rounded-xl text-sm font-medium cursor-default';
+        } else {
+          var res = await fetch('/api/community/friends', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ addressee_id: memberId }),
+          });
+          if (res.ok) {
+            friendBtn.textContent = _reqSent;
+            friendBtn.className = 'bg-gray-100 text-gray-600 px-4 py-2 rounded-xl text-sm font-medium cursor-default';
+          } else {
+            var err = await res.json();
+            friendBtn.textContent = err.error || prevText;
+            friendBtn.disabled = false;
+          }
+        }
+      } catch {
+        friendBtn.textContent = prevText;
+        friendBtn.disabled = false;
+      }
+    });
+  }
+</script>

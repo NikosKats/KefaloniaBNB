@@ -1,0 +1,263 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const session = Astro.locals.session!;
+const profile = Astro.locals.profile!;
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? Astro.url.origin;
+
+// Handle POST: save profile fields
+if (Astro.request.method === 'POST') {
+  const form = await Astro.request.formData();
+  const full_name            = form.get('full_name') as string;
+  const phone                = form.get('phone') as string;
+  const bio                  = form.get('bio') as string;
+  const company_name         = form.get('company_name') as string;
+  const payment_account_name = form.get('payment_account_name') as string | null;
+  const payment_revolut      = form.get('payment_revolut') as string | null;
+  const payment_wise         = form.get('payment_wise') as string | null;
+  const payment_iban         = form.get('payment_iban') as string | null;
+  const payment_bic          = form.get('payment_bic') as string | null;
+
+  const service = getServiceClient();
+  await service.from('profiles').update({
+    full_name, phone, bio, company_name,
+    payment_account_name: payment_account_name || null,
+    payment_revolut:      payment_revolut      || null,
+    payment_wise:         payment_wise         || null,
+    payment_iban:         payment_iban         || null,
+    payment_bic:          payment_bic          || null,
+  }).eq('id', session.user.id);
+  return Astro.redirect('/admin/profile?saved=1');
+}
+
+const saved = Astro.url.searchParams.get('saved') === '1';
+const subscriptionParam = Astro.url.searchParams.get('subscription');
+---
+
+<AdminLayout title="My Profile">
+
+  {saved && (
+    <div class="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-4 py-3 text-sm flex items-center gap-2">
+      <span>✅</span> Profile saved successfully.
+    </div>
+  )}
+  {subscriptionParam === 'success' && (
+    <div class="mb-6 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-4 py-3 text-sm flex items-center gap-2">
+      <span>🎉</span> Subscription activated! Direct contact is now enabled on your listings.
+    </div>
+  )}
+  {subscriptionParam === 'cancelled' && (
+    <div class="mb-6 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-sm flex items-center gap-2">
+      <span>ℹ️</span> Subscription checkout was cancelled. Contact support if you need help.
+    </div>
+  )}
+
+  <div class="max-w-2xl space-y-8">
+
+    <!-- Profile info -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <h2 class="font-semibold text-gray-900 mb-5">Profile information</h2>
+      <form method="POST" class="space-y-4">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Full name</label>
+            <input type="text" name="full_name" value={profile.full_name ?? ''} required
+              class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Company / Trading name</label>
+            <input type="text" name="company_name" value={profile.company_name ?? ''}
+              class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <input type="email" value={session.user.email ?? ''} disabled
+              class="w-full px-3 py-2 border border-gray-100 bg-gray-50 rounded-xl text-sm text-gray-400 cursor-not-allowed" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+            <input type="tel" name="phone" value={profile.phone ?? ''}
+              class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Bio (optional)</label>
+          <textarea name="bio" rows={3}
+            class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20 resize-none"
+          >{profile.bio ?? ''}</textarea>
+        </div>
+        <div class="flex justify-end">
+          <button type="submit"
+            class="bg-[#1a1a2e] text-white font-semibold px-5 py-2 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">
+            Save changes
+          </button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Subscription status (property owners only) -->
+    {profile.role === 'property_owner' && (() => {
+      const subActive = (profile as any).subscription_active === true;
+      const expiresAt = (profile as any).subscription_expires_at as string | null;
+      const expiryFmt = expiresAt ? new Date(expiresAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : null;
+      const isExpired = expiresAt ? new Date(expiresAt) < new Date() : false;
+      return (
+        <div class="bg-white rounded-2xl border border-gray-100 p-6">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h2 class="font-semibold text-gray-900">Direct Contact Subscription</h2>
+              <p class="text-sm text-gray-500 mt-0.5">€299/year — enables WhatsApp/Viber on your listings + 3% commission</p>
+            </div>
+            {subActive && !isExpired
+              ? <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Active</span>
+              : <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-gray-100 text-gray-500 border border-gray-200">Inactive</span>
+            }
+          </div>
+          {expiryFmt && (
+            <p class="text-xs text-gray-400 mb-4">{isExpired ? `Expired ${expiryFmt}` : `Renews ${expiryFmt}`}</p>
+          )}
+          {(!subActive || isExpired) && (
+            <button id="subscribe-btn"
+              class="bg-[#1a1a2e] text-white font-semibold px-5 py-2.5 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">
+              Subscribe — €299/year
+            </button>
+          )}
+          <div id="sub-msg" class="hidden mt-3 rounded-xl px-4 py-3 text-sm"></div>
+        </div>
+      );
+    })()}
+
+    <!-- Bank Transfer / Payment Details (only shown if super admin has enabled it) -->
+    {(profile as any).show_payment_details && (
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <h2 class="font-semibold text-gray-900 mb-1">Bank Transfer & Payment Details</h2>
+      <p class="text-sm text-gray-500 mb-5">These details are emailed to guests when a bank transfer booking is approved. Leave fields blank to use the platform defaults (KefaloniaBNB).</p>
+      <form method="POST" class="space-y-4">
+        <!-- Hidden fields to preserve the other form's values — we use a single POST form so we submit all together -->
+        <input type="hidden" name="full_name"    value={profile.full_name    ?? ''} />
+        <input type="hidden" name="phone"        value={profile.phone        ?? ''} />
+        <input type="hidden" name="bio"          value={profile.bio          ?? ''} />
+        <input type="hidden" name="company_name" value={profile.company_name ?? ''} />
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">Account name</label>
+          <input type="text" name="payment_account_name"
+            value={profile.payment_account_name ?? ''}
+            placeholder="KefaloniaBNB"
+            class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Revolut</label>
+            <input type="text" name="payment_revolut"
+              value={profile.payment_revolut ?? ''}
+              placeholder="@kefaloniabnb"
+              class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+          </div>
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">Wise</label>
+            <input type="email" name="payment_wise"
+              value={profile.payment_wise ?? ''}
+              placeholder="kefaloniabnb@email.com"
+              class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1">IBAN</label>
+          <input type="text" name="payment_iban"
+            value={profile.payment_iban ?? ''}
+            placeholder="GR0000000000000000000000000"
+            class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+        </div>
+
+        <div class="sm:w-1/2">
+          <label class="block text-sm font-medium text-gray-700 mb-1">BIC / SWIFT</label>
+          <input type="text" name="payment_bic"
+            value={profile.payment_bic ?? ''}
+            placeholder="ETHNGRAA"
+            class="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#1a1a2e]/20" />
+        </div>
+
+        <div class="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-800">
+          💡 These replace the <code>BANK_*</code> environment variables. Anything you fill in here takes priority.
+        </div>
+
+        <div class="flex justify-end">
+          <button type="submit"
+            class="bg-[#1a1a2e] text-white font-semibold px-5 py-2 rounded-xl text-sm hover:bg-[#2d2d4e] transition-colors">
+            Save payment details
+          </button>
+        </div>
+      </form>
+    </div>
+    )}
+
+    <!-- Security -->
+    <div class="bg-white rounded-2xl border border-gray-100 p-6">
+      <h2 class="font-semibold text-gray-900 mb-1">Security</h2>
+      <p class="text-sm text-gray-500 mb-4">A reset link will be sent to <strong>{session.user.email}</strong>.</p>
+      <div id="reset-success" class="hidden mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-4 py-3 text-sm">
+        ✅ Reset link sent — check your inbox and click the link to set a new password.
+      </div>
+      <div id="reset-error" class="hidden mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm"></div>
+      <button id="reset-password-btn"
+        class="text-sm font-semibold text-[#1a1a2e] border border-[#1a1a2e] px-4 py-2 rounded-xl hover:bg-[#1a1a2e] hover:text-white transition-colors">
+        Request password reset →
+      </button>
+    </div>
+  </div>
+</AdminLayout>
+
+<script define:vars={{ siteUrl }}>
+  // Password reset
+  document.getElementById('reset-password-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('reset-password-btn');
+    const successEl = document.getElementById('reset-success');
+    const errorEl = document.getElementById('reset-error');
+
+    btn.textContent = 'Sending…';
+    btn.setAttribute('disabled', 'true');
+
+    const res = await fetch('/api/auth/reset-password', { method: 'POST' });
+    const { error } = await res.json();
+
+    if (error) {
+      errorEl.textContent = error;
+      errorEl.classList.remove('hidden');
+      btn.textContent = 'Request password reset →';
+      btn.removeAttribute('disabled');
+    } else {
+      successEl.classList.remove('hidden');
+      errorEl.classList.add('hidden');
+      btn.classList.add('hidden');
+    }
+  });
+
+  // Subscribe button — redirect to Stripe checkout
+  document.getElementById('subscribe-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('subscribe-btn');
+    const msg = document.getElementById('sub-msg');
+    if (btn) { btn.textContent = 'Redirecting…'; btn.setAttribute('disabled', 'true'); }
+    try {
+      const res = await fetch('/api/subscription/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const { url, error } = await res.json();
+      if (url) {
+        window.location.href = url;
+      } else {
+        if (msg) { msg.className = 'mt-3 rounded-xl px-4 py-3 text-sm bg-red-50 border border-red-200 text-red-700'; msg.textContent = error ?? 'Could not start checkout'; msg.classList.remove('hidden'); }
+        if (btn) { btn.textContent = 'Subscribe — €299/year'; btn.removeAttribute('disabled'); }
+      }
+    } catch {
+      if (msg) { msg.className = 'mt-3 rounded-xl px-4 py-3 text-sm bg-red-50 border border-red-200 text-red-700'; msg.textContent = 'Network error — please try again.'; msg.classList.remove('hidden'); }
+      if (btn) { btn.textContent = 'Subscribe — €299/year'; btn.removeAttribute('disabled'); }
+    }
+  });
+</script>

@@ -1,0 +1,363 @@
+---
+import '../styles/global.css';
+import { getServiceClient } from '../lib/supabase.ts';
+
+interface Props {
+  title: string;
+}
+const { title } = Astro.props;
+const path = Astro.url.pathname;
+const profile = Astro.locals.profile;
+const session = Astro.locals.session;
+const isAdminViewing = profile?.role === 'admin' || profile?.role === 'super_admin';
+
+const navItems = [
+  { href: '/cleaner/dashboard',  label: 'Dashboard',  icon: '▤' },
+  { href: '/cleaner/requests',   label: 'Find Jobs',   icon: '🔍' },
+  { href: '/cleaner/profile',    label: 'My Profile',  icon: '👤' },
+  { href: '/cleaner/connect',    label: 'Payouts',     icon: '💳' },
+];
+
+function isActive(href: string) {
+  if (href === '/cleaner/dashboard') return path === '/cleaner/dashboard';
+  return path.startsWith(href);
+}
+
+// Fetch recent notifications for bell
+const userId = session?.user?.id;
+const accessToken = session?.access_token ?? '';
+const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL ?? '';
+const supabaseAnonKey = import.meta.env.PUBLIC_SUPABASE_ANON_KEY ?? '';
+
+let recentNotifications: any[] = [];
+if (userId) {
+  const service = getServiceClient();
+  const { data } = await service
+    .from('cleaning_notifications')
+    .select('id, type, payload, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(8);
+  recentNotifications = data ?? [];
+}
+
+const NOTIF_LABELS: Record<string, string> = {
+  new_request: 'New cleaning request available',
+  bid_received: 'New bid received on your request',
+  bid_accepted: 'Your bid has been accepted!',
+  bid_rejected: 'A bid was not selected',
+  job_scheduled: 'Job scheduled',
+  job_started: 'Job has started',
+  job_completed: 'Job marked complete',
+  job_approved: 'Job approved — payment released!',
+  payment_received: 'Payment received',
+  payout_sent: 'Payout sent to your account',
+  dispute_raised: 'A dispute has been raised',
+  dispute_resolved: 'Dispute resolved',
+};
+---
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title} — KefaloniaBNB</title>
+  <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+  <link rel="manifest" href="/api/manifest?page=cleaner" />
+  <link rel="apple-touch-icon" sizes="180x180" href="/icons/apple-touch-icon.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Kefalonia Cleaner" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#1a1a2e" />
+</head>
+<body class="min-h-screen bg-gray-50">
+
+  {isAdminViewing && (
+    <div class="bg-[#1a1a2e] text-white text-xs px-4 py-2 flex items-center justify-between gap-4">
+      <span class="flex items-center gap-2">
+        <span class="bg-[#c9a96e] text-white px-2 py-0.5 rounded font-semibold uppercase tracking-wide text-[10px]">Admin View</span>
+        Viewing Cleaner Portal as {profile?.full_name}
+      </span>
+      <a href="/admin/cleaning" class="text-[#c9a96e] hover:opacity-80 font-medium">← Back to Admin Cleaning</a>
+    </div>
+  )}
+
+  <!-- Notification data for unread count (server-rendered) -->
+  <div id="notif-data" class="hidden"
+    data-notifications={JSON.stringify(recentNotifications.map((n: any) => ({ id: n.id, created_at: n.created_at })))}
+    aria-hidden="true"
+  ></div>
+
+  <!-- Realtime config (hidden) -->
+  <div id="rt-cfg"
+    data-url={supabaseUrl}
+    data-key={supabaseAnonKey}
+    data-uid={userId ?? ''}
+    data-token={accessToken}
+    class="hidden"
+    aria-hidden="true"
+  ></div>
+
+  <!-- Toast container -->
+  <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- Top bar -->
+  <header class="bg-white border-b border-gray-100 sticky top-0 z-40">
+    <div class="max-w-5xl mx-auto px-4 flex items-center justify-between h-14">
+      <div class="flex items-center gap-3">
+        <span class="text-lg">🧹</span>
+        <span class="font-semibold text-gray-900 text-sm">Cleaner Portal</span>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-xs text-gray-500 hidden sm:block">{profile?.full_name}</span>
+
+        <!-- Notification Bell -->
+        {userId && (
+          <div id="notif-wrapper" class="relative">
+            <button id="notif-btn" class="relative p-1.5 rounded-lg hover:bg-gray-100 transition-colors" aria-label="Notifications">
+              <svg class="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
+              </svg>
+              <span id="notif-badge" class="hidden absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] font-bold rounded-full min-w-[16px] h-4 flex items-center justify-center px-0.5 leading-none">0</span>
+            </button>
+
+            <!-- Notification panel -->
+            <div id="notif-panel" class="hidden absolute right-0 top-11 w-80 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 overflow-hidden">
+              <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+                <p class="text-sm font-semibold text-gray-900">Notifications</p>
+                <span class="text-xs text-gray-400">{recentNotifications.length} recent</span>
+              </div>
+              <div class="max-h-72 overflow-y-auto" id="notif-list">
+                {recentNotifications.length === 0 && (
+                  <p class="text-sm text-gray-400 text-center py-8">No notifications yet</p>
+                )}
+                {recentNotifications.map((n: any) => {
+                  const label = NOTIF_LABELS[n.type] ?? n.type;
+                  const jobId = n.payload?.job_id;
+                  const href = jobId ? `/cleaner/jobs/${jobId}` : n.payload?.request_id ? `/cleaner/requests/${n.payload.request_id}` : null;
+                  const timeAgo = new Date(n.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+                  return (
+                    <div class="px-4 py-3 border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                      {href ? (
+                        <a href={href} class="block">
+                          <p class="text-sm text-gray-800 font-medium">{label}</p>
+                          <p class="text-xs text-gray-400 mt-0.5">{timeAgo}</p>
+                        </a>
+                      ) : (
+                        <div>
+                          <p class="text-sm text-gray-800 font-medium">{label}</p>
+                          <p class="text-xs text-gray-400 mt-0.5">{timeAgo}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        <a href="https://kefaloniabnb.com" target="_blank" class="text-xs text-gray-400 hover:text-gray-600">View site ↗</a>
+        <form method="POST" action="/api/auth/logout">
+          <button type="submit" class="text-xs text-gray-400 hover:text-gray-600">Sign out</button>
+        </form>
+      </div>
+    </div>
+  </header>
+
+  <div class="max-w-5xl mx-auto px-4 flex gap-6 py-6">
+
+    <!-- Sidebar -->
+    <nav class="hidden md:flex flex-col gap-1 w-44 flex-shrink-0">
+      {navItems.map(item => (
+        <a
+          href={item.href}
+          class={`flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium transition-colors ${
+            isActive(item.href)
+              ? 'bg-[#1a1a2e] text-white'
+              : 'text-gray-600 hover:bg-gray-100'
+          }`}
+        >
+          <span>{item.icon}</span>
+          <span>{item.label}</span>
+        </a>
+      ))}
+    </nav>
+
+    <!-- Mobile bottom nav -->
+    <nav class="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-100 flex z-40">
+      {navItems.map(item => (
+        <a
+          href={item.href}
+          class={`flex-1 flex flex-col items-center gap-0.5 py-2 text-xs transition-colors ${
+            isActive(item.href) ? 'text-[#c9a96e] font-medium' : 'text-gray-500'
+          }`}
+        >
+          <span class="text-base">{item.icon}</span>
+          <span>{item.label}</span>
+        </a>
+      ))}
+    </nav>
+
+    <!-- Main content -->
+    <main class="flex-1 min-w-0 pb-20 md:pb-0">
+      <h1 class="text-lg font-bold text-gray-900 mb-5">{title}</h1>
+      <slot />
+    </main>
+
+  </div>
+
+  <script is:inline>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').then(function(reg) {
+        if (navigator.clearAppBadge) navigator.clearAppBadge();
+        if (reg.active) reg.active.postMessage({ type: 'CLEAR_BADGE' });
+      }).catch(function() {});
+    }
+  </script>
+</body>
+</html>
+
+<script>
+  import { createClient } from '@supabase/supabase-js';
+
+  const STORAGE_KEY = 'notif_last_read_cleaner';
+  const badge = document.getElementById('notif-badge') as HTMLElement | null;
+
+  // ── Persistent unread count from server-rendered notifications ──────────
+  const notifDataEl = document.getElementById('notif-data') as HTMLElement | null;
+  const serverNotifs: Array<{ id: string; created_at: string }> = JSON.parse(
+    notifDataEl?.dataset.notifications ?? '[]'
+  );
+  const lastRead = localStorage.getItem(STORAGE_KEY) ?? '1970-01-01T00:00:00Z';
+  let unreadCount = serverNotifs.filter(n => new Date(n.created_at) > new Date(lastRead)).length;
+
+  function updateBadge() {
+    if (!badge) return;
+    if (unreadCount > 0) {
+      badge.textContent = unreadCount > 99 ? '99+' : String(unreadCount);
+      badge.classList.remove('hidden');
+    } else {
+      badge.classList.add('hidden');
+    }
+  }
+  updateBadge();
+
+  // ── Notification bell toggle ────────────────────────────────────────────
+  const notifBtn = document.getElementById('notif-btn');
+  const notifPanel = document.getElementById('notif-panel');
+  notifBtn?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    notifPanel?.classList.toggle('hidden');
+    if (!notifPanel?.classList.contains('hidden')) {
+      // Mark all as read
+      localStorage.setItem(STORAGE_KEY, new Date().toISOString());
+      unreadCount = 0;
+      updateBadge();
+    }
+  });
+  document.addEventListener('click', (e) => {
+    if (!document.getElementById('notif-wrapper')?.contains(e.target as Node)) {
+      notifPanel?.classList.add('hidden');
+    }
+  });
+
+  // ── Toast helper ────────────────────────────────────────────────────────
+  const NOTIF_LABELS: Record<string, string> = {
+    new_request: '🔍 New cleaning request available',
+    bid_received: '💬 New bid received',
+    bid_accepted: '✅ Your bid has been accepted!',
+    bid_rejected: '❌ Bid not selected',
+    job_scheduled: '📅 Job scheduled',
+    job_started: '▶️ Job has started',
+    job_completed: '✔️ Job marked complete',
+    job_approved: '🎉 Job approved — payout coming!',
+    payment_received: '💳 Payment received',
+    payout_sent: '💸 Payout sent to your account',
+    dispute_raised: '⚠️ A dispute has been raised',
+    dispute_resolved: '✅ Dispute resolved',
+  };
+
+  function showToast(type: string, href?: string) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+    const label = NOTIF_LABELS[type] ?? 'New notification';
+    const toast = document.createElement('div');
+    toast.className = 'pointer-events-auto bg-white border border-gray-200 rounded-2xl shadow-lg px-4 py-3 flex items-center gap-3 max-w-xs animate-slideIn';
+    toast.innerHTML = `
+      <span class="text-base flex-shrink-0">🔔</span>
+      <div class="flex-1 min-w-0">
+        <p class="text-sm font-medium text-gray-900 leading-snug">${label}</p>
+        ${href ? `<a href="${href}" class="text-xs text-[#c9a96e] font-medium hover:opacity-80">View →</a>` : ''}
+      </div>
+      <button class="text-gray-300 hover:text-gray-500 text-lg leading-none flex-shrink-0" onclick="this.closest('div').remove()">×</button>
+    `;
+    container.appendChild(toast);
+    setTimeout(() => toast.remove(), 7000);
+  }
+
+  // ── Supabase Realtime subscription ─────────────────────────────────────
+  const cfg = document.getElementById('rt-cfg') as HTMLElement | null;
+  const supabaseUrl = cfg?.dataset.url;
+  const supabaseAnonKey = cfg?.dataset.key;
+  const userId = cfg?.dataset.uid;
+  const accessToken = cfg?.dataset.token;
+
+  if (supabaseUrl && supabaseAnonKey && userId && accessToken) {
+    const client = createClient(supabaseUrl, supabaseAnonKey);
+    client.realtime.setAuth(accessToken);
+
+    client
+      .channel('cleaner-notifications')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'cleaning_notifications',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload: any) => {
+          const n = payload.new;
+          const jobId = n.payload?.job_id;
+          const reqId = n.payload?.request_id;
+          const href = jobId
+            ? `/cleaner/jobs/${jobId}`
+            : reqId
+            ? `/cleaner/requests/${reqId}`
+            : undefined;
+
+          showToast(n.type, href);
+
+          // Update badge
+          unreadCount++;
+          updateBadge();
+
+          // Prepend to notification list
+          const list = document.getElementById('notif-list');
+          if (list) {
+            const empty = list.querySelector('p');
+            if (empty) empty.remove();
+            const label = NOTIF_LABELS[n.type] ?? n.type;
+            const item = document.createElement('div');
+            item.className = 'px-4 py-3 border-b border-gray-50 bg-blue-50/40';
+            item.innerHTML = href
+              ? `<a href="${href}" class="block"><p class="text-sm text-gray-800 font-medium">${label}</p><p class="text-xs text-gray-400 mt-0.5">Just now</p></a>`
+              : `<p class="text-sm text-gray-800 font-medium">${label}</p><p class="text-xs text-gray-400 mt-0.5">Just now</p>`;
+            list.insertBefore(item, list.firstChild);
+          }
+        }
+      )
+      .subscribe();
+  }
+</script>
+
+<style>
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(100%); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+  .animate-slideIn { animation: slideIn 0.25s ease-out; }
+</style>

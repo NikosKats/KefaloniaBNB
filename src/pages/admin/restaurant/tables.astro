@@ -1,0 +1,175 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+
+const profile = Astro.locals.profile!;
+const role = profile.role;
+const service = getServiceClient();
+
+let restaurantIds = Astro.locals.ownerRestaurantIds ?? [];
+if (role === 'admin' || role === 'super_admin') {
+  const { data } = await service.from('restaurants').select('id');
+  restaurantIds = (data ?? []).map((r: any) => r.id);
+}
+
+const restaurantId = restaurantIds[0];
+if (!restaurantId) return Astro.redirect('/admin/restaurant');
+
+const { data: tables } = await service
+  .from('restaurant_tables')
+  .select('*')
+  .eq('restaurant_id', restaurantId)
+  .order('sort_order')
+  .order('name');
+
+Astro.response.headers.set('Cache-Control', 'no-store');
+---
+
+<AdminLayout title="Tables">
+  <div class="space-y-6">
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl font-bold text-white">Tables</h1>
+      <button id="add-btn" class="bg-[#c9a96e] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#b89556]">+ Add Table</button>
+    </div>
+
+    <!-- Add/Edit form -->
+    <div id="table-form-wrap" class="hidden bg-white/5 rounded-xl border border-white/10 p-6">
+      <h2 class="text-lg font-semibold text-white mb-4" id="form-title">Add Table</h2>
+      <form id="table-form" class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <input type="hidden" name="id" />
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Name *</label>
+          <input type="text" name="name" required placeholder="e.g. Table 1, Terrace A"
+            class="w-full bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Capacity *</label>
+          <input type="number" name="capacity" required min="1" max="50" value="2"
+            class="w-full bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Location</label>
+          <select name="location" class="w-full bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e]">
+            <option value="indoor" class="text-black">Indoor</option>
+            <option value="outdoor" class="text-black">Outdoor</option>
+            <option value="terrace" class="text-black">Terrace</option>
+            <option value="bar" class="text-black">Bar</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs text-gray-400 mb-1">Sort Order</label>
+          <input type="number" name="sort_order" value="0"
+            class="w-full bg-white/10 text-white px-3 py-2 rounded-lg border border-white/20 text-sm outline-none focus:border-[#c9a96e]" />
+        </div>
+        <div class="sm:col-span-2 flex items-center gap-4">
+          <label class="flex items-center gap-2 text-sm text-gray-300">
+            <input type="checkbox" name="is_active" checked class="rounded" /> Active
+          </label>
+        </div>
+        <div class="sm:col-span-2 flex gap-2">
+          <button type="submit" class="bg-[#c9a96e] text-white px-6 py-2 rounded-lg text-sm font-semibold hover:bg-[#b89556]">Save</button>
+          <button type="button" id="cancel-btn" class="bg-white/10 text-gray-300 px-6 py-2 rounded-lg text-sm hover:bg-white/20">Cancel</button>
+        </div>
+      </form>
+    </div>
+
+    <!-- Tables list -->
+    {(!tables || tables.length === 0) ? (
+      <div class="text-center py-16 text-gray-500 bg-white/5 rounded-xl border border-white/10">
+        <p class="text-4xl mb-2">🪑</p>
+        <p>No tables yet. Add your first table to start accepting reservations.</p>
+      </div>
+    ) : (
+      <div class="space-y-2">
+        {(tables ?? []).map((t: any) => (
+          <div class="table-row bg-white/5 rounded-xl border border-white/10 p-4 flex items-center justify-between"
+            data-json={JSON.stringify(t)}>
+            <div class="flex items-center gap-4">
+              <div class="w-10 h-10 rounded-lg bg-white/10 flex items-center justify-center text-white text-sm font-bold">
+                {t.capacity}
+              </div>
+              <div>
+                <p class="font-semibold text-white">{t.name}</p>
+                <p class="text-xs text-gray-400 capitalize">{t.location} · {t.capacity} seats</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2">
+              {!t.is_active && <span class="text-xs bg-red-900/30 text-red-400 px-2 py-0.5 rounded">Inactive</span>}
+              <button class="edit-btn text-xs text-blue-400 hover:underline">Edit</button>
+              <button class="delete-btn text-xs text-red-400 hover:text-red-300" data-id={t.id}>Delete</button>
+            </div>
+          </div>
+        ))}
+      </div>
+    )}
+  </div>
+</AdminLayout>
+
+<script define:vars={{ restaurantId }}>
+  const formWrap = document.getElementById('table-form-wrap');
+  const form = document.getElementById('table-form');
+  const formTitle = document.getElementById('form-title');
+
+  document.getElementById('add-btn').addEventListener('click', () => {
+    form.reset();
+    form.querySelector('[name="id"]').value = '';
+    formTitle.textContent = 'Add Table';
+    formWrap.classList.remove('hidden');
+  });
+
+  document.getElementById('cancel-btn').addEventListener('click', () => {
+    formWrap.classList.add('hidden');
+  });
+
+  // Edit
+  document.querySelectorAll('.edit-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const row = btn.closest('.table-row');
+      const data = JSON.parse(row.dataset.json);
+      form.querySelector('[name="id"]').value = data.id;
+      form.querySelector('[name="name"]').value = data.name;
+      form.querySelector('[name="capacity"]').value = data.capacity;
+      form.querySelector('[name="location"]').value = data.location ?? 'indoor';
+      form.querySelector('[name="sort_order"]').value = data.sort_order ?? 0;
+      form.querySelector('[name="is_active"]').checked = data.is_active !== false;
+      formTitle.textContent = 'Edit Table';
+      formWrap.classList.remove('hidden');
+    });
+  });
+
+  // Delete
+  document.querySelectorAll('.delete-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (!confirm('Delete this table?')) return;
+      const id = btn.dataset.id;
+      const res = await fetch(`/api/admin/restaurant/tables/${id}`, { method: 'DELETE' });
+      if (res.ok) location.reload();
+      else alert('Failed to delete');
+    });
+  });
+
+  // Submit
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const fd = new FormData(form);
+    const id = fd.get('id');
+    const payload = {
+      restaurant_id: restaurantId,
+      name: fd.get('name'),
+      capacity: parseInt(fd.get('capacity')),
+      location: fd.get('location'),
+      sort_order: parseInt(fd.get('sort_order') || '0'),
+      is_active: form.querySelector('[name="is_active"]').checked,
+    };
+
+    const url = id ? `/api/admin/restaurant/tables/${id}` : '/api/admin/restaurant/tables';
+    const method = id ? 'PATCH' : 'POST';
+    const res = await fetch(url, {
+      method,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    if (res.ok) location.reload();
+    else alert('Failed to save');
+  });
+</script>

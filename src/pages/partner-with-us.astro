@@ -1,0 +1,306 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { ALL_LOCATIONS } from '../lib/locations';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const seoTitle = 'Partner With Us — List Your Business on KefaloniaBNB';
+const seoDescription = 'Reach thousands of tourists staying in Kefalonia and Thassos. Feature your taverna, boat rental, cafe or activity in our local guide. Free to join, pay only when guests use your coupon.';
+---
+
+<BaseLayout title={seoTitle} description={seoDescription}>
+
+  <!-- Hero -->
+  <section class="bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] text-white py-20 px-4">
+    <div class="max-w-3xl mx-auto text-center">
+      <p class="text-[#c9a96e] text-sm font-semibold uppercase tracking-widest mb-3">{isEl ? 'Για Τοπικές Επιχειρήσεις' : isBg ? 'За Местни Бизнеси' : isSr ? 'За Локалне Бизнисе' : isTr ? 'Yerel İşletmeler İçin' : isRo ? 'Pentru Afaceri Locale' : 'For Local Businesses'}</p>
+      <h1 class="text-4xl sm:text-5xl font-bold mb-4">{isEl ? 'Προσεγγίστε Επισκέπτες που Μένουν Κοντά' : isBg ? 'Достигнете до Гости, Отседнали Наблизо' : isSr ? 'Досегните Госте који Бораве у Близини' : isTr ? 'Yakında Konaklayan Misafirlere Ulaşın' : isRo ? 'Ajungeți la Oaspeții care Stau în Apropiere' : 'Reach Guests Staying Nearby'}</h1>
+      <p class="text-white/70 text-lg leading-relaxed max-w-2xl mx-auto">
+        {isEl ? 'Η ταβέρνα, η ενοικίαση σκάφους, η ξεναγημένη εκδρομή ή το καφέ σας — προβεβλημένα στον τοπικό οδηγό μας, ορατά από κάθε τουρίστα που μένει στην περιοχή σας. Δωρεάν εγγραφή. Πληρώνετε μόνο όταν ένας επισκέπτης χρησιμοποιεί το κουπόνι σας.' : isBg ? 'Вашата таверна, наем на лодка, обиколка с екскурзовод или кафе — представени в местния ни наръчник, видими от всеки турист, отседнал в района ви. Безплатна регистрация. Плащате само когато гост използва вашия купон.' : isSr ? 'Ваша кафана, изнајмљивање чамца, вођена тура или кафе — истакнути у нашем локалном водичу, видљиви сваком туристи који борави у вашем крају. Бесплатно учлањење. Плаћате само када гост употреби ваш купон.' : isTr ? 'Lokantanız, tekne kiralama, rehberli tur veya kafeniz — yerel rehberimizde öne çıkarılmış, bölgenizde konaklayan her turistin görebileceği şekilde. Ücretsiz katılım. Yalnızca bir misafir kuponunuzu kullandığında ödersiniz.' : isRo ? 'Taverna, închirierea de bărci, turul ghidat sau cafeneaua dvs. — prezentate în ghidul nostru local, vizibile de fiecare turist care stă în zona dvs. Înscrierea este gratuită. Plătiți doar când un oaspete folosește cuponul dvs.' : 'Your taverna, boat rental, guided tour or cafe — featured in our local guide, seen by every tourist staying in your area. Free to join. Pay only when a guest uses your coupon.'}
+      </p>
+      <a href="#apply" class="inline-block mt-8 bg-[#c9a96e] hover:bg-[#b8934a] text-white font-bold px-8 py-3.5 rounded-xl text-sm transition-colors">
+        {isEl ? 'Υποβάλετε Αίτηση — Είναι Δωρεάν' : isBg ? 'Кандидатствайте — Безплатно' : isSr ? 'Пријавите се — Бесплатно' : isTr ? 'Hemen Başvurun — Ücretsiz' : isRo ? 'Aplicați Acum — Este Gratuit' : "Apply Now — It's Free"}
+      </a>
+    </div>
+  </section>
+
+  <!-- How it works -->
+  <section class="py-16 px-4 bg-white">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-2xl font-bold text-gray-900 text-center mb-10">{isEl ? 'Πώς λειτουργεί' : isBg ? 'Как работи' : isSr ? 'Како функционише' : isTr ? 'Nasıl çalışır' : isRo ? 'Cum funcționează' : 'How it works'}</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-8">
+        {[
+          {
+            step: '01',
+            icon: '📋',
+            title: isEl ? 'Υποβολή δωρεάν αίτησης' : isBg ? 'Подайте безплатна заявка' : isSr ? 'Пријавите се бесплатно' : isTr ? 'Ücretsiz başvurun' : isRo ? 'Aplicați gratuit' : 'Apply for free',
+            desc: isEl ? 'Πείτε μας για την επιχείρησή σας. Την αξιολογούμε και σας προσθέτουμε στον τοπικό οδηγό της περιοχής σας.' : isBg ? 'Разкажете ни за вашия бизнес. Ние го преглеждаме и ви добавяме в местния наръчник за вашия район.' : isSr ? 'Реците нам о свом бизнису. Прегледамо га и додамо вас у локални водич за вашу област.' : isTr ? 'Bize işletmenizi anlatın. İnceleyip sizi bölgenizdeki yerel rehbere ekliyoruz.' : isRo ? 'Spuneți-ne despre afacerea dvs. O evaluăm și vă adăugăm în ghidul local al zonei dvs.' : 'Tell us about your business. We review it and add you to the local guide for your area.',
+          },
+          {
+            step: '02',
+            icon: '🎟',
+            title: isEl ? 'Αποκτήστε κουπόνι έκπτωσης' : isBg ? 'Получете купон за отстъпка' : isSr ? 'Добијте купон за попуст' : isTr ? 'İndirim kuponu alın' : isRo ? 'Obțineți un cupon de reducere' : 'Get a discount coupon',
+            desc: isEl ? 'Δημιουργούμε έναν κωδικό κουπονιού που οι επισκέπτες δείχνουν στο κατάστημά σας — π.χ. «10% έκπτωση στο φαγητό σας». Εσείς ορίζετε την έκπτωση.' : isBg ? 'Създаваме код за купон, който гостите показват на вашето място — напр. „10% отстъпка от храната ви". Вие определяте отстъпката.' : isSr ? 'Правимо код купона који гости показују у вашем локалу — нпр. „10% попуста на оброк". Ви одређујете попуст.' : isTr ? 'Misafirlerin işletmenizde göstereceği bir kupon kodu oluşturuyoruz — örn. "Yemeğinizde %10 indirim". İndirimi siz belirlersiniz.' : isRo ? 'Creăm un cod de cupon pe care oaspeții îl prezintă la locația dvs. — ex. „10% reducere la masă". Dvs. stabiliți reducerea.' : 'We create a coupon code guests show at your venue — e.g. "10% off your meal". You set the discount.',
+          },
+          {
+            step: '03',
+            icon: '💶',
+            title: isEl ? 'Πληρώνετε μόνο ανά πελάτη' : isBg ? 'Плащате само за всеки клиент' : isSr ? 'Плаћате само по госту' : isTr ? 'Yalnızca misafir başına ödersiniz' : isRo ? 'Plătiți doar per client' : 'Pay only per customer',
+            desc: isEl ? 'Κάθε φορά που ένας επισκέπτης χρησιμοποιεί το κουπόνι σας, το καταγράφουμε. Στο τέλος του μήνα, σας τιμολογούμε ανά εξαργύρωση. Χωρίς επισκέπτες = χωρίς κόστος.' : isBg ? 'Всеки път, когато гост използва вашия купон, ние го регистрираме. В края на месеца ви фактурираме за всяко осребряване. Няма гости = няма разходи.' : isSr ? 'Сваки пут када гост употреби ваш купон, бележимо то. На крају месеца фактуришемо вам по искоришћавању. Нема гостију = нема трошкова.' : isTr ? 'Bir misafir kuponunuzu her kullandığında kaydediyoruz. Ay sonunda her kullanım başına fatura kesiyoruz. Misafir yok = maliyet yok.' : isRo ? 'De fiecare dată când un oaspete folosește cuponul dvs., înregistrăm. La sfârșitul lunii, vă facturăm per utilizare. Fără oaspeți = fără costuri.' : 'Every time a guest uses your coupon, we log it. At month end, we invoice you per redemption. No guests = no cost.',
+          },
+        ].map(({ step, icon, title, desc }) => (
+          <div class="text-center">
+            <div class="w-14 h-14 bg-[#f8f6f2] rounded-2xl flex items-center justify-center mx-auto mb-4 text-2xl">{icon}</div>
+            <p class="text-xs font-bold text-[#c9a96e] uppercase tracking-widest mb-1">Step {step}</p>
+            <h3 class="font-bold text-gray-900 mb-2">{title}</h3>
+            <p class="text-sm text-gray-500 leading-relaxed">{desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Why us -->
+  <section class="py-16 px-4 bg-[#f8f6f2]">
+    <div class="max-w-4xl mx-auto">
+      <h2 class="text-2xl font-bold text-gray-900 text-center mb-10">{isEl ? 'Γιατί να συνεργαστείτε με την KefaloniaBNB;' : isBg ? 'Защо да партнирате с KefaloniaBNB?' : isSr ? 'Зашто партнерство са KefaloniaBNB?' : isTr ? 'Neden KefaloniaBNB ile iş birliği yapmalısınız?' : isRo ? 'De ce să colaborați cu KefaloniaBNB?' : 'Why partner with KefaloniaBNB?'}</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+        {[
+          {
+            icon: '🎯',
+            title: isEl ? 'Κοινό με υψηλή πρόθεση' : isBg ? 'Аудитория с висока мотивация' : isSr ? 'Публика са јасном намером' : isTr ? 'Yüksek motivasyonlu kitle' : isRo ? 'Public cu intenție ridicată' : 'High-intent audience',
+            desc: isEl ? 'Οι επισκέπτες βρίσκονται ήδη στην περιοχή σας και αναζητούν ενεργά πράγματα να κάνουν και μέρη να φάνε. Μηδέν χαμένες εντυπώσεις.' : isBg ? 'Гостите вече са във вашия район и активно търсят занимания и места за хранене. Нула пропиляни импресии.' : isSr ? 'Гости су већ у вашој области и активно траже шта да раде и где да једу. Никаквог губљења утисака.' : isTr ? 'Misafirler zaten bölgenizdedir ve aktif olarak yapacak şeyler ve yemek yerleri aramaktadır. Boşa giden gösterim yok.' : isRo ? 'Oaspeții sunt deja în zona dvs. și caută activ lucruri de făcut și locuri unde să mănânce. Zero impresii irosite.' : 'Guests are already in your area and actively looking for things to do and places to eat. No wasted impressions.',
+          },
+          {
+            icon: '💰',
+            title: isEl ? 'Τιμολόγηση μηδενικού κινδύνου' : isBg ? 'Ценообразуване без риск' : isSr ? 'Цене без ризика' : isTr ? 'Sıfır riskli fiyatlandırma' : isRo ? 'Prețuri fără risc' : 'Zero risk pricing',
+            desc: isEl ? 'Πληρώνετε €2–5 ανά εξαργύρωση — μόνο για πραγματικούς πελάτες που στείλαμε. Αν δεν έρθει κανείς, δεν πληρώνετε τίποτα.' : isBg ? 'Плащате €2–5 за всяко осребряване — само за реални клиенти, които сме изпратили. Ако никой не дойде, не плащате нищо.' : isSr ? 'Плаћате €2–5 по искоришћавању — само за стварне кориснике које смо послали. Ако нико не дође, не плаћате ништа.' : isTr ? 'Her kullanım başına €2–5 ödersiniz — yalnızca gönderdiğimiz gerçek müşteriler için. Kimse gelmezse hiçbir şey ödemezsiniz.' : isRo ? 'Plătiți €2–5 per utilizare — doar pentru clienți reali pe care i-am trimis. Dacă nu vine nimeni, nu plătiți nimic.' : 'You pay €2–5 per redemption — only for real customers we sent. If nobody comes, you pay nothing.',
+          },
+          {
+            icon: '📊',
+            title: isEl ? 'Παρακολουθήστε τα αποτελέσματά σας' : isBg ? 'Проследявайте резултатите си' : isSr ? 'Пратите своје резултате' : isTr ? 'Sonuçlarınızı takip edin' : isRo ? 'Urmăriți-vă rezultatele' : 'Track your results',
+            desc: isEl ? 'Δείτε ακριβώς πόσοι επισκέπτες χρησιμοποίησαν το κουπόνι σας κάθε μήνα. Διαφανείς, μετρήσιμες παραπομπές.' : isBg ? 'Вижте точно колко гости са използвали купона ви всеки месец. Прозрачни, измерими препоръки.' : isSr ? 'Видите тачно колико је гостију употребило ваш купон сваког месеца. Транспарентне, мерљиве препоруке.' : isTr ? 'Her ay kaç misafirin kuponunuzu kullandığını tam olarak görün. Şeffaf, ölçülebilir yönlendirmeler.' : isRo ? 'Vedeți exact câți oaspeți au folosit cuponul dvs. în fiecare lună. Referințe transparente și măsurabile.' : 'See exactly how many guests used your coupon each month. Transparent, measurable referrals.',
+          },
+          {
+            icon: '🗺',
+            title: isEl ? 'Όλη η Καβάλα & Θάσος' : isBg ? 'Цялата Kefalonia & Thassos' : isSr ? 'Цела Кавала и Тасос' : isTr ? 'Tüm Kefalonia ve Taşoz' : isRo ? 'Toată Kefalonia și Thassos' : 'All Kefalonia & Thassos',
+            desc: isEl ? 'Καλύπτουμε 65+ τοποθεσίες σε όλη την περιοχή. Αν βρίσκεστε στην περιοχή μας, είστε στον οδηγό μας.' : isBg ? 'Покриваме 65+ локации из целия регион. Ако сте в нашата зона, сте в нашия наръчник.' : isSr ? 'Покривамо 65+ локација широм региона. Ако сте у нашој зони, налазите се у нашем водичу.' : isTr ? "Bölge genelinde 65'ten fazla konumu kapsıyoruz. Eğer bölgemizdeyseniz rehberimizdesiniz." : isRo ? 'Acoperim peste 65 de locații din regiune. Dacă sunteți în zona noastră, sunteți în ghidul nostru.' : "We cover 65+ locations across the region. If you're in our area, you're in our guide.",
+          },
+          {
+            icon: '🤝',
+            title: isEl ? 'Χωρίς αποκλειστικότητα' : isBg ? 'Без изключителност' : isSr ? 'Без ексклузивности' : isTr ? 'Münhasırlık yok' : isRo ? 'Fără exclusivitate' : 'No exclusivity',
+            desc: isEl ? 'Η καταχώρισή σας μαζί μας δεν σας εμποδίζει να χρησιμοποιείτε οποιαδήποτε άλλη πλατφόρμα ή μάρκετινγκ.' : isBg ? 'Регистрацията при нас не ви пречи да използвате каквато и да е друга платформа или маркетинг.' : isSr ? 'Листање код нас не спречава вас да користите било коју другу платформу или маркетинг.' : isTr ? "Bizimle listelemek, başka bir platform veya pazarlama yöntemi kullanmanızı engellemez." : isRo ? 'Listarea la noi nu vă împiedică să folosiți orice altă platformă sau marketing.' : "Being listed with us doesn't stop you from using any other platform or marketing.",
+          },
+          {
+            icon: '⚡',
+            title: isEl ? 'Ενεργό σε 48 ώρες' : isBg ? 'Активно за 48 часа' : isSr ? 'Активно за 48 сати' : isTr ? '48 saat içinde yayında' : isRo ? 'Activ în 48 de ore' : 'Live in 48 hours',
+            desc: isEl ? 'Υποβάλετε τη φόρμα παρακάτω. Αξιολογούμε, προσθέτουμε την καταχώρισή σας και δημιουργούμε το κουπόνι σας εντός 48 ωρών.' : isBg ? 'Попълнете формуляра по-долу. Ние преглеждаме, добавяме вашата регистрация и създаваме вашия купон в рамките на 48 часа.' : isSr ? 'Попуните образац испод. Прегледамо, додамо ваш унос и направимо ваш купон у року од 48 сати.' : isTr ? 'Aşağıdaki formu doldurun. 48 saat içinde inceleyip listenizi ekler ve kuponunuzu oluştururuz.' : isRo ? 'Trimiteți formularul de mai jos. Evaluăm, adăugăm listarea dvs. și creăm cuponul dvs. în 48 de ore.' : 'Submit the form below. We review, add your listing and create your coupon within 48 hours.',
+          },
+        ].map(({ icon, title, desc }) => (
+          <div class="flex gap-4 bg-white rounded-2xl p-5 border border-gray-100">
+            <span class="text-2xl shrink-0">{icon}</span>
+            <div>
+              <h3 class="font-semibold text-gray-900 mb-1">{title}</h3>
+              <p class="text-sm text-gray-500">{desc}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Business types -->
+  <section class="py-12 px-4 bg-white border-t border-gray-100">
+    <div class="max-w-3xl mx-auto text-center">
+      <p class="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-4">{isEl ? 'Ποιοι μπορούν να υποβάλουν αίτηση' : isBg ? 'Кой може да кандидатства' : isSr ? 'Ко може да се пријави' : isTr ? 'Kimler başvurabilir' : isRo ? 'Cine poate aplica' : 'Who can apply'}</p>
+      <div class="flex flex-wrap justify-center gap-2">
+        {(isEl ? [
+          '🐟 Ταβέρνες & Εστιατόρια',
+          '☕ Καφέ & Μπαρ',
+          '⛵ Ενοικιάσεις Σκαφών',
+          '🗺 Ξεναγημένες Εκδρομές',
+          '🏄 Θαλάσσια Σπορ',
+          '🚗 Ταξί & Μεταφορές',
+          '🛍 Καταστήματα & Αγορές',
+          '🎨 Τοπικές Εμπειρίες',
+        ] : isBg ? [
+          '🐟 Таверни & Ресторанти',
+          '☕ Кафенета & Барове',
+          '⛵ Наем на лодки',
+          '🗺 Обиколки с екскурзовод',
+          '🏄 Водни спортове',
+          '🚗 Таксита & Транспорт',
+          '🛍 Магазини & Пазари',
+          '🎨 Местни преживявания',
+        ] : isSr ? [
+          '🐟 Кафане и ресторани',
+          '☕ Кафићи и барови',
+          '⛵ Изнајмљивање чамаца',
+          '🗺 Вођене туре',
+          '🏄 Водени спортови',
+          '🚗 Таксији и превоз',
+          '🛍 Продавнице и тржнице',
+          '🎨 Локална искуства',
+        ] : isTr ? [
+          '🐟 Lokantalar ve Restoranlar',
+          '☕ Kafeler ve Barlar',
+          '⛵ Tekne Kiralama',
+          '🗺 Rehberli Turlar',
+          '🏄 Su Sporları',
+          '🚗 Taksiler ve Ulaşım',
+          '🛍 Dükkanlar ve Pazarlar',
+          '🎨 Yerel Deneyimler',
+        ] : isRo ? [
+          '🐟 Taverne și Restaurante',
+          '☕ Cafenele și Baruri',
+          '⛵ Închirieri Bărci',
+          '🗺 Tururi Ghidate',
+          '🏄 Sporturi Nautice',
+          '🚗 Taxiuri și Transport',
+          '🛍 Magazine și Piețe',
+          '🎨 Experiențe Locale',
+        ] : [
+          '🐟 Tavernas & Restaurants',
+          '☕ Cafes & Bars',
+          '⛵ Boat Rentals',
+          '🗺 Guided Tours',
+          '🏄 Watersports',
+          '🚗 Taxis & Transport',
+          '🛍 Shops & Markets',
+          '🎨 Local Experiences',
+        ]).map(t => (
+          <span class="text-sm bg-[#f8f6f2] border border-gray-100 text-gray-700 rounded-full px-4 py-1.5">{t}</span>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Application form -->
+  <section id="apply" class="py-16 px-4 bg-[#f8f6f2]">
+    <div class="max-w-2xl mx-auto">
+      <div class="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div class="px-6 py-5 border-b border-gray-100">
+          <h2 class="text-xl font-bold text-gray-900">{isEl ? 'Υποβάλετε αίτηση καταχώρισης' : isBg ? 'Кандидатствайте за регистрация' : isSr ? 'Пријавите се за листање' : isTr ? 'Listeye alınmak için başvurun' : isRo ? 'Aplicați pentru a fi listat' : 'Apply to be listed'}</h2>
+          <p class="text-sm text-gray-500 mt-1">{isEl ? 'Δωρεάν. Χωρίς δέσμευση. Θα επικοινωνήσουμε μαζί σας εντός 48 ωρών.' : isBg ? 'Безплатно. Без ангажимент. Ще се свържем с вас в рамките на 48 часа.' : isSr ? 'Бесплатно. Без обавезе. Јавићемо вам се у року од 48 сати.' : isTr ? "Ücretsiz. Taahhütsüz. 48 saat içinde size döneceğiz." : isRo ? 'Gratuit. Fără obligații. Vă vom contacta în 48 de ore.' : "Free. No commitment. We'll get back to you within 48 hours."}</p>
+        </div>
+        <form id="partner-form" class="p-6 space-y-4">
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">{isEl ? 'Το όνομά σας' : isBg ? 'Вашето име' : isSr ? 'Ваше ime' : isTr ? 'Adınız' : isRo ? 'Numele dvs.' : 'Your name'} *</label>
+              <input type="text" name="contact_name" required placeholder="Maria Papadopoulou"
+                class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#1a1a2e] focus:border-transparent" />
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">{isEl ? 'Επωνυμία επιχείρησης' : isBg ? 'Наименование на бизнеса' : isSr ? 'Назив бизниса' : isTr ? 'İşletme adı' : isRo ? 'Numele afacerii' : 'Business name'} *</label>
+              <input type="text" name="business_name" required placeholder="Taverna Akrogiali"
+                class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#1a1a2e] focus:border-transparent" />
+            </div>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">{isEl ? 'Τύπος επιχείρησης' : isBg ? 'Вид бизнес' : isSr ? 'Врста бизниса' : isTr ? 'İşletme türü' : isRo ? 'Tipul afacerii' : 'Business type'} *</label>
+              <select name="business_type" required
+                class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#1a1a2e] focus:border-transparent bg-white">
+                <option value="">{isEl ? 'Επιλέξτε τύπο…' : isBg ? 'Изберете вид…' : isSr ? 'Изаберите врсту…' : isTr ? 'Tür seçin…' : isRo ? 'Selectați tipul…' : 'Select type…'}</option>
+                <option value="taverna">{isEl ? 'Ταβέρνα / Εστιατόριο' : isBg ? 'Таверна / Ресторант' : isSr ? 'Кафана / Ресторан' : isTr ? 'Lokanta / Restoran' : isRo ? 'Tavernă / Restaurant' : 'Taverna / Restaurant'}</option>
+                <option value="cafe">{isEl ? 'Καφέ / Μπαρ' : isBg ? 'Кафене / Бар' : isSr ? 'Кафић / Бар' : isTr ? 'Kafe / Bar' : isRo ? 'Cafenea / Bar' : 'Cafe / Bar'}</option>
+                <option value="boat_rental">{isEl ? 'Ενοικίαση Σκάφους' : isBg ? 'Наем на лодка' : isSr ? 'Изнајмљивање чамца' : isTr ? 'Tekne Kiralama' : isRo ? 'Închiriere Bărci' : 'Boat Rental'}</option>
+                <option value="guided_tour">{isEl ? 'Ξεναγημένες Εκδρομές / Δραστηριότητες' : isBg ? 'Обиколки с екскурзовод / Дейности' : isSr ? 'Вођене туре / Активности' : isTr ? 'Rehberli Turlar / Aktiviteler' : isRo ? 'Tururi Ghidate / Activități' : 'Guided Tours / Activities'}</option>
+                <option value="watersports">{isEl ? 'Θαλάσσια Σπορ' : isBg ? 'Водни спортове' : isSr ? 'Водени спортови' : isTr ? 'Su Sporları' : isRo ? 'Sporturi Nautice' : 'Watersports'}</option>
+                <option value="transport">{isEl ? 'Μεταφορές / Ταξί' : isBg ? 'Транспорт / Такси' : isSr ? 'Превоз / Такси' : isTr ? 'Ulaşım / Taksi' : isRo ? 'Transport / Taxi' : 'Transport / Taxi'}</option>
+                <option value="shop">{isEl ? 'Κατάστημα / Αγορά' : isBg ? 'Магазин / Пазар' : isSr ? 'Продавница / Тржница' : isTr ? 'Dükkan / Pazar' : isRo ? 'Magazin / Piață' : 'Shop / Market'}</option>
+                <option value="other">{isEl ? 'Άλλο' : isBg ? 'Друго' : isSr ? 'Остало' : isTr ? 'Diğer' : isRo ? 'Altele' : 'Other'}</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-600 mb-1">{isEl ? 'Η περιοχή / τοποθεσία σας' : isBg ? 'Вашият район / местоположение' : isSr ? 'Ваша област / локација' : isTr ? 'Bölgeniz / konumunuz' : isRo ? 'Zona / locația dvs.' : 'Your area / location'} *</label>
+              <select name="location_slug" id="location-select" required
+                class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#1a1a2e] focus:border-transparent bg-white">
+                <option value="">{isEl ? 'Επιλέξτε τοποθεσία…' : isBg ? 'Изберете местоположение…' : isSr ? 'Изаберите локацију…' : isTr ? 'Konum seçin…' : isRo ? 'Selectați locația…' : 'Select location…'}</option>
+                <optgroup label={isEl ? 'Περιοχή Καβάλας' : isBg ? 'Регион Kefalonia' : isSr ? 'Регион Кавала' : isTr ? 'Kefalonia Bölgesi' : isRo ? 'Regiunea Kefalonia' : 'Kefalonia Region'}>
+                  {ALL_LOCATIONS.filter(l => l.region === 'kefalonia').map(l => (
+                    <option value={l.slug} data-name={l.name}>{l.name}</option>
+                  ))}
+                </optgroup>
+                <optgroup label={isEl ? 'Νησί Θάσου' : isBg ? 'Остров Thassos' : isSr ? 'Острво Тасос' : isTr ? 'Taşoz Adası' : isRo ? 'Insula Thassos' : 'Thassos Island'}>
+                  {ALL_LOCATIONS.filter(l => l.region === 'thassos').map(l => (
+                    <option value={l.slug} data-name={l.name}>{l.name}</option>
+                  ))}
+                </optgroup>
+              </select>
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{isEl ? 'Διεύθυνση email' : isBg ? 'Имейл адрес' : isSr ? 'Имејл адреса' : isTr ? 'E-posta adresi' : isRo ? 'Adresă de email' : 'Email address'} *</label>
+            <input type="email" name="email" required placeholder="you@example.com"
+              class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#1a1a2e] focus:border-transparent" />
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-600 mb-1">{isEl ? 'Πείτε μας για την επιχείρησή σας' : isBg ? 'Разкажете ни за вашия бизнес' : isSr ? 'Реците нам о свом бизнису' : isTr ? 'İşletmenizi bize anlatın' : isRo ? 'Spuneți-ne despre afacerea dvs.' : 'Tell us about your business'} <span class="text-gray-400">{isEl ? '(προαιρετικό)' : isBg ? '(по избор)' : isSr ? '(необавезно)' : isTr ? '(isteğe bağlı)' : isRo ? '(opțional)' : '(optional)'}</span></label>
+            <textarea name="message" rows="3" placeholder={isEl ? 'Τι προσφέρετε; Τηλέφωνο, ιστοσελίδα, διεύθυνση…' : isBg ? 'Какво предлагате? Телефон, уебсайт, адрес…' : isSr ? 'Шта нудите? Број телефона, веб-сајт, адреса…' : isTr ? 'Ne sunuyorsunuz? Telefon numarası, web sitesi, adres…' : isRo ? 'Ce oferiți? Număr de telefon, site web, adresă…' : 'What do you offer? Phone number, website, address…'}
+              class="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm outline-none focus:ring-2 focus:ring-[#1a1a2e] focus:border-transparent resize-none"></textarea>
+          </div>
+
+          <div id="form-msg" class="hidden text-sm font-medium rounded-xl px-4 py-3"></div>
+
+          <button type="submit" id="form-submit"
+            class="w-full bg-[#1a1a2e] hover:bg-[#2d2d4e] text-white font-bold px-8 py-3.5 rounded-xl text-sm transition-colors">
+            {isEl ? 'Υποβάλετε Αίτηση — Είναι Δωρεάν' : isBg ? 'Кандидатствайте — Безплатно' : isSr ? 'Пријавите се — Бесплатно' : isTr ? 'Hemen Başvurun — Ücretsiz' : isRo ? 'Aplicați Acum — Este Gratuit' : "Apply Now — It's Free"}
+          </button>
+          <p class="text-xs text-gray-400 text-center">{isEl ? 'Αξιολογούμε κάθε αίτηση. Χωρίς spam, χωρίς αυτόματες απαντήσεις.' : isBg ? 'Преглеждаме всяка заявка. Без спам, без автоматични отговори.' : isSr ? 'Прегледамо сваку пријаву. Без нежељене поште, без аутоматских одговора.' : isTr ? 'Her başvuruyu inceliyoruz. Spam yok, otomatik yanıt yok.' : isRo ? 'Evaluăm fiecare aplicație. Fără spam, fără răspunsuri automate.' : 'We review every application. No spam, no automated responses.'}</p>
+        </form>
+      </div>
+    </div>
+  </section>
+
+</BaseLayout>
+
+<script>
+  const form      = document.getElementById('partner-form') as HTMLFormElement;
+  const msgEl     = document.getElementById('form-msg')!;
+  const submitBtn = document.getElementById('form-submit') as HTMLButtonElement;
+  const locSel    = document.getElementById('location-select') as HTMLSelectElement;
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    submitBtn.disabled = true;
+    submitBtn.textContent = 'Sending…';
+    msgEl.classList.add('hidden');
+
+    const fd = new FormData(form);
+    const locationName = locSel.selectedOptions[0]?.dataset.name ?? locSel.value;
+
+    const res = await fetch('/api/partner-interest', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contact_name:  fd.get('contact_name'),
+        business_name: fd.get('business_name'),
+        business_type: fd.get('business_type'),
+        email:         fd.get('email'),
+        message:       fd.get('message'),
+        location:      locationName,
+        location_slug: fd.get('location_slug'),
+      }),
+    });
+
+    if (res.ok) {
+      msgEl.textContent = '✓ Application received! We\'ll be in touch within 48 hours.';
+      msgEl.className = 'text-sm font-medium rounded-xl px-4 py-3 bg-emerald-50 text-emerald-800 border border-emerald-200';
+      msgEl.classList.remove('hidden');
+      form.reset();
+    } else {
+      msgEl.textContent = 'Something went wrong — please email us at info@kefaloniabnb.com';
+      msgEl.className = 'text-sm font-medium rounded-xl px-4 py-3 bg-red-50 text-red-800 border border-red-200';
+      msgEl.classList.remove('hidden');
+    }
+
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Apply Now — It\'s Free';
+  });
+</script>

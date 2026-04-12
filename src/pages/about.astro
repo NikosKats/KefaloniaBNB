@@ -1,0 +1,204 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const lang = (Astro.locals.lang ?? 'en') as string;
+const isEl = lang === 'el';
+const isBg = lang === 'bg';
+const isSr = lang === 'sr';
+const isTr = lang === 'tr';
+const isRo = lang === 'ro';
+
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? '';
+const schemas = [
+  {
+    '@context': 'https://schema.org',
+    '@type': 'Organization',
+    '@id': `${siteUrl}/#organization`,
+    name: 'KefaloniaBNB',
+    url: siteUrl,
+    logo: `${siteUrl}/favicon.svg`,
+    description: 'Curated luxury villa rentals on the shores of Keramoti and Kefalonia, Greece. Direct booking, professional property management, and vetted cleaning services.',
+    contactPoint: {
+      '@type': 'ContactPoint',
+      contactType: 'customer service',
+      availableLanguage: ['English', 'Greek'],
+    },
+  },
+  {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: [
+      { '@type': 'ListItem', position: 1, name: 'Home', item: siteUrl },
+      { '@type': 'ListItem', position: 2, name: 'About', item: `${siteUrl}/about` },
+    ],
+  },
+];
+---
+
+<BaseLayout
+  title="About KefaloniaBNB — Luxury Villas in Keramoti & Kefalonia, Greece"
+  description="KefaloniaBNB curates exceptional villa experiences on the shores of northern Greece. Direct booking, professional management, and bespoke guest services — no middlemen, always the best rate."
+  schema={schemas}
+>
+
+  <!-- Hero -->
+  <section class="relative bg-[#1a1a2e] overflow-hidden">
+    <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(ellipse at 70% 50%, #c9a96e 0%, transparent 60%);"></div>
+    <div class="relative max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-24 sm:py-32 text-center">
+      <p class="text-[#c9a96e] text-xs font-semibold uppercase tracking-[0.2em] mb-4">Our Story</p>
+      <h1 class="text-4xl sm:text-5xl font-bold text-white leading-tight mb-6">
+        {isEl ? 'Εκεί που το Αιγαίο συναντά την αβίαστη πολυτέλεια' : isBg ? 'Там, където Егейско море среща безусилната лукса' : isSr ? 'Где се Егејско море среће са беспрекорним луксузом' : isTr ? 'Ege\'nin mükemmel lüksle buluştuğu yer' : isRo ? 'Unde Marea Egee întâlnește luxul fără efort' : 'Where the Aegean meets effortless luxury'}
+      </h1>
+      <p class="text-white/60 text-lg max-w-2xl mx-auto leading-relaxed">
+        {isEl ? 'Η KefaloniaBNB ιδρύθηκε με μία και μόνη πεποίθηση: ότι μια εξαιρετική διαμονή δεν θα πρέπει να απαιτεί εξαιρετική προσπάθεια για να κλειστεί. Αναλαμβάνουμε τα πάντα — εσείς απλώς φτάνετε και η εμπειρία ξεκινά.' : isBg ? 'KefaloniaBNB е основана с едно убеждение: че изключителният престой никога не трябва да изисква изключителни усилия за резервация. Ние се грижим за всичко — вие просто пристигате и преживяването започва.' : isSr ? 'KefaloniaBNB је основана са jednim убеђењем: да изванредан боравак никада не би требало да захтева изванредан напор за резервацију. Ми се бринемо о свему — тако да просто стигнете, и искуство почиње.' : isTr ? 'KefaloniaBNB tek bir inançla kuruldu: olağanüstü bir konaklamanın hiçbir zaman olağanüstü bir rezervasyon çabası gerektirmemesi gerektiği. Her şeyi biz hallederiz — siz sadece gelirsiniz ve deneyim başlar.' : isRo ? 'KefaloniaBNB a fost fondată pe o singură convingere: că un sejur extraordinar nu ar trebui să necesite niciodată un efort extraordinar pentru a rezerva. Ne ocupăm de tot — astfel încât pur și simplu ajungeți, iar experiența începe.' : 'KefaloniaBNB was founded on a single conviction: that an extraordinary stay should never require an extraordinary effort to book. We handle everything — so you simply arrive, and experience begins.'}
+      </p>
+    </div>
+  </section>
+
+  <!-- Story -->
+  <section class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+      <div>
+        <p class="text-[#c9a96e] text-xs font-semibold uppercase tracking-[0.2em] mb-3">{isEl ? 'Γιατί υπάρχουμε' : isBg ? 'Защо съществуваме' : isSr ? 'Зашто постојимо' : isTr ? 'Neden varız' : isRo ? 'De ce existăm' : 'Why we exist'}</p>
+        <h2 class="text-3xl font-bold text-gray-900 mb-6 leading-snug">{isEl ? 'Για επισκέπτες που απαιτούν περισσότερα. Για ιδιοκτήτες που αξίζουν καλύτερα.' : isBg ? 'Създадено за гости, които изискват повече. За собственици, които заслужават по-добро.' : isSr ? 'Направљено за госте који захтевају више. За власнике који заслужују боље.' : isTr ? 'Daha fazlasını talep eden misafirler için. Daha iyisini hak eden mülk sahipleri için.' : isRo ? 'Construit pentru oaspeți care cer mai mult. Proprietari care merită mai bine.' : 'Built for guests who demand more. Owners who deserve better.'}</h2>
+        <p class="text-gray-500 leading-relaxed mb-5">
+          {isEl ? 'Χτισμένα κατά μήκος της πευκόφυτης ακτής του Κεραμωτίου και της ηλιόλουστης χερσονήσου της Καβάλας, τα καταλύματά μας δεν είναι απλώς μέρη για ύπνο — είναι σκηνές για αναμνήσεις. Επιλέγουμε κάθε βίλα προσωπικά, διασφαλίζοντας ότι κάθε κατώφλι που περνάτε ανταποκρίνεται στο επίπεδο που αναζητάτε.' : isBg ? 'Наредени покрай покрития с борове бряг на Keramoti и слънчевия полуостров на Kefalonia, нашите имоти не са просто места за сън — те са сцени за спомени. Подбираме всяка вила лично, като гарантираме, че всеки праг, който прекрачвате, отговаря на стандарта, за който сте дошли.' : isSr ? 'Смештени дуж обале Кераmотиja окружене боровима и сунчаног полуострва Кавале, наше некретнине нису само места за спавање — оне су позорнице за сећања. Лично бирамо сваку вилу, обезбеђујући да сваки праг који прекорачите одговара стандарду ради кога сте дошли.' : isTr ? 'Keramoti\'nin çam ormanlı kıyı şeridi ve Kefalonia\'nın güneş dolu yarımadasına nestled olan mülklerimiz yalnızca uyku yeri değil — anılar için sahnelerdir. Her vilamızı kişisel olarak seçiyor, geçtiğiniz her eşiğin aradığınız standarda uyduğundan emin oluyoruz.' : isRo ? 'Așezate de-a lungul coastei cu pini din Keramoti și a peninsulei însorite din Kefalonia, proprietățile noastre nu sunt pur și simplu locuri de dormit — sunt scene pentru amintiri. Selectăm personal fiecare vilă, asigurându-ne că fiecare prag pe care îl treceți corespunde standardului pentru care ați venit.' : 'Nestled along the pine-fringed coastline of Keramoti and the sun-drenched peninsula of Kefalonia, our properties are not simply places to sleep — they are stages for memory. We curate each villa personally, ensuring that every threshold you cross meets the standard you came for.'}
+        </p>
+        <p class="text-gray-500 leading-relaxed mb-5">
+          {isEl ? 'Δημιουργήσαμε μια πλατφόρμα που αποκλείει τον θόρυβο των μεγάλων εταιρειών κρατήσεων — τα κρυφά τέλη τους, τους απρόσωπους αλγόριθμους, τις αδιάφορες γραμμές εξυπηρέτησης. Όταν κάνετε κράτηση μαζί μας, μιλάτε με ανθρώπους που γνωρίζουν κάθε ακίνητο ονομαστικά, που έχουν σταθεί σε κάθε δωμάτιο.' : isBg ? 'Изградихме платформа, която елиминира шума на големите агенции за резервации — скритите им такси, безличните им алгоритми, безразличните им обслужващи линии. Когато резервирате при нас, говорите с хора, които познават всеки имот по име, стояли са във всяка стая и ще отговорят на съобщението ви в рамките на часове, не дни.' : isSr ? 'Изградили смо платформу која елиминише буку великих агенција за резервације — њихове скривене накнаде, безличне алгоритме, равнодушне линије за кориснике. Када резервишете код нас, разговарате са људима који знају сваку некретнину по имену, стајали су у свакој соби и одговориће на вашу поруку за сате, не дане.' : isTr ? 'Büyük rezervasyon ajanslarının gürültüsünü — gizli ücretlerini, kişisiz algoritmalarını, ilgisiz müşteri hatlarını — devre dışı bırakan bir platform inşa ettik. Bizimle rezervasyon yaptığınızda, her mülkü ismiyle tanıyan, her odada bulunmuş ve mesajınıza saatler içinde yanıt verecek kişilerle konuşursunuz.' : isRo ? 'Am construit o platformă care elimină zgomotul marilor agenții de rezervări — taxele lor ascunse, algoritmii impersonali, liniile indiferente de servicii clienți. Când rezervați la noi, vorbiți cu oameni care cunosc fiecare proprietate pe nume, care au stat în fiecare cameră și care vă vor răspunde la mesaj în ore, nu în zile.' : 'We built a platform that cuts out the noise of large booking agencies — their hidden fees, their impersonal algorithms, their indifferent customer lines. When you book with us, you speak with people who know each property by name, who have stood in every room, and who will answer your message in hours, not days.'}
+        </p>
+        <p class="text-gray-500 leading-relaxed">
+          {isEl ? 'Για τους ιδιοκτήτες ακινήτων μας, πηγαίνουμε ακόμα πιο μακριά: ένα πλήρες οικοσύστημα διαχείρισης — από ζωντανά ταμπλό κρατήσεων και αυτόματες αποδόσεις έως επαγγελματική αγορά καθαρισμού με επαληθευμένους τοπικούς καθαριστές. Η επένδυσή σας, προστατευμένη και βελτιστοποιημένη.' : isBg ? 'За нашите собственици на имоти отиваме още по-далеч: пълна управленска екосистема — от табла за живи резервации и автоматизирани плащания до професионален пазар за почистване с верифицирани местни почистващи фирми, проследяване на задачите и потвърждение с снимки. Вашата инвестиция, защитена и оптимизирана.' : isSr ? 'За наше власнике некретнина, идемо још даље: потпуни екосистем управљања — од живих контролних табли резервација и аутоматских исплата до професионалног тржишта чишћења са верификованим локалним чистачима, праћењем послова и потврдом фотографијама. Ваша инвестиција, заштићена и оптимизована.' : isTr ? 'Mülk sahiplerimiz için daha da ileri gidiyoruz: canlı rezervasyon panolarından ve otomatik mülk sahibi ödemelerinden, doğrulanmış yerel temizlikçiler, iş takibi ve fotoğrafla doğrulanmış tamamlamalar içeren profesyonel bir temizlik pazarına kadar eksiksiz bir yönetim ekosistemi. Yatırımınız, korunmuş ve optimize edilmiş.' : isRo ? 'Pentru proprietarii noștri, mergem și mai departe: un ecosistem complet de management — de la tablouri de bord live pentru rezervări și plăți automate către proprietari, până la o piață profesională de curățenie cu curățători locali verificați, urmărirea lucrărilor și finalizări verificate cu fotografii. Investiția dumneavoastră, protejată și optimizată.' : 'For our property owners, we go further still: a complete management ecosystem — from live booking dashboards and automated owner payouts to a professional cleaning marketplace with verified local cleaners, job tracking, and photo-verified completions. Your investment, protected and optimised.'}
+        </p>
+      </div>
+      <div class="relative">
+        <div class="bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] rounded-2xl aspect-square flex items-center justify-center text-9xl">
+          🏡
+        </div>
+        <div class="absolute -bottom-4 -right-4 bg-[#c9a96e] rounded-2xl p-5 shadow-xl">
+          <p class="text-white text-3xl font-bold">100%</p>
+          <p class="text-white/80 text-xs font-medium mt-0.5">{isEl ? 'Απευθείας · Χωρίς μεσάζοντες' : isBg ? 'Директно · Без посредници' : isSr ? 'Директна резервација · Без посредника' : isTr ? 'Doğrudan rezervasyon · Aracısız' : isRo ? 'Direct · Fără intermediari' : 'Direct · No middlemen'}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pillars -->
+  <section class="bg-gray-50">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+      <div class="text-center mb-14">
+        <p class="text-[#c9a96e] text-xs font-semibold uppercase tracking-[0.2em] mb-3">{isEl ? 'Οι Αρχές μας' : isBg ? 'Нашите принципи' : isSr ? 'Наши принципи' : isTr ? 'İlkelerimiz' : isRo ? 'Principiile Noastre' : 'Our Principles'}</p>
+        <h2 class="text-3xl font-bold text-gray-900">{isEl ? 'Το πρότυπο KefaloniaBNB' : isBg ? 'Стандартът на KefaloniaBNB' : isSr ? 'Стандард KefaloniaBNB' : isTr ? 'KefaloniaBNB standardı' : isRo ? 'Standardul KefaloniaBNB' : 'The KefaloniaBNB standard'}</h2>
+      </div>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-8">
+        {[
+          {
+            icon: '✦',
+            title: isEl ? 'Επιλεγμένη Αριστεία' : isBg ? 'Подбрано Съвършенство' : isSr ? 'Одабрана Изврсност' : isTr ? 'Seçilmiş Mükemmellik' : isRo ? 'Excelență Selectată' : 'Curated Excellence',
+            desc: isEl ? 'Κάθε ακίνητο στο χαρτοφυλάκιό μας αξιολογείται προσωπικά. Αποδεχόμαστε μόνο εκείνα που πληρούν τα αυστηρά πρότυπά μας για χώρο, φινίρισμα και τοποθεσία. Η ποσότητα δεν είναι ποτέ ο στόχος — η ποιότητα πάντα είναι.' : isBg ? 'Всеки имот в нашето портфолио се преглежда лично. Приемаме само тези, които отговарят на строгите ни стандарти за пространство, завършеност и местоположение. Количеството никога не е целта — качеството винаги е.' : isSr ? 'Свака некретнина у нашем портфолију лично се прегледа. Прихватамо само оне које задовољавају наше строге стандарде простора, завршне обраде и локације. Количина никада није циљ — квалитет увек јесте.' : isTr ? 'Portföyümüzdeki her mülk kişisel olarak incelenir. Yalnızca alan, bitişlik ve konuma ilişkin titiz standartlarımıza uyanları kabul ederiz. Miktar hiçbir zaman hedef değildir — kalite her zaman öyledir.' : isRo ? 'Fiecare proprietate din portofoliul nostru este revizuită personal. Acceptăm doar pe cele care corespund standardelor noastre exigente de spațiu, finisaj și amplasament. Cantitatea nu este niciodată scopul — calitatea întotdeauna este.' : 'Every property in our portfolio is personally reviewed. We accept only those that match our exacting standards for space, finish, and setting. Quantity is never the goal — quality always is.',
+          },
+          {
+            icon: '🤝',
+            title: isEl ? 'Ριζική Διαφάνεια' : isBg ? 'Пълна Прозрачност' : isSr ? 'Потпуна Транспарентност' : isTr ? 'Tam Şeffaflık' : isRo ? 'Transparență Radicală' : 'Radical Transparency',
+            desc: isEl ? 'Η τιμή που εμφανίζεται είναι η τιμή που καταβάλλεται. Δεν υπάρχουν πρόσθετες χρεώσεις πλατφόρμας ή τέλη κράτησης. Πιστεύουμε στις έντιμες συναλλαγές.' : isBg ? 'Показаната цена е цената, която се плаща. Без допълнителни такси за платформата, без такси за резервация. Вярваме в честните отношения — между нас, нашите собственици и всеки гост, який прекрачи прага.' : isSr ? 'Приказана цена је цена која се плаћа. Без додатних накнада платформе, без накнада за резервацију. Верујемо у поштено пословање — између нас, наших власника и сваког госта који прође кроз врата.' : isTr ? 'Gösterilen fiyat ödenen fiyattır. Platform ek ücreti yok, ödeme sırasında eklenen rezervasyon ücreti yok. Aramızda, mülk sahiplerimiz ve kapıdan geçen her misafir arasında dürüst ilişkilere inanıyoruz.' : isRo ? 'Prețul afișat este prețul plătit. Fără suprataxe de platformă, fără taxe de rezervare adăugate la checkout. Credem în tranzacții oneste — între noi, proprietarii noștri și fiecare oaspete care trece pragul.' : 'The price displayed is the price paid. No platform surcharges, no booking fees layered on at checkout. We believe in honest dealings — between us, our owners, and every guest who walks through the door.',
+          },
+          {
+            icon: '🌊',
+            title: isEl ? 'Υπηρεσία με Τοπικές Ρίζες' : isBg ? 'Услуга с Местни Корени' : isSr ? 'Услуга са Локалним Коренима' : isTr ? 'Yerel Köklü Hizmet' : isRo ? 'Serviciu cu Rădăcini Locale' : 'Place-rooted Service',
+            desc: isEl ? 'Η ομάδα μας ζει εδώ. Γνωρίζουμε ποιες βίλες έχουν την καλύτερη θέα για ηλιοβασίλεμα, ποιες παραλίες είναι πιο ήσυχες τα Σαββατοκύριακα και ποιες τοπικές ταβέρνες αξίζουν την επίσκεψη. Αυτή η τοπική γνώση είναι δική σας από τη στιγμή που κάνετε κράτηση.' : isBg ? 'Нашият екип живее тук. Знаем кои вили хващат най-добрия залез, кои плажове са по-тихи през уикенда и кои местни таверни си заслужава да посетите. Това местно познание е ваше от момента на резервацията.' : isSr ? 'Наш тим живи овде. Знамо које виле хватају најбољи залазак сунца, које плаже су тише викендом и које локалне крчме вреде посете. То локално знање је ваше од тренутка резервације.' : isTr ? 'Ekibimiz burada yaşıyor. Hangi vilaların en iyi günbatımını yakaladığını, hangi plajların hafta sonları daha sakin olduğunu ve hangi yerel meyhanelerin yürümeye değer olduğunu biliyoruz. Bu yerel bilgi, rezervasyon yaptığınız andan itibaren sizindir.' : isRo ? 'Echipa noastră trăiește aici. Știm care vile prind cel mai frumos apus, care plaje sunt mai liniștite în weekend și care taverne locale merită drumul. Acea cunoaștere locală este a dumneavoastră din momentul în care rezervați.' : 'Our team lives here. We know which villas catch the best sunset, which beaches are quieter on weekends, and which local tavernas are worth the walk. That local knowledge is yours the moment you book.',
+          },
+        ].map((p) => (
+          <div class="bg-white rounded-2xl p-8 border border-gray-100 shadow-sm">
+            <div class="w-10 h-10 bg-[#1a1a2e] rounded-xl flex items-center justify-center text-[#c9a96e] font-bold text-lg mb-5">{p.icon}</div>
+            <h3 class="font-bold text-gray-900 mb-3">{p.title}</h3>
+            <p class="text-gray-500 text-sm leading-relaxed">{p.desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Platform features -->
+  <section class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <div class="text-center mb-14">
+      <p class="text-[#c9a96e] text-xs font-semibold uppercase tracking-[0.2em] mb-3">{isEl ? 'Τι χτίσαμε' : isBg ? 'Какво изградихме' : isSr ? 'Шта смо изградили' : isTr ? 'Ne inşa ettik' : isRo ? 'Ce am construit' : "What we've built"}</p>
+      <h2 class="text-3xl font-bold text-gray-900">{isEl ? 'Ένα ολοκληρωμένο οικοσύστημα — για επισκέπτες και ιδιοκτήτες' : isBg ? 'Пълна екосистема — за гости и собственици' : isSr ? 'Потпуни екосистем — за госте и власнике' : isTr ? 'Eksiksiz bir ekosistem — misafirler ve mülk sahipleri için' : isRo ? 'Un ecosistem complet — atât pentru oaspeți, cât și pentru proprietari' : 'A complete ecosystem — for guests and owners alike'}</h2>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+      {[
+        {
+          icon: '🏛️',
+          title: isEl ? 'Πλατφόρμα Απευθείας Κρατήσεων' : isBg ? 'Платформа за Директна Резервация' : isSr ? 'Платформа за Директне Резервације' : isTr ? 'Doğrudan Rezervasyon Platformu' : isRo ? 'Platformă de Rezervare Directă' : 'Direct Booking Platform',
+          desc: isEl ? 'Οι επισκέπτες κάνουν κράτηση απευθείας — άμεση πληρωμή ή τραπεζική μεταφορά. Χωρίς προμήθειες τρίτων. Πάντα η καλύτερη τιμή.' : isBg ? 'Гостите резервират директно — плащане с карта чрез Stripe или банков превод. Без комисионни на трети страни. Винаги най-добрата налична цена.' : isSr ? 'Гости резервишу директно — тренутно плаћање картицом или банковни трансфер. Без провизија трећих страна. Увек најбоља доступна цена.' : isTr ? 'Misafirler doğrudan rezervasyon yapar — anında Stripe ödemesi veya banka transferi. Üçüncü taraf komisyonu yok. Her zaman mevcut en iyi fiyat.' : isRo ? 'Oaspeții rezervă direct — checkout instant Stripe sau transfer bancar. Fără comisioane terțe. Cel mai bun tarif disponibil, întotdeauna.' : 'Guests reserve directly — instant Stripe checkout or bank transfer. No third-party commissions. The best available rate, always.',
+        },
+        {
+          icon: '📊',
+          title: isEl ? 'Πύλη Διαχείρισης Ιδιοκτητών' : isBg ? 'Портал за Управление на Собственици' : isSr ? 'Портал за Управљање Власника' : isTr ? 'Mülk Yönetim Portalı' : isRo ? 'Portal de Management Proprietar' : 'Owner Management Portal',
+          desc: isEl ? 'Οι ιδιοκτήτες έχουν πρόσβαση σε ιδιωτικό πίνακα ελέγχου: ζωντανό ημερολόγιο κρατήσεων, αναφορά εσόδων, παρακολούθηση αποδόσεων και άμεση επικοινωνία με επισκέπτες — όλα σε ένα μέρος.' : isBg ? 'Собствениците имат достъп до личен контролен панел: жив календар за резервации, отчети за приходи, автоматично проследяване на плащанията и директна комуникация с гостите — всичко на едно място.' : isSr ? 'Власници некретнина приступају приватној контролној табли: живи календар резервација, извештаји о приходима, праћење аутоматских исплата и директна комуникација са гостима — све на jedном месту.' : isTr ? 'Mülk sahipleri özel bir panoya erişir: canlı rezervasyon takvimi, gelir raporlama, otomatik ödeme takibi ve doğrudan misafir iletişimi — hepsi tek bir yerde.' : isRo ? 'Proprietarii accesează un tablou de bord privat: calendar live de rezervări, raportare venituri, urmărire automată a plăților și comunicare directă cu oaspeții — toate într-un singur loc.' : 'Property owners access a private dashboard: live booking calendar, revenue reporting, automated payout tracking, and direct guest communication — all in one place.',
+        },
+        {
+          icon: '🧹',
+          title: isEl ? 'Επαγγελματική Αγορά Καθαρισμού' : isBg ? 'Професионален Пазар за Почистване' : isSr ? 'Професионално Тржиште Чишћења' : isTr ? 'Profesyonel Temizlik Pazarı' : isRo ? 'Piață Profesională de Curățenie' : 'Professional Cleaning Marketplace',
+          desc: isEl ? 'Οι ιδιοκτήτες δημοσιεύουν αιτήματα καθαρισμού· επαληθευμένοι τοπικοί επαγγελματίες υποβάλλουν ανταγωνιστικές προσφορές. Οι εργασίες παρακολουθούνται από την ανάθεση έως την ολοκλήρωση.' : isBg ? 'Собствениците публикуват заявки за почистване; верифицирани местни специалисти подават конкурентни оферти. Задачите се проследяват от назначаването до потвърждението със снимки. Плащанията са автоматизирани.' : isSr ? 'Власници објављују захтеве за чишћење; верификовани локални стручњаци подносе конкурентне понуде. Послови се прате од доделе до завршетка потврђеног фотографијама. Исплате су аутоматизоване.' : isTr ? 'Mülk sahipleri temizlik talepleri yayınlar; onaylı yerel profesyoneller rekabetçi teklifler verir. İşler atamadan fotoğrafla doğrulanmış tamamlamaya kadar takip edilir. Ödemeler otomatiktir.' : isRo ? 'Proprietarii postează cereri de curățenie; profesioniști locali verificați licitează competitiv. Lucrările sunt urmărite de la atribuire până la finalizare verificată cu fotografii. Plățile sunt automatizate.' : 'Owners post cleaning requests; vetted local professionals bid competitively. Jobs are tracked from assignment through photo-verified completion. Payouts are automated.',
+        },
+        {
+          icon: '💳',
+          title: isEl ? 'Αυτόματες Αποδόσεις Ιδιοκτητών' : isBg ? 'Автоматизирани Плащания към Собственици' : isSr ? 'Аутоматске Исплате Власницима' : isTr ? 'Otomatik Mülk Sahibi Ödemeleri' : isRo ? 'Plăți Automate către Proprietari' : 'Automated Owner Payouts',
+          desc: isEl ? 'Όταν πληρώνει ένας επισκέπτης, το μερίδιό σας μεταφέρεται αυτόματα μέσω Stripe. Πλήρης ορατότητα κάθε ευρώ — κερδισμένου, μεταφερθέντος και εκκρεμούς.' : isBg ? 'Когато гост плати, вашият дял се прехвърля автоматично чрез Stripe. Пълна видимост на всяко евро — спечелено, прехвърлено и чакащо — в таблото за плащания.' : isSr ? 'Када гост плати, ваш удео се аутоматски преноси путем Stripe-а. Потпуна видљивост сваког евра — зарађеног, пренесеног и доступног — на контролној табли исплата.' : isTr ? 'Bir misafir ödeme yaptığında, payınız otomatik olarak Stripe aracılığıyla aktarılır. Ödeme panelinizde her avronun tam görünürlüğü — kazanılan, aktarılan ve bekleyen.' : isRo ? 'Când un oaspete plătește, partea dumneavoastră se transferă automat prin Stripe. Vizibilitate completă a fiecărui euro — câștigat, transferat și în așteptare — pe tabloul de plăți.' : 'When a guest pays, your share transfers automatically via Stripe. Full visibility of every euro — earned, transferred, and pending — on your payouts dashboard.',
+        },
+      ].map((f) => (
+        <div class="flex gap-5 p-6 rounded-2xl border border-gray-100 hover:border-[#c9a96e]/30 hover:shadow-md transition-all">
+          <div class="text-3xl flex-shrink-0">{f.icon}</div>
+          <div>
+            <h3 class="font-bold text-gray-900 mb-2">{f.title}</h3>
+            <p class="text-gray-500 text-sm leading-relaxed">{f.desc}</p>
+          </div>
+        </div>
+      ))}
+    </div>
+    <div class="text-center mt-10">
+      <a href="/services" class="inline-flex items-center gap-2 text-sm font-semibold text-[#1a1a2e] border border-[#1a1a2e] rounded-xl px-6 py-3 hover:bg-[#1a1a2e] hover:text-white transition-colors">
+        {isEl ? 'Δείτε όλες τις υπηρεσίες μας →' : isBg ? 'Разгледайте всички наши услуги →' : isSr ? 'Истражите све наше услуге →' : isTr ? 'Tüm hizmetlerimizi keşfedin →' : isRo ? 'Explorează toate serviciile noastre →' : 'Explore all our services →'}
+      </a>
+    </div>
+  </section>
+
+  <!-- Numbers -->
+  <section class="bg-[#1a1a2e]">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-8 text-center">
+        {[
+          { value: '100%', label: isEl ? 'Απευθείας κράτηση — χωρίς μεσάζοντες' : isBg ? 'Директна резервация — без посредници' : isSr ? 'Директна резервација — без посредника' : isTr ? 'Doğrudan rezervasyon — aracısız' : isRo ? 'Rezervare directă — fără intermediari' : 'Direct booking — no middlemen' },
+          { value: '24 h', label: isEl ? 'Τυπικός χρόνος απάντησης' : isBg ? 'Типично време за отговор' : isSr ? 'Типично време одговора' : isTr ? 'Tipik yanıt süresi' : isRo ? 'Timp tipic de răspuns la solicitări' : 'Typical response to enquiries' },
+          { value: '5★', label: isEl ? 'Πρότυπο ποιότητας για κάθε καταχώριση' : isBg ? 'Стандарт за качество за всяка обява' : isSr ? 'Стандард квалитета за сваки оглас' : isTr ? 'Her ilan için kalite standardı' : isRo ? 'Standard de calitate pentru fiecare anunț' : 'Quality standard for every listing' },
+          { value: '€0', label: isEl ? 'Κρυφά τέλη στην κράτησή σας' : isBg ? 'Скрити такси към вашата резервация' : isSr ? 'Скривене накнаде на вашу резервацију' : isTr ? 'Rezervasyonunuzda gizli ücret' : isRo ? 'Taxe ascunse la rezervarea dumneavoastră' : 'Hidden fees on your booking' },
+        ].map((s) => (
+          <div>
+            <p class="text-3xl font-bold text-[#c9a96e] mb-1">{s.value}</p>
+            <p class="text-white/50 text-xs leading-snug">{s.label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+    <div class="bg-gradient-to-br from-[#1a1a2e] to-[#0f3460] rounded-3xl p-12 text-center text-white">
+      <p class="text-[#c9a96e] text-xs font-semibold uppercase tracking-[0.2em] mb-3">{isEl ? 'Ξεκινήστε τη διαμονή σας' : isBg ? 'Започнете вашия престой' : isSr ? 'Започните свој боравак' : isTr ? 'Konaklamanıza başlayın' : isRo ? 'Începeți sejurul' : 'Begin your stay'}</p>
+      <h2 class="text-3xl font-bold mb-4">{isEl ? 'Κλείστε τη βίλα σας στο Αιγαίο' : isBg ? 'Резервирайте вашата вила на Егейско море' : isSr ? 'Резервишите своју вилу на Егејском мору' : isTr ? 'Ege\'deki villanızı rezerve edin' : isRo ? 'Rezervați vila dumneavoastră pe Egee' : 'Reserve your villa on the Aegean'}</h2>
+      <p class="text-white/60 mb-8 max-w-md mx-auto leading-relaxed">
+        {isEl ? 'Εξερευνήστε την επιλεγμένη συλλογή μας και κάντε απευθείας κράτηση. Η καλύτερη τιμή, η πιο προσωπική εξυπηρέτηση — εγγυημένα.' : isBg ? 'Разгледайте ръчно подбраната ни колекция и резервирайте директно при нас. Най-добрата цена, най-персоналното обслужване — гарантирано.' : isSr ? 'Прегледајте наш ручно одабрани избор и резервишите директно код нас. Најбоља цена, најличнија услуга — гарантовано.' : isTr ? 'El ile seçilmiş koleksiyonumuza göz atın ve doğrudan bizimle rezervasyon yapın. En iyi fiyat, en kişisel hizmet — garantili.' : isRo ? 'Răsfoiți colecția noastră selectată manual și rezervați direct la noi. Cel mai bun tarif, cel mai personal serviciu — garantat.' : 'Browse our handpicked collection and book directly with us. The best rate, the most personal service — guaranteed.'}
+      </p>
+      <div class="flex flex-col sm:flex-row gap-3 justify-center">
+        <a href="/rentals" class="inline-block bg-[#c9a96e] hover:bg-[#b8934a] text-white font-semibold px-8 py-3 rounded-xl text-sm transition-colors">
+          {isEl ? 'Δείτε τις Βίλες' : isBg ? 'Разгледайте Вилите' : isSr ? 'Прегледајте Виле' : isTr ? 'Villaları Keşfet' : isRo ? 'Răsfoiește Vilele' : 'Browse Villas'}
+        </a>
+        <a href="/services" class="inline-block bg-white/10 hover:bg-white/20 text-white font-semibold px-8 py-3 rounded-xl text-sm transition-colors">
+          {isEl ? 'Οι Υπηρεσίες μας →' : isBg ? 'Нашите Услуги →' : isSr ? 'Наше Услуге →' : isTr ? 'Hizmetlerimiz →' : isRo ? 'Serviciile Noastre →' : 'Our Services →'}
+        </a>
+      </div>
+    </div>
+  </section>
+
+</BaseLayout>
