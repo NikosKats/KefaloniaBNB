@@ -1,0 +1,149 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { getServiceClient } from '../lib/supabase.ts';
+import { TIER_THRESHOLDS } from '../lib/points.ts';
+
+const session = Astro.locals.session;
+const service = getServiceClient();
+
+// User's tier (bronze = signed in, no tier column yet = bronze)
+let userTier: 'bronze' | 'silver' | 'gold' | null = null;
+let userPoints = 0;
+if (session) {
+  const { data: profile } = await service
+    .from('profiles')
+    .select('tier, points_balance')
+    .eq('id', session.user.id)
+    .single();
+  userTier = (profile?.tier ?? 'bronze') as any;
+  userPoints = profile?.points_balance ?? 0;
+}
+
+const TIER_RANK: Record<string, number> = { bronze: 1, silver: 2, gold: 3 };
+
+// Pull active partner coupons. Show only those with an active flash window
+// (or no flash window set) so the page always reflects something fresh.
+const nowIso = new Date().toISOString();
+const { data: rawPerks } = await service
+  .from('partner_coupons')
+  .select('id, code, description, discount_type, discount_value, min_tier, flash_starts_at, flash_ends_at, partner_businesses(name, location_name, slug)')
+  .eq('is_active', true)
+  .or(`flash_ends_at.is.null,flash_ends_at.gte.${nowIso}`)
+  .order('flash_ends_at', { ascending: true, nullsFirst: false });
+
+const perks = (rawPerks ?? []).filter((p: any) => {
+  // Flash window must have started (if set).
+  if (p.flash_starts_at && new Date(p.flash_starts_at) > new Date()) return false;
+  return true;
+});
+
+function discountLabel(p: any): string {
+  if (p.discount_type === 'percent') return `${p.discount_value}% off`;
+  return `€${p.discount_value} off`;
+}
+
+function isUnlocked(minTier: string | null): boolean {
+  if (!minTier) return !!session;                             // any signed-in member
+  if (!userTier) return false;                                 // anon
+  return TIER_RANK[userTier] >= TIER_RANK[minTier];
+}
+
+const lockedCount = perks.filter((p: any) => !isUnlocked(p.min_tier)).length;
+---
+
+<BaseLayout title="Member perks — Keramoti" description="Flash discounts and member-only offers from Kefalonia partners">
+  <section class="bg-gradient-to-br from-[#1a1a2e] to-[#2d2d4e] py-14">
+    <div class="max-w-5xl mx-auto px-4">
+      <h1 class="text-4xl sm:text-5xl font-bold text-white mb-3">Member perks</h1>
+      <p class="text-gray-300 text-lg mb-6">Flash discounts from local tavernas, beaches, boats &amp; tours — unlocked by Keramoti members.</p>
+
+      {!session && (
+        <div class="flex flex-wrap gap-3 items-center">
+          <a href="/community/join?next=/perks" class="inline-block bg-[#c9a96e] text-white px-6 py-3 rounded-xl font-semibold hover:bg-[#b89556] transition-colors">
+            Join free to unlock
+          </a>
+          <span class="text-gray-400 text-sm">{lockedCount} perks locked. Takes 30 seconds.</span>
+        </div>
+      )}
+
+      {session && userTier && (
+        <div class="inline-flex items-center gap-2 bg-white/10 border border-white/20 rounded-full px-4 py-2">
+          <span class="text-xl">{userTier === 'gold' ? '🥇' : userTier === 'silver' ? '🥈' : '🥉'}</span>
+          <span class="text-white font-semibold capitalize">{userTier} member</span>
+          <span class="text-gray-300 text-sm">· {userPoints.toLocaleString()} pts</span>
+          {userTier !== 'gold' && (
+            <a href="/account" class="text-[#c9a96e] text-sm font-semibold ml-2">Upgrade →</a>
+          )}
+        </div>
+      )}
+    </div>
+  </section>
+
+  <section class="max-w-5xl mx-auto px-4 py-12">
+    {perks.length === 0 ? (
+      <p class="text-center text-gray-500 py-12">No active perks right now — check back soon for flash drops.</p>
+    ) : (
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        {perks.map((p: any) => {
+          const unlocked = isUnlocked(p.min_tier);
+          const biz = p.partner_businesses;
+          return (
+            <div class={`relative rounded-2xl border p-5 transition-all ${unlocked ? 'bg-white border-gray-200 hover:border-[#c9a96e] hover:shadow-lg' : 'bg-gray-100 border-gray-200'}`}>
+              {!unlocked && (
+                <div class="absolute inset-0 flex items-center justify-center rounded-2xl bg-white/80 backdrop-blur-sm z-10">
+                  <div class="text-center">
+                    <div class="text-3xl mb-2">🔒</div>
+                    <p class="text-sm font-semibold text-gray-900">
+                      {p.min_tier ? `${p.min_tier.charAt(0).toUpperCase() + p.min_tier.slice(1)} tier required` : 'Members only'}
+                    </p>
+                    <a href={session ? '/account' : '/community/join?next=/perks'} class="text-xs text-[#c9a96e] font-semibold underline">
+                      {session ? 'How to upgrade' : 'Join free'}
+                    </a>
+                  </div>
+                </div>
+              )}
+
+              <div class={`${unlocked ? '' : 'blur-[2px] select-none'}`}>
+                {p.flash_ends_at && (
+                  <div class="inline-block bg-red-100 text-red-700 text-xs font-bold uppercase px-2 py-1 rounded mb-3">
+                    ⚡ Flash · ends {new Date(p.flash_ends_at).toLocaleDateString()}
+                  </div>
+                )}
+                <h3 class="text-lg font-bold text-gray-900 mb-1">{discountLabel(p)}</h3>
+                <p class="text-sm text-gray-600 mb-3">{p.description}</p>
+                {biz && (
+                  <p class="text-xs text-gray-500 mb-3">
+                    at <strong>{biz.name}</strong>{biz.location_name ? ` · ${biz.location_name}` : ''}
+                  </p>
+                )}
+                {unlocked ? (
+                  <div class="bg-[#fefce8] border-2 border-dashed border-[#c9a96e] rounded-lg py-2.5 text-center">
+                    <p class="text-xs text-gray-500 leading-none mb-1">Coupon</p>
+                    <p class="font-mono font-bold text-[#1a1a2e] select-all">{p.code}</p>
+                  </div>
+                ) : (
+                  <div class="bg-gray-200 rounded-lg py-2.5 text-center">
+                    <p class="font-mono font-bold text-gray-400">••••••••</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    )}
+  </section>
+
+  {!session && (
+    <section class="bg-gray-50 py-12">
+      <div class="max-w-2xl mx-auto px-4 text-center">
+        <h2 class="text-2xl font-bold text-gray-900 mb-2">One signup, every perk</h2>
+        <p class="text-gray-600 mb-6">Free membership. No spam. Instant welcome gift + access to every flash drop.</p>
+        <a href="/community/join?next=/perks" class="inline-block bg-[#1a1a2e] text-white px-8 py-4 rounded-xl font-semibold hover:bg-[#2d2d4e] transition-colors">
+          🎁 Join free &amp; reveal my welcome gift
+        </a>
+        <p class="text-xs text-gray-500 mt-4">Silver tier unlocks at {TIER_THRESHOLDS.silver} pts · Gold at {TIER_THRESHOLDS.gold} pts</p>
+      </div>
+    </section>
+  )}
+</BaseLayout>

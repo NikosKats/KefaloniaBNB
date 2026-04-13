@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
 import { getServiceClient } from '../../../lib/supabase.ts';
+import { awardPoints } from '../../../lib/points.ts';
 
 // POST: toggle favorite on a listing
 export const POST: APIRoute = async ({ request, locals }) => {
@@ -23,6 +24,9 @@ export const POST: APIRoute = async ({ request, locals }) => {
     return json({ favorited: false }, 200);
   } else {
     await service.from('favorites').insert({ user_id: userId, listing_id });
+    // Gamification: one-shot bonus for the user's first favorite.
+    // Unique index swallows duplicates, so this is safe to always call.
+    awardPoints(userId, 'first_favorite', { refId: listing_id }).catch(() => {/* ignore */});
     return json({ favorited: true }, 200);
   }
 };

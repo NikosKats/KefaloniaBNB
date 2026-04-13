@@ -1,10 +1,13 @@
 import type { APIRoute } from 'astro';
 import { createSupabaseServerClient, getServiceClient } from '../../../lib/supabase.ts';
 import { pushToAdminsAndOwner } from '../../../lib/push.ts';
+import { awardPoints } from '../../../lib/points.ts';
+import { createLockedWelcomeReward } from '../../../lib/welcomeReward.ts';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   const body = await request.json();
   const { full_name, email, password } = body;
+  const refSource = cookies.get('ref_source')?.value ?? null;
 
   if (!full_name?.trim() || !email?.trim() || !password) {
     return new Response(JSON.stringify({ error: 'Name, email, and password are required' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
@@ -41,6 +44,15 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       full_name: full_name.trim(),
       role: 'member',
     }, { onConflict: 'id' });
+
+    // ── Gamification: signup bonus + locked welcome reveal ───────────
+    // Fire-and-forget: never block signup on gamification side-effects.
+    // ref_source (if present) is stored as refId on the signup ledger row so
+    // admins can batch-credit referrers later via the referral dashboard.
+    Promise.all([
+      awardPoints(data.user.id, 'signup', { refId: refSource ?? undefined }),
+      createLockedWelcomeReward(data.user.id),
+    ]).catch((e) => console.error('[signup] gamification hooks failed', e));
   }
 
   // Push notification to admins about new member

@@ -1,6 +1,7 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { getServiceClient } from '../../lib/supabase.ts';
+import { awardPoints, pointsToNextTier, TIER_THRESHOLDS } from '../../lib/points.ts';
 
 const lang = (Astro.locals.lang ?? 'en') as string;
 const isBg = lang === 'bg';
@@ -39,12 +40,43 @@ const service = getServiceClient();
 const userId = session.user.id;
 
 const [profileRes, bookingsRes, postsRes] = await Promise.all([
-  service.from('profiles').select('full_name, email, avatar_url, bio, location, friends_count, favorites_count, unread_messages_count, unread_notifications_count, created_at').eq('id', userId).single(),
+  service.from('profiles').select('full_name, email, avatar_url, bio, location, friends_count, favorites_count, unread_messages_count, unread_notifications_count, points_balance, tier, created_at').eq('id', userId).single(),
   service.from('bookings').select('id', { count: 'exact', head: true }).or(`guest_user_id.eq.${userId},guest_email.eq.${(Astro.locals.profile as any)?.email ?? ''}`),
   service.from('community_posts').select('id', { count: 'exact', head: true }).eq('author_id', userId),
 ]);
 
 const profile = profileRes.data;
+
+// Gamification: award email_verified bonus on first authenticated account visit.
+// One-shot (unique index) so safe to always call.
+if (session.user.email_confirmed_at) {
+  awardPoints(userId, 'email_verified').catch(() => {/* ignore */});
+}
+
+// Award profile_photo if user has an avatar (one-shot).
+if (profile?.avatar_url) {
+  awardPoints(userId, 'profile_photo').catch(() => {/* ignore */});
+}
+
+const points = profile?.points_balance ?? 0;
+const tier = (profile?.tier ?? 'bronze') as 'bronze' | 'silver' | 'gold';
+const nextTier = pointsToNextTier(points);
+const tierProgressPct = nextTier.next
+  ? Math.min(100, Math.round(((points - (tier === 'bronze' ? 0 : TIER_THRESHOLDS.silver)) / (nextTier.needed + (points - (tier === 'bronze' ? 0 : TIER_THRESHOLDS.silver)))) * 100))
+  : 100;
+
+const tierLabel = { bronze: 'Bronze', silver: 'Silver', gold: 'Gold' }[tier];
+const tierColor = { bronze: '#b08d57', silver: '#9ca3af', gold: '#c9a96e' }[tier];
+const tierEmoji = { bronze: '🥉', silver: '🥈', gold: '🥇' }[tier];
+
+// Does the user still have an unrevealed welcome reward?
+const { data: welcomeReward } = await service
+  .from('welcome_rewards')
+  .select('id, revealed_at, expires_at, coupon_code, used_at')
+  .eq('user_id', userId)
+  .maybeSingle();
+const hasUnrevealedReward = !!welcomeReward && !welcomeReward.revealed_at && new Date(welcomeReward.expires_at) > new Date();
+const hasRevealedUnusedReward = !!welcomeReward?.revealed_at && !welcomeReward?.used_at && new Date(welcomeReward.expires_at) > new Date();
 const bookingsCount = bookingsRes.count ?? 0;
 const postsCount = postsRes.count ?? 0;
 
@@ -91,6 +123,62 @@ const navCards = [
       <div>
         <h1 class="text-2xl font-bold text-gray-900">{profile?.full_name || t.myAccount}</h1>
         <p class="text-sm text-gray-500">{profile?.email} {profile?.location ? `· ${profile.location}` : ''}</p>
+      </div>
+    </div>
+
+    <!-- Welcome reward nudge -->
+    {hasUnrevealedReward && (
+      <a href="/account/welcome-reveal" class="block mb-6 rounded-2xl p-5 bg-gradient-to-r from-[#1a1a2e] to-[#2d2d4e] border border-[#c9a96e]/40 hover:border-[#c9a96e] transition-colors">
+        <div class="flex items-center gap-4">
+          <div class="text-4xl">🎁</div>
+          <div class="flex-1">
+            <p class="text-white font-semibold">Your welcome gift is ready to reveal</p>
+            <p class="text-gray-300 text-sm mt-1">Everyone wins. 1 in 50 wins a free night. Tap to scratch →</p>
+          </div>
+          <span class="text-[#c9a96e] text-sm font-semibold">Reveal</span>
+        </div>
+      </a>
+    )}
+    {hasRevealedUnusedReward && welcomeReward?.coupon_code && (
+      <a href="/account/welcome-reveal" class="block mb-6 rounded-2xl p-5 bg-[#fefce8] border border-[#c9a96e]/60 hover:shadow-md transition-shadow">
+        <div class="flex items-center gap-4">
+          <div class="text-3xl">💌</div>
+          <div class="flex-1">
+            <p class="text-gray-900 font-semibold">Your welcome coupon <code class="bg-white px-2 py-0.5 rounded border">{welcomeReward.coupon_code}</code> is live</p>
+            <p class="text-gray-600 text-sm mt-1">Use it before {new Date(welcomeReward.expires_at).toLocaleDateString()} at midnight.</p>
+          </div>
+        </div>
+      </a>
+    )}
+
+    <!-- Tier progress card -->
+    <div class="rounded-2xl p-5 mb-8 border" style={`background: linear-gradient(135deg, ${tierColor}15, ${tierColor}05); border-color: ${tierColor}40;`}>
+      <div class="flex items-center justify-between mb-3">
+        <div class="flex items-center gap-3">
+          <span class="text-3xl">{tierEmoji}</span>
+          <div>
+            <p class="text-xs text-gray-500 uppercase tracking-wide">Member tier</p>
+            <p class="text-xl font-bold" style={`color: ${tierColor};`}>{tierLabel}</p>
+          </div>
+        </div>
+        <div class="text-right">
+          <p class="text-xs text-gray-500">Points</p>
+          <p class="text-2xl font-bold text-gray-900">{points.toLocaleString()}</p>
+        </div>
+      </div>
+      {nextTier.next ? (
+        <>
+          <div class="h-2 rounded-full bg-gray-200 overflow-hidden mb-2">
+            <div class="h-full rounded-full transition-all" style={`width: ${tierProgressPct}%; background: ${tierColor};`}></div>
+          </div>
+          <p class="text-xs text-gray-600"><strong>{nextTier.needed}</strong> points to <strong class="capitalize">{nextTier.next}</strong> tier &mdash; unlock bigger member discounts &amp; flash perks.</p>
+        </>
+      ) : (
+        <p class="text-xs text-gray-600">🎉 You've reached the top tier. Enjoy every perk.</p>
+      )}
+      <div class="flex gap-2 mt-3">
+        <a href="/perks" class="text-xs font-semibold px-3 py-1.5 rounded-full" style={`background: ${tierColor}; color: #fff;`}>View perks</a>
+        <a href="/account/favorites" class="text-xs font-semibold px-3 py-1.5 rounded-full bg-white border border-gray-200 text-gray-700 hover:border-gray-400">Earn more</a>
       </div>
     </div>
 

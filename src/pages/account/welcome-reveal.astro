@@ -1,0 +1,215 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const session = Astro.locals.session;
+if (!session) return Astro.redirect('/community/join?next=/account/welcome-reveal');
+
+const userId = session.user.id;
+const emailConfirmed = !!session.user.email_confirmed_at;
+
+const service = getServiceClient();
+const { data: reward } = await service
+  .from('welcome_rewards')
+  .select('id, prize_tier, coupon_code, revealed_at, expires_at, used_at')
+  .eq('user_id', userId)
+  .maybeSingle();
+
+const alreadyRevealed = !!reward?.revealed_at && !!reward.coupon_code;
+const expired = reward ? new Date(reward.expires_at) < new Date() : true;
+---
+
+<BaseLayout title="Your welcome gift" noIndex>
+  <section class="min-h-[70vh] bg-gradient-to-br from-[#1a1a2e] via-[#2d2d4e] to-[#1a1a2e] py-16">
+    <div class="max-w-lg mx-auto px-4 text-center">
+      <h1 class="text-3xl sm:text-4xl font-bold text-white mb-2">
+        {alreadyRevealed ? 'Your welcome gift 🎁' : 'Scratch to reveal your welcome gift'}
+      </h1>
+      <p class="text-gray-300 mb-10">
+        {alreadyRevealed
+          ? 'Use the code at checkout on any stay.'
+          : emailConfirmed
+            ? 'Everyone wins. Scratch the card to see what you got.'
+            : 'Please verify your email first — the reveal is gated behind it.'}
+      </p>
+
+      {!reward && (
+        <div class="bg-white/10 border border-white/20 rounded-2xl p-8">
+          <p class="text-gray-200">No welcome gift found for your account.</p>
+          <a href="/listings" class="inline-block mt-4 text-[#c9a96e] font-semibold">Browse stays →</a>
+        </div>
+      )}
+
+      {reward && !emailConfirmed && (
+        <div class="bg-white/10 border border-white/20 rounded-2xl p-8">
+          <p class="text-white mb-3">Check your inbox for the verification link.</p>
+          <p class="text-gray-300 text-sm">Your prize is waiting and expires in 7 days from signup.</p>
+        </div>
+      )}
+
+      {reward && emailConfirmed && alreadyRevealed && !expired && (
+        <div class="bg-white rounded-2xl p-8 shadow-2xl">
+          <p class="text-xs uppercase tracking-widest text-gray-500 mb-2">Your prize</p>
+          <p id="prize-label" class="text-4xl font-extrabold text-[#1a1a2e] mb-1" data-tier={reward.prize_tier}></p>
+          <p id="prize-desc" class="text-sm text-gray-600 mb-6"></p>
+          <div class="bg-[#fefce8] border-2 border-dashed border-[#c9a96e] rounded-xl py-4 mb-4">
+            <p class="text-xs text-gray-500 mb-1">Coupon code</p>
+            <p class="text-2xl font-mono font-bold text-[#1a1a2e] select-all tracking-widest">{reward.coupon_code}</p>
+          </div>
+          <button id="copy-btn" class="w-full bg-[#1a1a2e] text-white py-3 rounded-xl font-semibold hover:bg-[#2d2d4e] transition-colors">Copy code</button>
+          <p id="countdown" class="text-xs text-red-500 mt-4 font-semibold" data-expires={reward.expires_at}></p>
+        </div>
+      )}
+
+      {reward && emailConfirmed && alreadyRevealed && expired && (
+        <div class="bg-white/10 border border-white/20 rounded-2xl p-8">
+          <p class="text-white mb-3">Your welcome reward has expired.</p>
+          <p class="text-gray-300 text-sm">But member perks are always live on <a href="/perks" class="text-[#c9a96e] underline">/perks</a>.</p>
+        </div>
+      )}
+
+      {reward && emailConfirmed && !alreadyRevealed && !expired && (
+        <div class="inline-block">
+          <button id="scratch-btn" class="relative group">
+            <div id="scratch-surface" class="w-64 h-64 rounded-3xl bg-gradient-to-br from-[#c9a96e] to-[#b89556] shadow-2xl flex items-center justify-center cursor-pointer transition-transform group-hover:scale-105 active:scale-95">
+              <span class="text-6xl">🎁</span>
+            </div>
+            <p class="mt-4 text-white font-semibold">Tap to reveal</p>
+          </button>
+
+          <div id="reveal-result" class="hidden bg-white rounded-2xl p-8 shadow-2xl mt-4">
+            <p class="text-xs uppercase tracking-widest text-gray-500 mb-2">You won</p>
+            <p id="rv-label" class="text-4xl font-extrabold text-[#1a1a2e] mb-1"></p>
+            <p id="rv-desc" class="text-sm text-gray-600 mb-6"></p>
+            <div class="bg-[#fefce8] border-2 border-dashed border-[#c9a96e] rounded-xl py-4 mb-4">
+              <p class="text-xs text-gray-500 mb-1">Coupon code</p>
+              <p id="rv-code" class="text-2xl font-mono font-bold text-[#1a1a2e] select-all tracking-widest"></p>
+            </div>
+            <button id="rv-copy" class="w-full bg-[#1a1a2e] text-white py-3 rounded-xl font-semibold hover:bg-[#2d2d4e] transition-colors">Copy code</button>
+            <p id="rv-countdown" class="text-xs text-red-500 mt-4 font-semibold"></p>
+          </div>
+        </div>
+      )}
+
+      <a href="/account" class="inline-block mt-8 text-gray-400 hover:text-white text-sm">← Back to account</a>
+    </div>
+
+    <!-- Confetti canvas -->
+    <canvas id="confetti-canvas" class="fixed inset-0 pointer-events-none z-50" style="display:none;"></canvas>
+  </section>
+
+  <script is:inline>
+    const PRIZE_LABELS = {
+      small:   { label: '€15 off',         desc: '€15 off any stay of 2+ nights' },
+      medium:  { label: '10% off',         desc: '10% off any stay' },
+      large:   { label: 'Free cleaning',   desc: 'Cleaning fee on us — any stay' },
+      jackpot: { label: 'Free night 🎉',   desc: 'One free night on stays of 3+ nights' },
+    };
+
+    function fmtCountdown(isoExpiry) {
+      const ms = new Date(isoExpiry).getTime() - Date.now();
+      if (ms <= 0) return 'Expired';
+      const h = Math.floor(ms / 3600000);
+      const m = Math.floor((ms % 3600000) / 60000);
+      if (h >= 48) return `Expires in ${Math.floor(h / 24)} days`;
+      if (h >= 1) return `Expires in ${h}h ${m}m`;
+      return `Expires in ${m}m`;
+    }
+
+    function copyCode(code, btn) {
+      navigator.clipboard.writeText(code).then(() => {
+        const orig = btn.textContent;
+        btn.textContent = '✓ Copied';
+        setTimeout(() => (btn.textContent = orig), 1500);
+      });
+    }
+
+    // Confetti burst
+    function confettiBurst() {
+      const canvas = document.getElementById('confetti-canvas');
+      if (!canvas) return;
+      canvas.style.display = 'block';
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const ctx = canvas.getContext('2d');
+      const colors = ['#c9a96e', '#1a1a2e', '#ffffff', '#fbbf24', '#ef4444'];
+      const parts = Array.from({ length: 140 }, () => ({
+        x: canvas.width / 2, y: canvas.height / 3,
+        vx: (Math.random() - 0.5) * 18,
+        vy: (Math.random() - 1) * 14,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        size: Math.random() * 6 + 3,
+        life: 100,
+      }));
+      let frames = 0;
+      function tick() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        parts.forEach((p) => {
+          p.x += p.vx; p.y += p.vy; p.vy += 0.4; p.life -= 1;
+          ctx.fillStyle = p.color;
+          ctx.fillRect(p.x, p.y, p.size, p.size);
+        });
+        frames++;
+        if (frames < 120) requestAnimationFrame(tick);
+        else { canvas.style.display = 'none'; ctx.clearRect(0, 0, canvas.width, canvas.height); }
+      }
+      tick();
+    }
+
+    // Populate already-revealed view
+    const existingLabel = document.getElementById('prize-label');
+    if (existingLabel) {
+      const tier = existingLabel.dataset.tier;
+      const info = PRIZE_LABELS[tier] || PRIZE_LABELS.small;
+      existingLabel.textContent = info.label;
+      document.getElementById('prize-desc').textContent = info.desc;
+      const cd = document.getElementById('countdown');
+      const tick = () => cd.textContent = fmtCountdown(cd.dataset.expires);
+      tick(); setInterval(tick, 60000);
+      document.getElementById('copy-btn')?.addEventListener('click', (e) => {
+        copyCode(e.target.closest('[data-code]')?.dataset.code || document.querySelector('.font-mono')?.textContent.trim(), e.target);
+      });
+    }
+
+    // Scratch interaction
+    const scratchBtn = document.getElementById('scratch-btn');
+    if (scratchBtn) {
+      scratchBtn.addEventListener('click', async () => {
+        scratchBtn.disabled = true;
+        const surface = document.getElementById('scratch-surface');
+        surface.style.transition = 'transform 0.4s';
+        surface.style.transform = 'scale(0.8) rotate(12deg)';
+        surface.style.opacity = '0';
+
+        try {
+          const res = await fetch('/api/rewards/reveal', { method: 'POST' });
+          const data = await res.json();
+          if (!data.ok || !data.reward) throw new Error(data.error || 'reveal failed');
+          const prize = data.reward;
+          const info = PRIZE_LABELS[prize.prize_tier] || PRIZE_LABELS.small;
+
+          setTimeout(() => {
+            scratchBtn.style.display = 'none';
+            const result = document.getElementById('reveal-result');
+            result.classList.remove('hidden');
+            document.getElementById('rv-label').textContent = info.label;
+            document.getElementById('rv-desc').textContent = info.desc;
+            document.getElementById('rv-code').textContent = prize.coupon_code;
+            const cd = document.getElementById('rv-countdown');
+            cd.dataset.expires = prize.expires_at;
+            const tick = () => cd.textContent = fmtCountdown(prize.expires_at);
+            tick(); setInterval(tick, 60000);
+            confettiBurst();
+            document.getElementById('rv-copy').addEventListener('click', (e) => copyCode(prize.coupon_code, e.target));
+          }, 400);
+        } catch (e) {
+          scratchBtn.disabled = false;
+          surface.style.transform = 'none';
+          surface.style.opacity = '1';
+          alert('Reveal failed. Try again in a moment.');
+          console.error(e);
+        }
+      });
+    }
+  </script>
+</BaseLayout>

@@ -1,5 +1,6 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
 
 const lang = (Astro.locals.lang ?? 'en') as string;
 const isEl = lang === 'el';
@@ -14,6 +15,41 @@ if (Astro.locals.session) {
   const next = Astro.url.searchParams.get('next') ?? '/community/board';
   return Astro.redirect(next);
 }
+
+// ── Social proof: recent signups for the toast ticker ─────────────────────
+// Fetch last 5 members; we render their first name + rough "joined X ago".
+const service = getServiceClient();
+const { data: recentMembers } = await service
+  .from('profiles')
+  .select('full_name, location, created_at')
+  .eq('role', 'member')
+  .order('created_at', { ascending: false })
+  .limit(5);
+
+function firstName(full: string | null): string {
+  if (!full) return 'A new member';
+  return full.split(' ')[0];
+}
+function agoLabel(iso: string): string {
+  const ms = Date.now() - new Date(iso).getTime();
+  const m = Math.floor(ms / 60000);
+  if (m < 1) return 'just now';
+  if (m < 60) return `${m}m ago`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `${h}h ago`;
+  return `${Math.floor(h / 24)}d ago`;
+}
+const tickerItems = (recentMembers ?? []).map((m: any) => ({
+  name: firstName(m.full_name),
+  where: m.location || 'Kefalonia',
+  ago: agoLabel(m.created_at),
+}));
+
+// Total community size for social proof headline.
+const { count: memberCount } = await service
+  .from('profiles')
+  .select('id', { count: 'exact', head: true })
+  .eq('role', 'member');
 ---
 
 <BaseLayout
@@ -24,8 +60,57 @@ if (Astro.locals.session) {
     <div class="max-w-md mx-auto px-4 text-center">
       <h1 class="text-3xl font-bold text-white mb-2">{isEl ? 'Κοινότητα Κεραμωτής' : isBg ? 'Общност Керамоти' : isSr ? 'Zajednica Keramoti' : isTr ? 'Keramoti Topluluğu' : isRo ? 'Comunitatea Keramoti' : 'Keramoti Community'}</h1>
       <p class="text-gray-300">{isEl ? 'Γίνε μέλος για να μοιραστείς, ρωτήσεις, ανακαλύψεις' : isBg ? 'Присъединете се, за да споделяте съвети, задавате въпроси, откривате местни съкровища' : isSr ? 'Pridruži se da deliš savete, postavljaš pitanja, otkrivaš lokalne dragulje' : isTr ? 'İpuçları paylaşmak, sorular sormak, yerel güzellikleri keşfetmek için katılın' : isRo ? 'Alătură-te pentru a distribui sfaturi, a pune întrebări, a descoperi comori locale' : 'Join to share tips, ask questions, discover local gems'}</p>
+
+      <!-- Reward hook -->
+      <div class="mt-6 inline-flex items-center gap-2 bg-[#c9a96e]/15 border border-[#c9a96e]/40 rounded-full px-4 py-2">
+        <span class="text-lg">🎁</span>
+        <span class="text-sm text-[#c9a96e] font-semibold">Every new member wins a welcome gift — €15 off, 10% off, free cleaning, or a free night</span>
+      </div>
+      {memberCount && memberCount > 0 && (
+        <p class="mt-3 text-xs text-gray-400">Join <strong class="text-white">{memberCount.toLocaleString()}</strong> members already inside</p>
+      )}
     </div>
   </section>
+
+  {tickerItems.length > 0 && (
+    <div id="signup-ticker" class="fixed bottom-4 left-4 right-4 sm:left-6 sm:right-auto sm:max-w-xs z-40 pointer-events-none">
+      <div id="ticker-toast" class="opacity-0 transition-all duration-500 transform translate-y-4 bg-white rounded-xl shadow-xl border border-gray-100 px-4 py-3 flex items-center gap-3">
+        <div class="w-9 h-9 rounded-full bg-[#c9a96e] text-white flex items-center justify-center font-semibold text-sm" id="ticker-avatar"></div>
+        <div class="flex-1 min-w-0">
+          <p class="text-sm text-gray-900"><strong id="ticker-name"></strong> joined</p>
+          <p class="text-xs text-gray-500"><span id="ticker-where"></span> · <span id="ticker-ago"></span></p>
+        </div>
+      </div>
+    </div>
+  )}
+
+  <script is:inline define:vars={{ tickerItems }}>
+    (function() {
+      if (!tickerItems || !tickerItems.length) return;
+      const toast = document.getElementById('ticker-toast');
+      const name = document.getElementById('ticker-name');
+      const where = document.getElementById('ticker-where');
+      const ago = document.getElementById('ticker-ago');
+      const avatar = document.getElementById('ticker-avatar');
+      let i = 0;
+      function show() {
+        const item = tickerItems[i % tickerItems.length];
+        name.textContent = item.name;
+        where.textContent = item.where;
+        ago.textContent = item.ago;
+        avatar.textContent = (item.name || '?')[0].toUpperCase();
+        toast.style.opacity = '1';
+        toast.style.transform = 'translateY(0)';
+        setTimeout(() => {
+          toast.style.opacity = '0';
+          toast.style.transform = 'translateY(1rem)';
+        }, 4500);
+        i++;
+      }
+      setTimeout(show, 2500);
+      setInterval(show, 9000);
+    })();
+  </script>
 
   <section class="max-w-md mx-auto px-4 py-10">
     <!-- Social Login -->
