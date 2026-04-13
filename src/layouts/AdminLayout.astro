@@ -97,6 +97,7 @@ const adminLabels: Record<string, Record<string, string>> = {
   rest_owners: { en: 'Restaurant Owners', el: 'Ιδιοκτήτες Εστιατορίων', bg: 'Собственици на ресторанти', sr: 'Власници ресторана', tr: 'Restoran Sahipleri', ro: 'Proprietari Restaurante' },
   banner:      { en: 'Banner',       el: 'Banner', bg: 'Банер', sr: 'Банер', tr: 'Banner', ro: 'Banner' },
   referrals:   { en: 'Referrals',    el: 'Παραπομπές', bg: 'Препоръки', sr: 'Препоруке', tr: 'Yönlendirmeler', ro: 'Referințe' },
+  marketing:   { en: 'Marketing',    el: 'Μάρκετινγκ', bg: 'Маркетинг', sr: 'Маркетинг', tr: 'Pazarlama', ro: 'Marketing' },
 };
 function al(key: string) { return adminLabels[key]?.[lang] ?? adminLabels[key]?.en ?? key; }
 
@@ -139,6 +140,7 @@ const navItems = isRestaurantOwner ? [
   { href: '/admin/community',   label: al('community'),     icon: '💬' },
   { href: '/admin/members',     label: al('members'),       icon: '👥' },
   { href: '/admin/qr-codes',    label: al('qr_codes'),      icon: '📱' },
+  { href: '/admin/marketing',   label: al('marketing'),     icon: '📣' },
   ...(isSuperAdmin ? [
     { href: '/admin/owners',              label: al('owners'),         icon: '🏘️' },
     { href: '/admin/restaurant-owners',   label: al('rest_owners'),    icon: '🍽️' },

@@ -1,0 +1,108 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../lib/supabase.ts';
+
+const profile = Astro.locals.profile!;
+if (!profile || !['admin', 'super_admin'].includes(profile.role)) return Astro.redirect('/admin');
+
+const service = getServiceClient();
+const since30d = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+
+const [campaignsRes, clicksRes, couponsRes] = await Promise.all([
+  service.from('marketing_campaigns').select('id, name, ref_code, channel, is_active', { count: 'exact' }).eq('is_active', true),
+  service.from('referral_clicks').select('id', { count: 'exact', head: true }).gte('created_at', since30d),
+  service.from('coupons').select('id', { count: 'exact', head: true }).eq('is_active', true),
+]);
+
+const activeCampaigns = campaignsRes.count ?? 0;
+const clicks30d = clicksRes.count ?? 0;
+const activeCoupons = couponsRes.count ?? 0;
+
+const tiles = [
+  {
+    href: '/admin/marketing/campaigns',
+    icon: '🎯',
+    title: 'Campaigns',
+    desc: 'Create ad campaigns with auto-generated ref codes, QR images, share links and click tracking.',
+    cta: 'Manage campaigns',
+    badge: `${activeCampaigns} active`,
+  },
+  {
+    href: '/admin/marketing/flyers',
+    icon: '🖨️',
+    title: 'Printable flyers',
+    desc: 'A4/A5 flyers per listing or campaign. Includes QR + welcome-gift CTA. Print-ready.',
+    cta: 'Open flyer studio',
+    badge: 'Print-ready',
+  },
+  {
+    href: '/admin/qr-codes',
+    icon: '📱',
+    title: 'QR Codes',
+    desc: 'Per-listing, per-restaurant and community QR codes. Print, place, scan.',
+    cta: 'Open QR studio',
+    badge: 'Existing tool',
+  },
+  {
+    href: '/admin/coupons',
+    icon: '🏷️',
+    title: 'Coupons',
+    desc: 'Discount codes for guests — fixed € or %, expiry, max-uses, listing-scoped.',
+    cta: 'Manage coupons',
+    badge: `${activeCoupons} active`,
+  },
+  {
+    href: '/admin/referrals',
+    icon: '🔗',
+    title: 'Referral analytics',
+    desc: 'Click attribution per ref code, top landing pages, ref-source bookings.',
+    cta: 'View analytics',
+    badge: `${clicks30d} clicks · 30d`,
+  },
+  {
+    href: '/admin/banner',
+    icon: '📢',
+    title: 'Site banner',
+    desc: 'Top-of-site announcement banner — flash sales, holiday hours, big news.',
+    cta: 'Edit banner',
+    badge: 'Super admin',
+  },
+];
+---
+
+<AdminLayout title="Marketing">
+  <p class="text-sm text-gray-500 mb-6">
+    All your acquisition tools in one place. Build a campaign, print a flyer, drop a QR — every link is auto-tracked into the referral analytics.
+  </p>
+
+  <!-- Quick-stat strip -->
+  <div class="grid grid-cols-3 gap-3 mb-8">
+    <div class="bg-white rounded-2xl border border-gray-100 p-4">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Active campaigns</p>
+      <p class="text-2xl font-bold text-gray-900 mt-1">{activeCampaigns}</p>
+    </div>
+    <div class="bg-white rounded-2xl border border-gray-100 p-4">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Clicks · last 30d</p>
+      <p class="text-2xl font-bold text-gray-900 mt-1">{clicks30d.toLocaleString()}</p>
+    </div>
+    <div class="bg-white rounded-2xl border border-gray-100 p-4">
+      <p class="text-xs text-gray-500 uppercase tracking-wide">Active coupons</p>
+      <p class="text-2xl font-bold text-gray-900 mt-1">{activeCoupons}</p>
+    </div>
+  </div>
+
+  <!-- Tile grid -->
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    {tiles.map((t) => (
+      <a href={t.href} class="bg-white rounded-2xl border border-gray-100 p-5 hover:border-[#c9a96e] hover:shadow-md transition-all group">
+        <div class="flex items-start justify-between mb-3">
+          <span class="text-3xl">{t.icon}</span>
+          <span class="text-[10px] uppercase tracking-wide bg-gray-100 text-gray-500 px-2 py-1 rounded-full font-semibold">{t.badge}</span>
+        </div>
+        <h3 class="font-semibold text-gray-900 mb-1 group-hover:text-[#c9a96e] transition-colors">{t.title}</h3>
+        <p class="text-sm text-gray-500 mb-4 leading-relaxed">{t.desc}</p>
+        <p class="text-sm text-[#c9a96e] font-semibold">{t.cta} →</p>
+      </a>
+    ))}
+  </div>
+</AdminLayout>

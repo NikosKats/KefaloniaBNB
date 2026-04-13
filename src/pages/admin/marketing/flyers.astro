@@ -1,0 +1,244 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+import qrcode from 'qrcode-generator';
+
+const profile = Astro.locals.profile!;
+if (!profile || !['admin', 'super_admin'].includes(profile.role)) return Astro.redirect('/admin');
+
+const service = getServiceClient();
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://kefaloniabnb.com';
+
+const url = Astro.url;
+const campaignId = url.searchParams.get('campaign');
+const listingId = url.searchParams.get('listing');
+const size = (url.searchParams.get('size') ?? 'a4') as 'a4' | 'a5';
+
+// Listings & campaigns for picker
+const [listingsRes, campaignsRes] = await Promise.all([
+  service.from('listings').select('id, slug, title, city, base_price, currency, listing_images(url, is_cover, sort_order)').eq('is_active', true).order('title'),
+  service.from('marketing_campaigns').select('id, name, ref_code, target_url, flyer_headline, flyer_subhead, flyer_offer, flyer_listing_id, channel, utm_source, utm_medium, utm_campaign').eq('is_active', true).order('created_at', { ascending: false }),
+]);
+
+const listings = listingsRes.data ?? [];
+const campaigns = campaignsRes.data ?? [];
+
+let selectedCampaign: any = null;
+let selectedListing: any = null;
+
+if (campaignId) selectedCampaign = campaigns.find((c: any) => c.id === campaignId) ?? null;
+if (listingId) {
+  selectedListing = listings.find((l: any) => l.id === listingId) ?? null;
+} else if (selectedCampaign?.flyer_listing_id) {
+  selectedListing = listings.find((l: any) => l.id === selectedCampaign.flyer_listing_id) ?? null;
+}
+
+function coverImage(l: any): string | null {
+  if (!l?.listing_images) return null;
+  const cover = l.listing_images.find((i: any) => i.is_cover);
+  if (cover) return cover.url;
+  const sorted = [...l.listing_images].sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
+  return sorted[0]?.url ?? null;
+}
+
+function buildTrackedUrl(c: any): string {
+  if (!c) return `${siteUrl}/community/join`;
+  const u = new URL(c.target_url, siteUrl);
+  u.searchParams.set('ref', c.ref_code);
+  if (c.utm_source) u.searchParams.set('utm_source', c.utm_source);
+  if (c.utm_medium) u.searchParams.set('utm_medium', c.utm_medium);
+  if (c.utm_campaign) u.searchParams.set('utm_campaign', c.utm_campaign);
+  return u.toString();
+}
+
+function qrSvg(url: string, sizePx = 320): string {
+  const qr = qrcode(0, 'H');     // High error-correction → tolerates print smudges
+  qr.addData(url);
+  qr.make();
+  const count = qr.getModuleCount();
+  const cell = sizePx / count;
+  const rects: string[] = [];
+  for (let y = 0; y < count; y++) {
+    for (let x = 0; x < count; x++) {
+      if (qr.isDark(y, x)) {
+        rects.push(`<rect x="${(x * cell).toFixed(2)}" y="${(y * cell).toFixed(2)}" width="${cell.toFixed(2)}" height="${cell.toFixed(2)}" fill="#1a1a2e"/>`);
+      }
+    }
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${sizePx}" height="${sizePx}" viewBox="0 0 ${sizePx} ${sizePx}"><rect width="${sizePx}" height="${sizePx}" fill="#fff"/>${rects.join('')}</svg>`;
+}
+
+const trackedUrl = buildTrackedUrl(selectedCampaign);
+const qrMarkup = qrSvg(trackedUrl, 320);
+
+const headline = selectedCampaign?.flyer_headline
+  || (selectedListing ? `Stay at ${selectedListing.title}` : 'Stay in Kefalonia. Skip the booking fees.');
+const subhead = selectedCampaign?.flyer_subhead
+  || 'Direct booking · local hosts · scratch a welcome gift';
+const offer = selectedCampaign?.flyer_offer || '🎁 Sign up & reveal a welcome gift';
+
+const cover = coverImage(selectedListing);
+const isA5 = size === 'a5';
+---
+
+<AdminLayout title="Printable flyers">
+  <!-- Toolbar (hidden in print) -->
+  <div class="bg-white rounded-2xl border border-gray-100 p-4 mb-6 print:hidden">
+    <form method="GET" class="flex flex-wrap items-end gap-3">
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">Campaign</label>
+        <select name="campaign" class="px-3 py-2 border border-gray-200 rounded-lg text-sm">
+          <option value="">— None (generic) —</option>
+          {campaigns.map((c: any) => <option value={c.id} selected={campaignId === c.id}>{c.name} · {c.ref_code}</option>)}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">Listing</label>
+        <select name="listing" class="px-3 py-2 border border-gray-200 rounded-lg text-sm">
+          <option value="">— Auto / generic —</option>
+          {listings.map((l: any) => <option value={l.id} selected={listingId === l.id}>{l.title}</option>)}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">Size</label>
+        <select name="size" class="px-3 py-2 border border-gray-200 rounded-lg text-sm">
+          <option value="a4" selected={size === 'a4'}>A4</option>
+          <option value="a5" selected={size === 'a5'}>A5</option>
+        </select>
+      </div>
+      <button type="submit" class="bg-[#1a1a2e] text-white px-5 py-2.5 rounded-lg font-semibold text-sm hover:bg-[#2d2d4e]">Preview</button>
+      <button type="button" onclick="window.print()" class="bg-[#c9a96e] text-white px-5 py-2.5 rounded-lg font-semibold text-sm hover:opacity-90">🖨️ Print / Save PDF</button>
+      <a href="/admin/marketing" class="text-sm text-gray-500 hover:text-gray-900 ml-auto">← Back to Marketing</a>
+    </form>
+    <p class="text-xs text-gray-500 mt-3">
+      Tracked URL: <code class="bg-gray-100 px-2 py-0.5 rounded">{trackedUrl}</code>
+    </p>
+  </div>
+
+  <!-- Flyer canvas -->
+  <div class={`flyer-page mx-auto bg-white shadow-lg ${isA5 ? 'flyer-a5' : 'flyer-a4'}`}>
+    <div class="flyer-inner">
+      <!-- Header -->
+      <div class="flyer-header">
+        <p class="flyer-brand">KefaloniaBNB</p>
+        <p class="flyer-tag">Direct booking · Keramoti, Kefalonia</p>
+      </div>
+
+      {cover && (
+        <div class="flyer-hero" style={`background-image: url('${cover}');`}></div>
+      )}
+
+      <div class="flyer-body">
+        <h1 class="flyer-headline">{headline}</h1>
+        <p class="flyer-subhead">{subhead}</p>
+
+        <div class="flyer-offer">
+          <span>{offer}</span>
+        </div>
+
+        <div class="flyer-qr-row">
+          <div class="flyer-qr" set:html={qrMarkup}></div>
+          <div class="flyer-qr-text">
+            <p class="flyer-qr-instruct"><strong>Scan to book direct</strong></p>
+            <p class="flyer-qr-url">{trackedUrl.replace(/^https?:\/\//, '')}</p>
+            {selectedListing && (
+              <p class="flyer-listing-meta">{selectedListing.title}{selectedListing.city ? ` · ${selectedListing.city}` : ''}{selectedListing.base_price ? ` · from €${selectedListing.base_price}/night` : ''}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div class="flyer-footer">
+        <p>kefaloniabnb.com</p>
+        {selectedCampaign && <p class="flyer-ref">ref · {selectedCampaign.ref_code}</p>}
+      </div>
+    </div>
+  </div>
+</AdminLayout>
+
+<style>
+  /* On-screen preview matches print proportions */
+  .flyer-page { color: #1a1a2e; }
+  .flyer-a4 { width: 210mm; min-height: 297mm; }
+  .flyer-a5 { width: 148mm; min-height: 210mm; }
+
+  .flyer-inner {
+    padding: 18mm 16mm;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+  .flyer-header { text-align: center; margin-bottom: 8mm; }
+  .flyer-brand { font-size: 22pt; font-weight: 700; color: #1a1a2e; margin: 0; letter-spacing: -0.5px; }
+  .flyer-tag { font-size: 9pt; color: #888; margin: 2mm 0 0; }
+
+  .flyer-hero {
+    width: 100%;
+    height: 70mm;
+    background-size: cover;
+    background-position: center;
+    border-radius: 4mm;
+    margin-bottom: 8mm;
+  }
+
+  .flyer-body { flex: 1; }
+  .flyer-headline { font-size: 26pt; font-weight: 800; line-height: 1.1; margin: 0 0 4mm; color: #1a1a2e; }
+  .flyer-subhead { font-size: 12pt; color: #555; margin: 0 0 8mm; }
+
+  .flyer-offer {
+    background: #fefce8;
+    border: 2px dashed #c9a96e;
+    border-radius: 4mm;
+    padding: 5mm 6mm;
+    text-align: center;
+    margin-bottom: 8mm;
+  }
+  .flyer-offer span { font-size: 14pt; font-weight: 700; color: #1a1a2e; }
+
+  .flyer-qr-row {
+    display: flex;
+    align-items: center;
+    gap: 8mm;
+    margin-top: auto;
+    padding-top: 6mm;
+    border-top: 1px solid #e5e7eb;
+  }
+  .flyer-qr { width: 38mm; height: 38mm; flex-shrink: 0; }
+  .flyer-qr :global(svg) { width: 100%; height: 100%; }
+  .flyer-qr-text { flex: 1; }
+  .flyer-qr-instruct { font-size: 12pt; margin: 0 0 1mm; }
+  .flyer-qr-url { font-size: 9pt; color: #888; margin: 0 0 2mm; font-family: 'Courier New', monospace; word-break: break-all; }
+  .flyer-listing-meta { font-size: 10pt; color: #555; margin: 0; }
+
+  .flyer-footer {
+    margin-top: 4mm;
+    text-align: center;
+    font-size: 8pt;
+    color: #999;
+    border-top: 1px solid #e5e7eb;
+    padding-top: 2mm;
+  }
+  .flyer-footer p { margin: 0.5mm 0; }
+  .flyer-ref { font-family: 'Courier New', monospace; }
+
+  /* On-screen: scale down so the page fits a 1024px-ish admin canvas */
+  @media screen {
+    .flyer-page {
+      transform-origin: top center;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.12);
+    }
+    .flyer-a4 { transform: scale(0.7); margin-bottom: -90mm; }
+    .flyer-a5 { transform: scale(0.85); margin-bottom: -32mm; }
+  }
+
+  /* Print: hide everything but the flyer */
+  @media print {
+    @page { size: A4; margin: 0; }
+    body { background: #fff; }
+    /* Hide admin chrome */
+    :global(aside), :global(header), :global(.print\:hidden) { display: none !important; }
+    :global(.flex.h-screen), :global(.flex-1.flex.flex-col) { display: block !important; height: auto !important; overflow: visible !important; }
+    .flyer-page { box-shadow: none; transform: none; margin: 0; }
+  }
+</style>

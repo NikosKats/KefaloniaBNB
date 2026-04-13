@@ -1,0 +1,302 @@
+---
+import AdminLayout from '../../../layouts/AdminLayout.astro';
+import { getServiceClient } from '../../../lib/supabase.ts';
+import qrcode from 'qrcode-generator';
+
+const profile = Astro.locals.profile!;
+if (!profile || !['admin', 'super_admin'].includes(profile.role)) return Astro.redirect('/admin');
+
+const service = getServiceClient();
+const siteUrl = import.meta.env.PUBLIC_SITE_URL ?? 'https://kefaloniabnb.com';
+
+// Listings dropdown for "tied to listing"
+const { data: listings } = await service
+  .from('listings')
+  .select('id, title, slug')
+  .eq('is_active', true)
+  .order('title');
+
+// All campaigns (most recent first)
+const { data: campaigns } = await service
+  .from('marketing_campaigns')
+  .select('id, name, ref_code, channel, target_url, description, is_active, created_at, flyer_listing_id, utm_source, utm_medium, utm_campaign')
+  .order('created_at', { ascending: false });
+
+// Click counts per ref_code (last 90d) — joins to existing referral_clicks tracking.
+const since = new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString();
+const { data: clicks } = await service
+  .from('referral_clicks')
+  .select('ref_code')
+  .gte('created_at', since);
+
+const clicksByCode: Record<string, number> = {};
+for (const r of clicks ?? []) {
+  const c = (r as any).ref_code;
+  if (!c) continue;
+  clicksByCode[c] = (clicksByCode[c] ?? 0) + 1;
+}
+
+// Conversion (bookings with ref_source matching our codes)
+const { data: bookings } = await service
+  .from('bookings')
+  .select('ref_source, total_price, status')
+  .not('ref_source', 'is', null);
+
+const conversionsByCode: Record<string, { bookings: number; revenue: number }> = {};
+for (const b of bookings ?? []) {
+  const code = (b as any).ref_source;
+  if (!code) continue;
+  if (!conversionsByCode[code]) conversionsByCode[code] = { bookings: 0, revenue: 0 };
+  conversionsByCode[code].bookings += 1;
+  if ((b as any).status !== 'cancelled') conversionsByCode[code].revenue += Number((b as any).total_price ?? 0);
+}
+
+function qrSvg(url: string, size = 200): string {
+  const qr = qrcode(0, 'M');
+  qr.addData(url);
+  qr.make();
+  const count = qr.getModuleCount();
+  const cell = size / count;
+  const rects: string[] = [];
+  for (let y = 0; y < count; y++) {
+    for (let x = 0; x < count; x++) {
+      if (qr.isDark(y, x)) {
+        rects.push(`<rect x="${(x * cell).toFixed(2)}" y="${(y * cell).toFixed(2)}" width="${cell.toFixed(2)}" height="${cell.toFixed(2)}" fill="#1a1a2e"/>`);
+      }
+    }
+  }
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}"><rect width="${size}" height="${size}" fill="#fff"/>${rects.join('')}</svg>`;
+}
+
+function buildTrackedUrl(c: any): string {
+  const u = new URL(c.target_url, siteUrl);
+  u.searchParams.set('ref', c.ref_code);
+  if (c.utm_source) u.searchParams.set('utm_source', c.utm_source);
+  if (c.utm_medium) u.searchParams.set('utm_medium', c.utm_medium);
+  if (c.utm_campaign) u.searchParams.set('utm_campaign', c.utm_campaign);
+  return u.toString();
+}
+
+const enriched = (campaigns ?? []).map((c: any) => {
+  const trackedUrl = buildTrackedUrl(c);
+  return {
+    ...c,
+    trackedUrl,
+    qr: qrSvg(trackedUrl, 220),
+    clicks: clicksByCode[c.ref_code] ?? 0,
+    bookings: conversionsByCode[c.ref_code]?.bookings ?? 0,
+    revenue: conversionsByCode[c.ref_code]?.revenue ?? 0,
+  };
+});
+
+const channelOptions = [
+  { value: 'flyer',   label: '🖨️ Printed flyer' },
+  { value: 'qr',      label: '📱 QR placement' },
+  { value: 'social',  label: '📣 Social media' },
+  { value: 'email',   label: '✉️ Email' },
+  { value: 'print',   label: '📰 Print ad' },
+  { value: 'partner', label: '🤝 Partner placement' },
+  { value: 'other',   label: 'Other' },
+];
+
+function fmtDate(d: string) { return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); }
+function fmtEur(n: number) { return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n); }
+---
+
+<AdminLayout title="Campaigns">
+  <div class="flex items-center justify-between flex-wrap gap-3 mb-6">
+    <p class="text-sm text-gray-500">{enriched.length} campaign{enriched.length === 1 ? '' : 's'} · clicks &amp; revenue from last 90 days</p>
+    <a href="/admin/marketing" class="text-sm text-gray-500 hover:text-gray-900">← Back to Marketing</a>
+  </div>
+
+  <!-- New campaign form -->
+  <details class="bg-white rounded-2xl border border-gray-100 p-5 mb-8" open={enriched.length === 0}>
+    <summary class="font-semibold text-gray-900 cursor-pointer flex items-center gap-2">
+      <span class="text-xl">➕</span> New campaign
+    </summary>
+
+    <form id="campaign-form" class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-5">
+      <div class="md:col-span-2">
+        <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">Name</label>
+        <input name="name" required placeholder="e.g. Spring 2026 Lithostroto Flyer" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1a1a2e]" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">Channel</label>
+        <select name="channel" required class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1a1a2e]">
+          {channelOptions.map((o) => <option value={o.value}>{o.label}</option>)}
+        </select>
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">Target URL (where the link goes)</label>
+        <input name="target_url" required value={`${siteUrl}/community/join`} class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1a1a2e] font-mono" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">UTM source <span class="text-gray-400 normal-case">(optional)</span></label>
+        <input name="utm_source" placeholder="instagram" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1a1a2e] font-mono" />
+      </div>
+      <div>
+        <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">UTM medium <span class="text-gray-400 normal-case">(optional)</span></label>
+        <input name="utm_medium" placeholder="paid_social" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1a1a2e] font-mono" />
+      </div>
+      <div class="md:col-span-2">
+        <label class="block text-xs font-semibold text-gray-700 uppercase mb-1">Internal note</label>
+        <input name="description" placeholder="Targeting Italian families · 200 print copies dropped at the harbour kiosk" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1a1a2e]" />
+      </div>
+
+      <fieldset class="md:col-span-2 border border-dashed border-gray-200 rounded-lg p-4">
+        <legend class="text-xs font-semibold text-gray-500 uppercase px-2">Flyer copy <span class="text-gray-400 normal-case">(optional · enables print preview)</span></legend>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
+          <div class="md:col-span-2">
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Headline</label>
+            <input name="flyer_headline" placeholder="Stay in Kefalonia. Skip the booking fees." class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1a1a2e]" />
+          </div>
+          <div class="md:col-span-2">
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Subhead</label>
+            <input name="flyer_subhead" placeholder="Direct booking · local hosts · scratch a welcome gift" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1a1a2e]" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Offer / CTA</label>
+            <input name="flyer_offer" value="🎁 Sign up & reveal a welcome gift" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1a1a2e]" />
+          </div>
+          <div>
+            <label class="block text-xs font-semibold text-gray-700 mb-1">Tied to listing</label>
+            <select name="flyer_listing_id" class="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#1a1a2e]">
+              <option value="">— None (generic flyer) —</option>
+              {(listings ?? []).map((l: any) => <option value={l.id}>{l.title}</option>)}
+            </select>
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="md:col-span-2 flex items-center gap-3">
+        <button type="submit" class="bg-[#1a1a2e] text-white px-6 py-3 rounded-lg font-semibold text-sm hover:bg-[#2d2d4e] transition-colors">Create campaign</button>
+        <p id="form-msg" class="text-sm hidden"></p>
+      </div>
+    </form>
+  </details>
+
+  <!-- Campaign list -->
+  {enriched.length === 0 ? (
+    <div class="text-center py-20 text-gray-400">
+      <p class="text-4xl mb-3">📣</p>
+      <p class="font-medium">No campaigns yet</p>
+      <p class="text-sm mt-1">Create your first campaign above.</p>
+    </div>
+  ) : (
+    <div class="space-y-4">
+      {enriched.map((c: any) => (
+        <div class="bg-white rounded-2xl border border-gray-100 p-5">
+          <div class="flex flex-wrap items-start gap-5">
+            <!-- QR -->
+            <div class="shrink-0">
+              <div class="w-32 h-32 rounded-xl border border-gray-200 p-2" set:html={c.qr}></div>
+              <p class="text-[10px] text-gray-400 text-center mt-1.5 font-mono">{c.ref_code}</p>
+            </div>
+
+            <!-- Meta -->
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap mb-1">
+                <h3 class="font-semibold text-gray-900 text-lg">{c.name}</h3>
+                <span class="text-[10px] uppercase tracking-wide bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full font-semibold">{c.channel}</span>
+                {!c.is_active && <span class="text-[10px] uppercase tracking-wide bg-red-100 text-red-700 px-2 py-0.5 rounded-full font-semibold">Paused</span>}
+              </div>
+              <p class="text-xs text-gray-500 mb-3">Created {fmtDate(c.created_at)}{c.description ? ` · ${c.description}` : ''}</p>
+
+              <div class="flex flex-wrap gap-2 mb-3">
+                <a href={c.trackedUrl} target="_blank" rel="noopener" class="text-xs px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-700 font-mono truncate max-w-full">{c.trackedUrl}</a>
+                <button class="copy-btn text-xs px-3 py-1.5 rounded-lg bg-[#1a1a2e] text-white hover:bg-[#2d2d4e] font-semibold" data-copy={c.trackedUrl}>Copy link</button>
+                <a href={`https://wa.me/?text=${encodeURIComponent(c.trackedUrl)}`} target="_blank" rel="noopener" class="text-xs px-3 py-1.5 rounded-lg bg-[#25D366] text-white font-semibold hover:opacity-90">WhatsApp</a>
+                <a href={`https://twitter.com/intent/tweet?url=${encodeURIComponent(c.trackedUrl)}&text=${encodeURIComponent('Stay in Kefalonia 🏝️')}`} target="_blank" rel="noopener" class="text-xs px-3 py-1.5 rounded-lg bg-black text-white font-semibold hover:opacity-90">X / Twitter</a>
+                <a href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(c.trackedUrl)}`} target="_blank" rel="noopener" class="text-xs px-3 py-1.5 rounded-lg bg-[#1877F2] text-white font-semibold hover:opacity-90">Facebook</a>
+                <a href={`/admin/marketing/flyers?campaign=${c.id}`} class="text-xs px-3 py-1.5 rounded-lg bg-[#c9a96e] text-white font-semibold hover:opacity-90">🖨️ Open flyer</a>
+              </div>
+
+              <div class="grid grid-cols-3 gap-3 max-w-md">
+                <div class="bg-gray-50 rounded-lg p-3 text-center">
+                  <p class="text-[10px] text-gray-500 uppercase tracking-wide">Clicks · 90d</p>
+                  <p class="text-xl font-bold text-gray-900">{c.clicks}</p>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-3 text-center">
+                  <p class="text-[10px] text-gray-500 uppercase tracking-wide">Bookings</p>
+                  <p class="text-xl font-bold text-gray-900">{c.bookings}</p>
+                </div>
+                <div class="bg-gray-50 rounded-lg p-3 text-center">
+                  <p class="text-[10px] text-gray-500 uppercase tracking-wide">Revenue</p>
+                  <p class="text-xl font-bold text-[#c9a96e]">{fmtEur(c.revenue)}</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="shrink-0 flex flex-col gap-2">
+              <button class="toggle-btn text-xs px-3 py-2 rounded-lg border border-gray-200 hover:border-gray-400 font-semibold" data-id={c.id} data-active={c.is_active}>
+                {c.is_active ? 'Pause' : 'Resume'}
+              </button>
+              <button class="delete-btn text-xs px-3 py-2 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 font-semibold" data-id={c.id}>Delete</button>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+
+  <script is:inline>
+    document.getElementById('campaign-form')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const form = e.target;
+      const fd = new FormData(form);
+      const body = Object.fromEntries(fd.entries());
+      const msg = document.getElementById('form-msg');
+      msg.classList.remove('hidden', 'text-red-500', 'text-green-600');
+      msg.textContent = 'Creating…';
+      try {
+        const res = await fetch('/api/admin/marketing/campaigns', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || 'Failed');
+        msg.textContent = `✓ Created · ref code ${data.ref_code}`;
+        msg.classList.add('text-green-600');
+        setTimeout(() => location.reload(), 700);
+      } catch (err) {
+        msg.textContent = '✗ ' + (err.message || 'Failed');
+        msg.classList.add('text-red-500');
+      }
+    });
+
+    document.querySelectorAll('.copy-btn').forEach((b) => {
+      b.addEventListener('click', (e) => {
+        const url = e.target.dataset.copy;
+        navigator.clipboard.writeText(url).then(() => {
+          const orig = e.target.textContent;
+          e.target.textContent = '✓ Copied';
+          setTimeout(() => (e.target.textContent = orig), 1500);
+        });
+      });
+    });
+
+    document.querySelectorAll('.toggle-btn').forEach((b) => {
+      b.addEventListener('click', async (e) => {
+        const id = e.target.dataset.id;
+        const active = e.target.dataset.active === 'true';
+        const res = await fetch(`/api/admin/marketing/campaigns?id=${id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ is_active: !active }),
+        });
+        if (res.ok) location.reload();
+      });
+    });
+
+    document.querySelectorAll('.delete-btn').forEach((b) => {
+      b.addEventListener('click', async (e) => {
+        if (!confirm('Delete this campaign? Click history is preserved separately.')) return;
+        const id = e.target.dataset.id;
+        const res = await fetch(`/api/admin/marketing/campaigns?id=${id}`, { method: 'DELETE' });
+        if (res.ok) location.reload();
+      });
+    });
+  </script>
+</AdminLayout>
